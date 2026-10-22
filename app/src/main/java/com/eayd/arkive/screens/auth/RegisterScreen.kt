@@ -16,6 +16,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eayd.arkive.viewmodel.AuthUiState
@@ -31,6 +32,9 @@ fun RegisterScreen(
     val uiState by viewModel.uiState.collectAsState()
     val emailCheck by viewModel.emailCheck.collectAsState()
     val loading = uiState is AuthUiState.Loading
+    // Google ile kayıt yeni hesap açtıysa sözleşme onay bekliyor demektir (aşağıdaki pencere).
+    val eulaPending = uiState is AuthUiState.EulaRequired
+    val context = LocalContext.current
     val rules = viewModel.passwordRules
 
     // Şifre kutusuna tıklanınca ya da içinde yazı varsa kurallar gösterilir.
@@ -77,8 +81,13 @@ fun RegisterScreen(
             onClick = viewModel::register,
         )
         Spacer(Modifier.height(12.dp))
-        // Google ile kayıt da yeni hesap açar; sözleşme onayı burada da şarttır.
-        GoogleSignInButton("Google ile Kayıt Ol", enabled = !loading && eulaAccepted, onResult = viewModel::loginWithGoogle)
+        // Google ile kayıt için kutuyu işaretlemek gerekmez: yeni hesap açılırsa sözleşme o anda gösterilir.
+        // Kutu zaten işaretliyse sözleşme tekrar sorulmaz.
+        GoogleSignInButton(
+            label = "Google ile Kayıt Ol",
+            enabled = !loading && !eulaPending,
+            onResult = { viewModel.loginWithGoogle(it, eulaAlreadyAccepted = eulaAccepted) },
+        )
         Spacer(Modifier.height(12.dp))
         TextButton(onClick = onNavigateToLogin) { Text("Zaten hesabın var mı? Giriş yap") }
     }
@@ -90,6 +99,13 @@ fun RegisterScreen(
                 eulaAccepted = true
                 showEula = false
             },
+        )
+    }
+
+    if (eulaPending) {
+        EulaDialog(
+            onDismiss = { viewModel.declineEula(context) },
+            onAccept = viewModel::acceptEula,
         )
     }
 }

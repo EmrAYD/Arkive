@@ -22,6 +22,7 @@ object AppSettings {
     private const val PREFS_NAME = "arkive_settings"
     private const val KEY_THEME = "theme_mode"
     private const val KEY_WIFI_ONLY = "wifi_only"
+    private const val KEY_PENDING_EULA_UID = "pending_eula_uid"
 
     private lateinit var prefs: SharedPreferences
 
@@ -57,6 +58,17 @@ object AppSettings {
         _themeMode.value = mode
         prefs.edit().putString(KEY_THEME, mode.name).apply()
     }
+
+    /**
+     * Google ile yeni açılan ama Kullanıcı Sözleşmesi'ni henüz onaylamamış hesabın kimliği (yoksa null).
+     * Sözleşme penceresi açıkken uygulama kapanırsa, bir sonraki açılışta bu hesap onaysız sayılıp silinir;
+     * silme başarısız olursa işaret kalır ve aynı hesapla tekrar girilince sözleşme yine sorulur.
+     */
+    var pendingEulaUid: String?
+        get() = prefs.getString(KEY_PENDING_EULA_UID, null)
+        set(value) {
+            prefs.edit().apply { if (value == null) remove(KEY_PENDING_EULA_UID) else putString(KEY_PENDING_EULA_UID, value) }.commit()
+        }
 
     fun setWifiOnly(enabled: Boolean) {
         _wifiOnly.value = enabled

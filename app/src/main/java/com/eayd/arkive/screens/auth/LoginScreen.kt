@@ -11,6 +11,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eayd.arkive.viewmodel.AuthUiState
@@ -28,6 +29,8 @@ fun LoginScreen(
     val emailCheck by viewModel.emailCheck.collectAsState()
     val passwordResetState by viewModel.passwordResetState.collectAsState()
     val loading = uiState is AuthUiState.Loading
+    val eulaPending = uiState is AuthUiState.EulaRequired
+    val context = LocalContext.current
 
     NavigateOnSuccess(uiState, onLoginSuccess, viewModel::resetState)
 
@@ -70,8 +73,21 @@ fun LoginScreen(
             onClick = viewModel::login,
         )
         Spacer(Modifier.height(12.dp))
-        GoogleSignInButton("Google ile Giriş Yap", enabled = !loading, onResult = viewModel::loginWithGoogle)
+        GoogleSignInButton(
+            label = "Google ile Giriş Yap",
+            enabled = !loading && !eulaPending,
+            onResult = { viewModel.loginWithGoogle(it) },
+        )
         Spacer(Modifier.height(12.dp))
         TextButton(onClick = onNavigateToRegister) { Text("Hesabın yok mu? Kayıt ol") }
+    }
+
+    // Google ile ilk kez giren (yeni hesap açılan) kullanıcıya sözleşme gösterilir. Kapatmak = kabul etmemek:
+    // az önce açılan hesap silinir.
+    if (eulaPending) {
+        EulaDialog(
+            onDismiss = { viewModel.declineEula(context) },
+            onAccept = viewModel::acceptEula,
+        )
     }
 }

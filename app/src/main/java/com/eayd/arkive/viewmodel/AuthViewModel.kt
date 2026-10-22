@@ -7,6 +7,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.utils.clearGoogleCredentialState
 import com.eayd.arkive.utils.toAuthErrorMessage
 import com.google.firebase.auth.AuthResult
@@ -28,6 +29,9 @@ sealed interface AuthUiState {
     data object Loading : AuthUiState
     data object Unauthenticated : AuthUiState
     data object Success : AuthUiState
+
+    /** Google ile yeni hesap açıldı; Kullanıcı Sözleşmesi onaylanana kadar ana ekrana geçilmez. */
+    data object EulaRequired : AuthUiState
     data class Error(val message: String) : AuthUiState
 }
 
@@ -115,7 +119,16 @@ class AuthViewModel : ViewModel() {
     // --- Oturum -------------------------------------------------------------------------------------
 
     fun checkAuthStatus() {
-        _uiState.value = if (auth.currentUser != null) AuthUiState.Success else AuthUiState.Unauthenticated
+        val user = auth.currentUser
+        if (user != null && AppSettings.pendingEulaUid == user.uid) {
+            // Sözleşme penceresi açıkken uygulama kapanmış: onaylanmamış hesap kullanıma açılmaz.
+            viewModelScope.launch {
+                discardUnacceptedAccount()
+                _uiState.value = AuthUiState.Unauthenticated
+            }
+            return
+        }
+        _uiState.value = if (user != null) AuthUiState.Success else AuthUiState.Unauthenticated
     }
 
     fun resetState() {
@@ -148,8 +161,14 @@ class AuthViewModel : ViewModel() {
         ) { auth.signInWithEmailAndPassword(email, password).await() }
     }
 
-    /** [idToken] null ise Google penceresi iptal edilmiş ya da başarısız olmuş demektir. */
-    fun loginWithGoogle(idToken: String?) {
+    /**
+     * [idToken] null ise Google penceresi iptal edilmiş ya da başarısız olmuş demektir.
+     *
+     * Bu giriş yeni bir hesap açarsa ve [eulaAlreadyAccepted] false ise durum [AuthUiState.EulaRequired] olur;
+     * ekran sözleşmeyi gösterir, sonucu [acceptEula] ya da [declineEula] ile bildirir. Kayıt ekranı sözleşmeyi
+     * zaten onaylattığı için true gönderir.
+     */
+    fun loginWithGoogle(idToken: String?, eulaAlreadyAccepted: Boolean = false) {
         if (idToken == null) {
             _uiState.value = AuthUiState.Error("Google ile giriş işlemi iptal edildi veya başarısız oldu.")
             return
@@ -157,21 +176,77 @@ class AuthViewModel : ViewModel() {
         authenticate(
             failure = "Google girişi başarısız. Lütfen tekrar deneyin.",
             noUser = "Google girişi başarısız oldu",
+            eulaRequiredForNewUser = !eulaAlreadyAccepted,
         ) { auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await() }
     }
 
-    /** Üç giriş yolunun ortak akışı: yükleniyor → sonuç (başarı ya da Türkçe hata mesajı). */
-    private fun authenticate(failure: String, noUser: String, call: suspend () -> AuthResult) {
+    /**
+     * Üç giriş yolunun ortak akışı: yükleniyor → sonuç (başarı ya da Türkçe hata mesajı).
+     * [eulaRequiredForNewUser] true iken yeni açılan (ya da önceden onaysız kalmış) hesap için başarı yerine
+     * [AuthUiState.EulaRequired] döner.
+     */
+    private fun authenticate(
+        failure: String,
+        noUser: String,
+        eulaRequiredForNewUser: Boolean = false,
+        call: suspend () -> AuthResult,
+    ) {
         _uiState.value = AuthUiState.Loading
         viewModelScope.launch {
             try {
-                _uiState.value = if (call().user == null) AuthUiState.Error(noUser) else AuthUiState.Success
+                val result = call()
+                val user = result.user
+                _uiState.value = when {
+                    user == null -> AuthUiState.Error(noUser)
+                    eulaRequiredForNewUser &&
+                        (result.additionalUserInfo?.isNewUser == true || AppSettings.pendingEulaUid == user.uid) -> {
+                        AppSettings.pendingEulaUid = user.uid
+                        AuthUiState.EulaRequired
+                    }
+                    else -> AuthUiState.Success
+                }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 _uiState.value = AuthUiState.Error(e.toAuthErrorMessage(failure))
             }
         }
+    }
+
+    /** Kullanıcı Sözleşmesi onaylandı: Google ile açılan yeni hesap kullanıma açılır. */
+    fun acceptEula() {
+        AppSettings.pendingEulaUid = null
+        _uiState.value = AuthUiState.Success
+    }
+
+    /** Kullanıcı Sözleşmesi reddedildi: az önce açılan hesap silinir, oturum kapatılır, giriş ekranında kalınır. */
+    fun declineEula(context: Context) {
+        val appContext = context.applicationContext
+        _uiState.value = AuthUiState.Loading
+        viewModelScope.launch {
+            discardUnacceptedAccount()
+            clearGoogleCredentialState(appContext)
+            _uiState.value = AuthUiState.Error("Sözleşmeyi kabul etmediğiniz için hesap oluşturulmadı.")
+        }
+    }
+
+    /**
+     * Sözleşmeyi onaylamamış hesabı Firebase'den siler ve oturumu kapatır. Silme başarısız olursa (ör. bağlantı yok)
+     * oturum yine kapatılır ama [AppSettings.pendingEulaUid] işareti kalır; aynı hesapla tekrar girilince sözleşme
+     * yeniden sorulur.
+     */
+    private suspend fun discardUnacceptedAccount() {
+        var deleted = true
+        try {
+            auth.currentUser?.delete()?.await()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            deleted = false
+            e.printStackTrace()
+        }
+        auth.signOut()
+        if (deleted) AppSettings.pendingEulaUid = null
     }
 
     /**
