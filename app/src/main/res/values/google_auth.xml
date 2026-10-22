@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Google ile giriş için Firebase projesindeki Web client ID -->
+    <string name="google_web_client_id" translatable="false">1080695114808-bm16dv2s87ntsi52njtjtmv4sr0v3tgp.apps.googleusercontent.com</string>
+</resources>
