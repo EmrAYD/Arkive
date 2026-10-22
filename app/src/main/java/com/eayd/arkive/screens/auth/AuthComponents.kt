@@ -1,6 +1,7 @@
 package com.eayd.arkive.screens.auth
 
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
@@ -8,10 +9,13 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
@@ -55,27 +59,37 @@ import kotlinx.coroutines.launch
 /** Gradyan arka plan, logo, karşılama metni ve [title] başlığı; altına formun içeriği gelir. */
 @Composable
 fun AuthScreenLayout(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(
+    // İçerik kısa ekranlarda ve klavye açıkken kaydırılabilir; yeterli yer varsa eskisi gibi ortalanır.
+    BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
             .arkiveGradientBackground() // status bar / nav bar arkasına kadar uzanır
-            .safeDrawingPadding()       // içerik sistem çubuklarının ve klavyenin altında kalmaz
-            .padding(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
+            .safeDrawingPadding(),      // içerik sistem çubuklarının ve klavyenin altında kalmaz
     ) {
-        Icon(
-            painter = painterResource(id = R.drawable.logo),
-            contentDescription = "Arkive Logosu",
-            modifier = Modifier.size(192.dp),
-            tint = Color.Unspecified,
-        )
-        Spacer(Modifier.height(12.dp))
-        Text("Arkive'e hoşgeldiniz!", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
-        Spacer(Modifier.height(24.dp))
-        Text(title, style = MaterialTheme.typography.headlineMedium)
-        Spacer(Modifier.height(24.dp))
-        content()
+        val minHeight = maxHeight
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(min = minHeight)
+                    .padding(24.dp),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center,
+            ) {
+                Icon(
+                    painter = painterResource(id = R.drawable.logo),
+                    contentDescription = "Arkive Logosu",
+                    modifier = Modifier.size(192.dp),
+                    tint = Color.Unspecified,
+                )
+                Spacer(Modifier.height(12.dp))
+                Text("Arkive'e hoşgeldiniz!", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
+                Spacer(Modifier.height(24.dp))
+                Text(title, style = MaterialTheme.typography.headlineMedium)
+                Spacer(Modifier.height(24.dp))
+                content()
+            }
+        }
     }
 }
 

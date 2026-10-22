@@ -12,6 +12,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
@@ -35,6 +36,10 @@ fun RegisterScreen(
     // Şifre kutusuna tıklanınca ya da içinde yazı varsa kurallar gösterilir.
     var passwordFocused by remember { mutableStateOf(false) }
 
+    // Kullanıcı Sözleşmesi: kutu yalnızca sözleşme sonuna kadar okunup onaylanınca işaretlenir (EulaDialog).
+    var eulaAccepted by rememberSaveable { mutableStateOf(false) }
+    var showEula by rememberSaveable { mutableStateOf(false) }
+
     NavigateOnSuccess(uiState, onRegisterSuccess, viewModel::resetState)
 
     AuthScreenLayout(title = "Kayıt Ol") {
@@ -55,19 +60,36 @@ fun RegisterScreen(
             }
         }
 
-        Spacer(Modifier.height(20.dp))
+        Spacer(Modifier.height(12.dp))
+        EulaConsentRow(
+            accepted = eulaAccepted,
+            onOpen = { showEula = true },
+            onWithdraw = { eulaAccepted = false },
+        )
+        Spacer(Modifier.height(12.dp))
         AuthErrorText(uiState)
 
         // Kayıt düğmesi sadece kurallar sağlandığında aktif olur.
         AuthSubmitButton(
             label = "Kayıt Ol",
             loading = loading,
-            enabled = emailCheck == EmailCheck.Valid && rules.allMet,
+            enabled = emailCheck == EmailCheck.Valid && rules.allMet && eulaAccepted,
             onClick = viewModel::register,
         )
         Spacer(Modifier.height(12.dp))
-        GoogleSignInButton("Google ile Kayıt Ol", enabled = !loading, onResult = viewModel::loginWithGoogle)
+        // Google ile kayıt da yeni hesap açar; sözleşme onayı burada da şarttır.
+        GoogleSignInButton("Google ile Kayıt Ol", enabled = !loading && eulaAccepted, onResult = viewModel::loginWithGoogle)
         Spacer(Modifier.height(12.dp))
         TextButton(onClick = onNavigateToLogin) { Text("Zaten hesabın var mı? Giriş yap") }
+    }
+
+    if (showEula) {
+        EulaDialog(
+            onDismiss = { showEula = false },
+            onAccept = {
+                eulaAccepted = true
+                showEula = false
+            },
+        )
     }
 }
