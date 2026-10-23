@@ -8,7 +8,6 @@ import androidx.credentials.GetCredentialRequest
 import com.eayd.arkive.BuildConfig
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
-import com.google.firebase.auth.FirebaseUser
 import kotlin.coroutines.cancellation.CancellationException
 
 suspend fun getGoogleIdToken(context: Context): String? {
@@ -56,15 +55,4 @@ suspend fun clearGoogleCredentialState(context: Context) {
     } catch (e: Exception) {
         e.printStackTrace()
     }
-}
-
-/**
- * Kullanıcıya gösterilecek ad: görünen ad, yoksa e-posta, o da yoksa "Kullanıcı".
- * Cihazda önbellekten geri yüklenen kullanıcılarda null yerine boş metin ("") gelebildiği için isNullOrBlank
- * kullanılır (elvis operatörü yalnızca null'da bir sonrakine düşer).
- */
-fun FirebaseUser.resolvedName(): String = when {
-    !displayName.isNullOrBlank() -> displayName!!
-    !email.isNullOrBlank() -> email!!
-    else -> "Kullanıcı"
 }

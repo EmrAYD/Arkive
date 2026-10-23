@@ -9,7 +9,6 @@ import com.google.gson.annotations.SerializedName
 data class MeResponse(
     val id: String,
     val email: String?,
-    val name: String?,
     @SerializedName("used_storage") val usedStorage: Long,
     @SerializedName("plan_name") val planName: String,
     @SerializedName("storage_limit") val storageLimit: Long,

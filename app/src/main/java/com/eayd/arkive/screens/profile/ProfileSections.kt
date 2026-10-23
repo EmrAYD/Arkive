@@ -49,26 +49,19 @@ import com.eayd.arkive.viewmodel.StorageInfo
 // Profil ekranının bölümleri. Bu dosyadaki bileşenler yalnızca verilen değerleri çizer; durum ProfileViewModel'dedir.
 
 
-/** Sayfanın başındaki büyük profil simgesi, ad ve e-posta. */
+/** Sayfanın başındaki büyük profil simgesi ve e-posta. */
 @Composable
-internal fun ProfileHeader(name: String, email: String?) {
+internal fun ProfileHeader(email: String?) {
     Column(
         modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
-        ProfileAvatar(name, size = 84.dp)
-        Spacer(Modifier.height(12.dp))
-        Text(
-            text = name,
-            style = MaterialTheme.typography.headlineSmall,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
-        )
-        if (!email.isNullOrBlank() && email != name) {
+        ProfileAvatar(email.orEmpty(), size = 84.dp)
+        if (!email.isNullOrBlank()) {
+            Spacer(Modifier.height(12.dp))
             Text(
                 text = email,
-                style = MaterialTheme.typography.bodyMedium,
-                color = MaterialTheme.colorScheme.outline,
+                style = MaterialTheme.typography.headlineSmall,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )

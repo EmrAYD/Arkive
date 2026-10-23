@@ -2,7 +2,6 @@ package com.eayd.arkive.viewmodel
 
 import androidx.lifecycle.ViewModel
 import com.eayd.arkive.data.ApiClient
-import com.eayd.arkive.utils.resolvedName
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -27,21 +26,22 @@ data class StorageInfo(
 
 /** Ana ekranın yan menüsü ve profil düğmesi için gereken bilgiler. */
 data class HomeUiState(
-    val userName: String,
+    /** Oturumdaki kullanıcının e-postası (profil simgesi için); uygulama kullanıcı adı tutmaz. */
+    val userEmail: String,
     val isLoading: Boolean = true,
     val storage: StorageInfo? = null,
     val error: String? = null,
 )
 
 /**
- * Ana ekranın durumu: giriş yapmış kullanıcının adı ve yan menüdeki "kalan kullanım" bilgisi (GET /me).
+ * Ana ekranın durumu: giriş yapmış kullanıcının e-postası ve yan menüdeki "kalan kullanım" bilgisi (GET /me).
  * Menü her açıldığında [refresh] çağrılır; böylece dosya yükleyip sildikçe değer güncel kalır.
  */
 class HomeViewModel : ViewModel() {
 
     private val _state = MutableStateFlow(
         FirebaseAuth.getInstance().currentUser.let { user ->
-            HomeUiState(userName = user?.resolvedName() ?: "Kullanıcı")
+            HomeUiState(userEmail = user?.email.orEmpty())
         }
     )
     val state: StateFlow<HomeUiState> = _state.asStateFlow()

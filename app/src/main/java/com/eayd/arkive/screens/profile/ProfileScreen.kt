@@ -98,7 +98,7 @@ fun ProfileScreen(
                 modifier = Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
                 verticalArrangement = Arrangement.spacedBy(20.dp),
             ) {
-                ProfileHeader(state.name, state.email)
+                ProfileHeader(state.email)
 
                 AccountSection(
                     email = state.email,

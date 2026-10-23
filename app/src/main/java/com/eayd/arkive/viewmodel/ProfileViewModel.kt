@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.eayd.arkive.data.ApiClient
 import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.data.ThemeMode
-import com.eayd.arkive.utils.resolvedName
 import com.eayd.arkive.utils.toAuthErrorMessage
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
@@ -32,7 +31,6 @@ sealed interface ProfileDialog {
 }
 
 data class ProfileUiState(
-    val name: String,
     val email: String?,
     /** E-posta + şifreyle açılmış hesap. Google ile giriş yapanların şifresi Google'dadır; burada değiştirilemez. */
     val hasPassword: Boolean,
@@ -57,7 +55,7 @@ private fun Throwable.toPasswordChangeMessage(): String = when {
 }
 
 /**
- * Profil ekranının durumu: oturumdaki kullanıcının adı/e-postası (Firebase), planı ve sınırları (GET /me),
+ * Profil ekranının durumu: oturumdaki kullanıcının e-postası (Firebase), planı ve sınırları (GET /me),
  * çöp kutusu saklama süresi ayarı (PATCH /me) ve şifre değiştirme (Firebase).
  */
 class ProfileViewModel : ViewModel() {
@@ -67,7 +65,6 @@ class ProfileViewModel : ViewModel() {
     private val _state = MutableStateFlow(
         auth.currentUser.let { user ->
             ProfileUiState(
-                name = user?.resolvedName() ?: "Kullanıcı",
                 email = user?.email,
                 hasPassword = user?.providerData?.any { it.providerId == EmailAuthProvider.PROVIDER_ID } == true,
             )

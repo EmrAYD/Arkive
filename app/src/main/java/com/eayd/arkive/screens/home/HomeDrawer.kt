@@ -184,10 +184,10 @@ private fun StorageSection(
     }
 }
 
-/** Adın ilk harfini gösteren yuvarlak simge (üst çubuktaki profil düğmesi ve profil sayfasının başlığı). */
+/** E-postanın ilk harfini gösteren yuvarlak simge (üst çubuktaki profil düğmesi ve profil sayfasının başlığı). */
 @Composable
-internal fun ProfileAvatar(name: String, size: Dp = 42.dp) {
-    val initial = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+internal fun ProfileAvatar(email: String, size: Dp = 42.dp) {
+    val initial = email.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
     Box(
         modifier = Modifier
             .size(size)
@@ -206,6 +206,6 @@ internal fun ProfileAvatar(name: String, size: Dp = 42.dp) {
 
 /** Üst çubuktaki profil düğmesi; basınca profil sayfası açılır. */
 @Composable
-internal fun ProfileButton(userName: String, onClick: () -> Unit) {
-    IconButton(onClick = onClick) { ProfileAvatar(userName) }
+internal fun ProfileButton(email: String, onClick: () -> Unit) {
+    IconButton(onClick = onClick) { ProfileAvatar(email) }
 }

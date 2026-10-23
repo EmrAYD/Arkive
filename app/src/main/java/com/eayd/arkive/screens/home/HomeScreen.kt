@@ -111,7 +111,7 @@ fun HomeScreen(
                             }
                         },
                         actions = {
-                            ProfileButton(userName = state.userName, onClick = { showProfile = true })
+                            ProfileButton(email = state.userEmail, onClick = { showProfile = true })
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
                         // Sistem çubuğu boşluğunu yukarıdaki safeDrawingPadding zaten ayırdı; ikinci kez eklenmesin.
