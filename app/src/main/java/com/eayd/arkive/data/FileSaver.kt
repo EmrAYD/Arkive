@@ -6,6 +6,7 @@ import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
+import androidx.annotation.RequiresApi
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -35,6 +36,7 @@ object FileSaver {
             "İndirilenler/$SUBFOLDER klasörüne kaydedildi"
         }
 
+    @RequiresApi(Build.VERSION_CODES.Q)
     private suspend fun saveWithMediaStore(context: Context, url: String, fileName: String, mime: String) {
         val resolver = context.contentResolver
         val values = ContentValues().apply {
