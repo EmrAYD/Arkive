@@ -62,7 +62,7 @@ import com.eayd.arkive.viewmodel.fileKey
 import com.eayd.arkive.viewmodel.folderKey
 
 /**
- * Çöp kutusu. Normal modda: geri oku, başlık + öğe sayısı, sağda "Seç"; altında saklama süresini anlatan bilgi
+ * Çöp kutusu. Normal modda: geri oku, başlık + öğe sayısı, sağda "Boşalt" (kökte; onay sorar) ve "Seç"; altında saklama süresini anlatan bilgi
  * metni ve silinen öğeler (her birinde kalıcı silinmeye kalan gün). "Seç"e ya da bir öğeye basınca seçim modu
  * açılır: solda "Hepsi", ortada başlık, sağda "İptal"; öğelerde seçim daireleri; altta "Geri yükle" ve "Kalıcı sil".
  * Ekran yalnızca [TrashViewModel] durumunu çizer; seçim, geri yükleme ve silme ViewModel'dedir.
@@ -99,8 +99,12 @@ fun TrashScreen(
                     title = state.folderName ?: "Çöp kutusu",
                     subtitle = headerSubtitle(state, inFolder),
                     showSelect = !state.isLoading && state.itemCount > 0,
+                    // Tüm çöp kutusunu boşaltma yalnızca kökte; çöpteki bir klasörün içinde gösterilmez.
+                    showEmpty = !state.isLoading && state.itemCount > 0 && !inFolder,
+                    emptyEnabled = !state.busy,
                     onBack = onBack,
                     onSelect = viewModel::startSelecting,
+                    onEmpty = viewModel::askEmptyTrash,
                 )
             }
 
@@ -126,12 +130,25 @@ fun TrashScreen(
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
     }
 
+    if (state.confirmEmpty) {
+        ConfirmDialog(
+            title = "Çöp kutusu tamamen boşaltılsın mı?",
+            message = "Çöp kutusundaki ${state.itemCount} öğe (klasörlerin içindekilerle birlikte) çöp kutusundan ve " +
+                "depolama alanınızdan silinecek. Bu işlem geri alınamaz.",
+            confirmLabel = "Kalıcı olarak sil",
+            saving = state.busy,
+            error = null,
+            onConfirm = viewModel::emptyTrash,
+            onDismiss = viewModel::dismissEmptyConfirm,
+        )
+    }
+
     if (state.confirmDelete) {
         ConfirmDialog(
             title = "${state.selection.count} öğe kalıcı olarak silinsin mi?",
             message = "Seçilen öğeler (klasörlerin içindekilerle birlikte) çöp kutusundan ve depolama alanınızdan " +
                 "silinecek. Bu işlem geri alınamaz.",
-            confirmLabel = "Kalıcı sil",
+            confirmLabel = "Kalıcı olarak sil",
             saving = state.busy,
             error = null,
             onConfirm = viewModel::deleteSelectedForever,
@@ -147,8 +164,11 @@ private fun TrashHeader(
     title: String,
     subtitle: String,
     showSelect: Boolean,
+    showEmpty: Boolean,
+    emptyEnabled: Boolean,
     onBack: () -> Unit,
     onSelect: () -> Unit,
+    onEmpty: () -> Unit,
 ) {
     Row(
         modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp),
@@ -169,6 +189,14 @@ private fun TrashHeader(
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )
+        }
+        if (showEmpty) {
+            // "Seç"in solunda: kırmızı, çünkü her şeyi kalıcı siler (önce onay penceresi açılır).
+            TextButton(
+                onClick = onEmpty,
+                enabled = emptyEnabled,
+                colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
+            ) { Text("Tümünü sil") }
         }
         if (showSelect) {
             TextButton(onClick = onSelect) { Text("Seç") }

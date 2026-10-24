@@ -103,4 +103,8 @@ interface ArkiveApi {
     /** Seçilenleri KALICI siler (geri alınamaz). */
     @POST("trash/delete")
     suspend fun deleteTrash(@Body body: TrashIdsRequest): TrashCountResponse
+
+    /** Çöp kutusunu tamamen boşaltır: içindeki her şeyi KALICI siler (geri alınamaz). */
+    @DELETE("trash")
+    suspend fun emptyTrash(): TrashCountResponse
 }

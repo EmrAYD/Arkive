@@ -32,6 +32,8 @@ data class TrashUiState(
     val busy: Boolean = false,
     /** "Kalıcı sil" onay penceresi açık mı. */
     val confirmDelete: Boolean = false,
+    /** "Çöp kutusunu boşalt" onay penceresi açık mı. */
+    val confirmEmpty: Boolean = false,
 ) {
     val itemCount: Int get() = files.size + folders.size
     val allKeys: Set<String>
@@ -136,6 +138,25 @@ class TrashViewModel(private val folderId: String? = null) : ViewModel() {
 
     fun dismissDeleteConfirm() = _state.update { it.copy(confirmDelete = false) }
 
+    // Çöp kutusunu boşaltma yalnızca kökte vardır (klasör içinde düğme gösterilmez).
+    fun askEmptyTrash() = _state.update { if (!isFolderView && it.itemCount > 0 && !it.busy) it.copy(confirmEmpty = true) else it }
+
+    fun dismissEmptyConfirm() = _state.update { it.copy(confirmEmpty = false) }
+
+    /** Çöp kutusundaki HER ŞEYİ kalıcı siler (DELETE /trash). */
+    fun emptyTrash() {
+        if (isFolderView || _state.value.busy) return
+        // "Boşalt"a basılır basılmaz onay penceresi kapanır; iş arka planda sürer, sonucu bildirim olarak gelir.
+        _state.update { it.copy(busy = true, confirmEmpty = false) }
+        launchCatching(
+            onError = { message -> _state.update { it.copy(busy = false, notice = message) } },
+        ) {
+            ApiClient.api.emptyTrash()
+            _state.update { it.copy(busy = false, selection = Selection(), notice = "Çöp kutusu boşaltıldı") }
+            fetch(showSpinner = false)
+        }
+    }
+
     /** Seçilenleri özgün yerlerine geri yükler. */
     fun restoreSelected() = perform(
         call = { ApiClient.api.restoreTrash(it) },
@@ -153,15 +174,16 @@ class TrashViewModel(private val folderId: String? = null) : ViewModel() {
         val current = _state.value
         if (current.selection.count == 0 || current.busy) return
         val ids = TrashIdsRequest(fileIds = current.selection.fileIds, folderIds = current.selection.folderIds)
-        _state.update { it.copy(busy = true) }
+        // "Kalıcı sil"e basılır basılmaz onay penceresi kapanır (confirmDelete = false); düğmeler busy ile kilitlenir.
+        _state.update { it.copy(busy = true, confirmDelete = false) }
         launchCatching(
-            onError = { message -> _state.update { it.copy(busy = false, confirmDelete = false, notice = message) } },
+            onError = { message -> _state.update { it.copy(busy = false, notice = message) } },
         ) {
             call(ids)
             // Sunucunun döndürdüğü sayı klasörlerin içindekileri de kapsar; kullanıcıya seçtiği kadarını söyleriz.
             val chosen = ids.fileIds.size + ids.folderIds.size
             _state.update {
-                it.copy(busy = false, confirmDelete = false, selection = Selection(), notice = success(chosen))
+                it.copy(busy = false, selection = Selection(), notice = success(chosen))
             }
             fetch(showSpinner = false)
         }

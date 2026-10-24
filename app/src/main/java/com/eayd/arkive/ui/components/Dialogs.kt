@@ -63,7 +63,7 @@ fun ConfirmDialog(
                 Text(confirmLabel, color = MaterialTheme.colorScheme.error)
             }
         },
-        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("Vazgeç") } },
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("İptal") } },
     )
 }
 
@@ -129,7 +129,7 @@ fun NameDialog(
                 onClick = { onConfirm(trimmed, color) },
             ) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("Vazgeç") } },
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("İptal") } },
     )
 }
 
