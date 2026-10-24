@@ -3,11 +3,14 @@ package com.eayd.arkive.viewmodel
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.eayd.arkive.data.ApiClient
+import com.eayd.arkive.data.FileSaver
 import com.eayd.arkive.data.NetworkPolicy
 import com.eayd.arkive.utils.toApiErrorMessage
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -31,11 +34,27 @@ fun ViewModel.launchCatching(onError: (String) -> Unit = {}, block: suspend () -
         }
     }
 
-/** Dosya için kısa süreli indirme adresi ister; gelince [onUrl], olmazsa [onError] çağrılır. */
-fun ViewModel.requestDownloadUrl(fileId: String, onUrl: (String) -> Unit, onError: (String) -> Unit) {
-    launchCatching(onError) {
-        NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa indirme başlatılmaz
-        onUrl(ApiClient.api.getDownloadUrl(fileId).url)
+// İndirmeler ekrandan bağımsız sürsün diye uygulama genelinde bir kapsamda çalışır: kullanıcı indirme sürerken
+// başka ekrana geçse de (ViewModel yok olsa da) dosya kaydedilmeye devam eder. Uygulama kapanınca zaten biter.
+private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
+
+/**
+ * Dosyayı uygulama içinden indirip cihazın İndirilenler klasörüne kaydeder (tarayıcı açılmaz).
+ * İlerleme ve sonuç [notify] ile kısa bildirim olarak iletilir.
+ */
+fun saveFileToDevice(fileId: String, fileName: String, mimeType: String?, notify: (String) -> Unit) {
+    downloadScope.launch {
+        try {
+            NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa indirme başlatılmaz
+            notify("“$fileName” indiriliyor…")
+            val url = ApiClient.api.getDownloadUrl(fileId).url
+            val where = FileSaver.saveToDownloads(url, fileName, mimeType)
+            notify("“$fileName” $where")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            notify(e.toApiErrorMessage())
+        }
     }
 }
 

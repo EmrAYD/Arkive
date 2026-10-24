@@ -181,9 +181,6 @@ class PreviewViewModel(
         _notice.value = message
     }
 
-    /** "İndir / başka uygulamada aç" için taze bir adres ister; gelince [onUrl] çağrılır. */
-    fun requestExternalUrl(onUrl: (String) -> Unit) = requestDownloadUrl(fileId, onUrl, ::showNotice)
-
     fun openDialog(dialog: PreviewDialog) {
         if (dialog == PreviewDialog.Info) storage.ensureLoaded()
         dialogs.open(dialog)

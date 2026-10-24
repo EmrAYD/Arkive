@@ -41,6 +41,6 @@ internal fun NoPreviewMessage(file: FileDto, reason: String, onOpenExternally: (
         Spacer(Modifier.height(12.dp))
         Text(reason, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
         Spacer(Modifier.height(20.dp))
-        Button(onClick = onOpenExternally) { Text("İndir / başka uygulamada aç") }
+        Button(onClick = onOpenExternally) { Text("İndir") }
     }
 }

@@ -33,11 +33,3 @@ fun Context.openNotificationSettings(): Boolean = try {
 } catch (e: ActivityNotFoundException) {
     false
 }
-
-/**
- * İndirme adresini açar; açacak uygulama yoksa [onFailure] kullanıcıya gösterilecek mesajla çağrılır.
- * Liste ve ön izleme ekranlarındaki "İndir" aynı kuralı kullanır.
- */
-fun Context.openDownload(url: String, onFailure: (String) -> Unit) {
-    if (!openUrl(url)) onFailure("Dosyayı açacak bir uygulama bulunamadı.")
-}

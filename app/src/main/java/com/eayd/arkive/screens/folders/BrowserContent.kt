@@ -32,7 +32,7 @@ import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.ui.components.CenteredHint
 import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.NoticeEffect
-import com.eayd.arkive.utils.openDownload
+import com.eayd.arkive.ui.components.rememberFileDownloader
 import com.eayd.arkive.viewmodel.BrowserDialog
 import com.eayd.arkive.viewmodel.BrowserUiState
 import com.eayd.arkive.viewmodel.BrowserViewModel
@@ -58,6 +58,7 @@ fun BrowserContent(
     val selection = state.selection
     val snackbar = remember { SnackbarHostState() }
     val context = LocalContext.current
+    val startDownload = rememberFileDownloader(viewModel::showNotice)
     val listState = rememberLazyListState()
     val dragState = remember { FileDragState() }
 
@@ -137,7 +138,8 @@ fun BrowserContent(
                     onOpenFile = onOpenFile,
                     onDownload = { file ->
                         // Dosyaya dokunmak ön izleme ekranını açar; bu yalnızca menüdeki "İndir" içindir.
-                        viewModel.requestDownload(file) { url -> context.openDownload(url, viewModel::showNotice) }
+                        // Uygulama içinden İndirilenler klasörüne kaydedilir (tarayıcı açılmaz).
+                        startDownload(file.id, file.name, file.mimeType)
                     },
                 )
             }

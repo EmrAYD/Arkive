@@ -2,6 +2,7 @@ package com.eayd.arkive.data
 
 import java.io.ByteArrayOutputStream
 import java.io.File
+import java.io.OutputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withContext
@@ -54,6 +55,23 @@ object FileDownloader {
                                 }
                             }
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    /** Dosyanın tamamını [output]'a yazar (kaydetmek için). [output]'u çağıran kapatır. İptal edilirse durur. */
+    suspend fun copyTo(url: String, output: OutputStream) {
+        get(url) { body ->
+            withContext(Dispatchers.IO) {
+                body.byteStream().use { input ->
+                    val buffer = ByteArray(64 * 1024)
+                    while (true) {
+                        ensureActive()
+                        val n = input.read(buffer)
+                        if (n < 0) break
+                        output.write(buffer, 0, n)
                     }
                 }
             }

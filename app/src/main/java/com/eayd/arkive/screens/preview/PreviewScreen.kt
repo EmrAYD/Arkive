@@ -45,7 +45,7 @@ import com.eayd.arkive.ui.components.MoveFolderDialog
 import com.eayd.arkive.ui.components.NameDialog
 import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.ui.components.TrashedFileActionsMenu
-import com.eayd.arkive.utils.openDownload
+import com.eayd.arkive.ui.components.rememberFileDownloader
 import com.eayd.arkive.viewmodel.PreviewContent
 import com.eayd.arkive.viewmodel.PreviewDialog
 import com.eayd.arkive.viewmodel.PreviewState
@@ -76,8 +76,12 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
     // Dosya silinince ön izlenecek bir şey kalmaz: listeye dön.
     LaunchedEffect(deleted) { if (deleted) onBack() }
 
-    // Tarayıcıda/indirme yöneticisinde açar; yedek yol (ön izleme desteklenmeyen dosyalar için de bu).
-    val openExternally = { viewModel.requestExternalUrl { url -> context.openDownload(url, viewModel::showNotice) } }
+    // Uygulama içinden İndirilenler klasörüne kaydeder (tarayıcı açılmaz); ön izleme desteklenmeyen dosyalar için de bu.
+    val startDownload = rememberFileDownloader(viewModel::showNotice)
+    val download = {
+        (state as? PreviewState.Ready)?.file?.let { f -> startDownload(f.id, f.name, f.mimeType) }
+        Unit
+    }
 
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         TopAppBar(
@@ -98,14 +102,14 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
                             TrashedFileActionsMenu(
                                 expanded = menuOpen,
                                 onDismiss = { menuOpen = false },
-                                onDownload = openExternally,
+                                onDownload = download,
                                 onInfo = { viewModel.openDialog(PreviewDialog.Info) },
                             )
                         } else {
                             FileActionsMenu(
                                 expanded = menuOpen,
                                 onDismiss = { menuOpen = false },
-                                onDownload = openExternally,
+                                onDownload = download,
                                 onMove = { viewModel.openDialog(PreviewDialog.Move) },
                                 onRename = { viewModel.openDialog(PreviewDialog.Rename) },
                                 onInfo = { viewModel.openDialog(PreviewDialog.Info) },
@@ -136,7 +140,7 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
 
                 is PreviewState.Error -> ErrorRetry(s.message, viewModel::load, Modifier.align(Alignment.Center))
 
-                is PreviewState.Ready -> PreviewContentView(s.file, s.content, openExternally)
+                is PreviewState.Ready -> PreviewContentView(s.file, s.content, download)
             }
 
             SnackbarHost(
@@ -152,15 +156,15 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
 
 /** Dosyanın türüne uygun görüntüleyiciyi seçer. */
 @Composable
-private fun PreviewContentView(file: FileDto, content: PreviewContent, openExternally: () -> Unit) {
+private fun PreviewContentView(file: FileDto, content: PreviewContent, download: () -> Unit) {
     when (content) {
         is PreviewContent.Image -> ZoomableImage(content.bitmap, file.name)
         is PreviewContent.Pdf -> PdfViewer(content.doc)
         is PreviewContent.Text -> TextViewer(content.text, content.truncated)
         is PreviewContent.Media ->
-            if (content.isAudio) AudioPlayer(content.url, file, openExternally)
-            else VideoPlayer(content.url, file, openExternally)
-        is PreviewContent.NoPreview -> NoPreviewMessage(file, content.reason, openExternally)
+            if (content.isAudio) AudioPlayer(content.url, file, download)
+            else VideoPlayer(content.url, file, download)
+        is PreviewContent.NoPreview -> NoPreviewMessage(file, content.reason, download)
     }
 }
 

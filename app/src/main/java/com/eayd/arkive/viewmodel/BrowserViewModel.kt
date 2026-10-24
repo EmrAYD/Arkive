@@ -383,9 +383,6 @@ class BrowserViewModel(
         }
     }
 
-    /** Dosya için kısa süreli indirme adresi ister; gelince [onUrl] çağrılır, olmazsa hata bildirimi gösterilir. */
-    fun requestDownload(file: FileDto, onUrl: (String) -> Unit) = requestDownloadUrl(file.id, onUrl, ::showNotice)
-
     // --- Toplu işlemler ------------------------------------------------------------------------------
     // Öğelere sırayla uygulanır. Biri başarısız olsa da diğerleri denenir; sonunda liste her durumda sunucudan
     // yenilenir (işlenenler ekranda doğru görünsün). Başarısız olan olursa [BatchFailure] fırlatılır.
