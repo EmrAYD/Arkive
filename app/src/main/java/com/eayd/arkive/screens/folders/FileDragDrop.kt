@@ -45,7 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.ui.components.fileTypeIcon
-import com.eayd.arkive.ui.components.folderColorOrNull
+import com.eayd.arkive.ui.components.folderAccent
 import com.eayd.arkive.viewmodel.SelectedItems
 import kotlin.math.roundToInt
 
@@ -279,7 +279,7 @@ internal fun DragGhost(state: FileDragState) {
                     else -> Icons.AutoMirrored.Filled.DriveFileMove
                 },
                 contentDescription = null,
-                tint = singleFolder?.let { folderColorOrNull(it.color) } ?: MaterialTheme.colorScheme.primary,
+                tint = folderAccent(singleFolder?.color),
                 modifier = Modifier.size(24.dp),
             )
             Spacer(Modifier.width(12.dp))

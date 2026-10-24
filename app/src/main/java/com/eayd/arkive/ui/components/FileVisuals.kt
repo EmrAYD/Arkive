@@ -19,8 +19,11 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import androidx.core.graphics.ColorUtils
 import com.eayd.arkive.utils.FileKind
 import com.eayd.arkive.utils.fileKind
 
@@ -31,9 +34,49 @@ import com.eayd.arkive.utils.fileKind
 fun folderColorOrNull(hex: String?): Color? =
     hex?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
 
-/** Klasörün simge rengi: seçilmiş renk, yoksa tema rengi. */
+/** Bir klasör renginin açık ve koyu temadaki görünümü. */
+private class FolderTone(val light: Color, val dark: Color)
+
+/**
+ * Renk seçicideki her renk için temaya göre elle seçilmiş ton çifti. Sunucuda hep seçilen özgün renk
+ * ("#RRGGBB") saklanır; ekranda gösterilirken temaya göre bu çiftten biri kullanılır:
+ * açık temada (açık zemin) daha KOYU, koyu temada (koyu zemin) daha AÇIK ton. Anahtarlar büyük harfle yazılır.
+ */
+private val FolderTones: Map<String, FolderTone> = mapOf(
+    "#1E88E5" to FolderTone(light = Color(0xFF1879CE), dark = Color(0xFF5FAAED)),   // mavi
+    "#43A047" to FolderTone(light = Color(0xFF44A248), dark = Color(0xFF81CA84)),   // yeşil
+    "#FB8C00" to FolderTone(light = Color(0xFFE68000), dark = Color(0xFFFFB04D)),   // turuncu
+    "#E53935" to FolderTone(light = Color(0xFFCB1E1A), dark = Color(0xFFEB6461)),   // kırmızı
+    "#8E24AA" to FolderTone(light = Color(0xFF9E28BD), dark = Color(0xFFC86CE0)),   // mor
+    "#000000" to FolderTone(light = Color(0xFF000000), dark = Color(0xFFFFFFFF)),   // siyah / beyaz
+)
+
+/** Uygulama şu an koyu temada mı (kullanıcının seçtiği tema dahil; zeminin parlaklığına bakılır). */
 @Composable
-fun folderAccent(hex: String?): Color = folderColorOrNull(hex) ?: MaterialTheme.colorScheme.primary
+private fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
+
+/** Listede olmayan bir rengi temaya uydurur: açık temada koyulaştırır, koyu temada açar (tonu korur). */
+private fun adaptToTheme(color: Color, dark: Boolean): Color {
+    val hsl = FloatArray(3)
+    ColorUtils.colorToHSL(color.toArgb(), hsl)
+    hsl[2] = if (dark) maxOf(hsl[2], 0.72f) else minOf(hsl[2], 0.36f)
+    return Color(ColorUtils.HSLToColor(hsl))
+}
+
+/**
+ * Klasörün simge rengi: seçilmiş rengin temaya uygun tonu (açık temada koyu, koyu temada açık), renk yoksa tema rengi.
+ * Klasör simgesi çizen her yer bunu kullanmalı; ham renk için [folderColorOrNull].
+ */
+@Composable
+fun folderAccent(hex: String?): Color {
+    val base = folderColorOrNull(hex) ?: return MaterialTheme.colorScheme.primary
+    val dark = isDarkTheme()
+    val tone = FolderTones[hex?.uppercase()]
+    return when {
+        tone != null -> if (dark) tone.dark else tone.light
+        else -> adaptToTheme(base, dark)
+    }
+}
 
 /** Dosya türüne uygun simge. Sınıflandırma [fileKind] ile yapılır; tür adı ve ön izleme de aynısını kullanır. */
 fun fileTypeIcon(mimeType: String?): ImageVector = when (fileKind(mimeType)) {

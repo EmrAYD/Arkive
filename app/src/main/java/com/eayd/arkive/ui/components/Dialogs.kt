@@ -69,7 +69,7 @@ fun ConfirmDialog(
 
 // Klasör renk seçenekleri. null = renksiz (varsayılan tema rengi kullanılır).
 private val FolderColorChoices: List<String?> =
-    listOf(null, "#1E88E5", "#43A047", "#FB8C00", "#E53935", "#8E24AA", "#00897B")
+    listOf(null, "#1E88E5", "#43A047", "#FB8C00", "#E53935", "#8E24AA", "#000000")
 
 /**
  * Ad (ve istenirse renk) giriş penceresi: klasör oluşturma/düzenleme ve dosya yeniden adlandırma için ortak.
@@ -145,7 +145,7 @@ private fun ColorSwatches(current: String?, enabled: Boolean, onSelect: (String?
                 modifier = Modifier
                     .size(28.dp)
                     .clip(CircleShape)
-                    .background(folderColorOrNull(hex) ?: Color.Transparent)
+                    .background(if (hex == null) Color.Transparent else folderAccent(hex))
                     .border(
                         width = if (isSelected) 3.dp else 1.dp,
                         color = if (isSelected) MaterialTheme.colorScheme.onSurface
