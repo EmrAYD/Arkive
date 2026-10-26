@@ -23,6 +23,7 @@ object AppSettings {
     private const val KEY_THEME = "theme_mode"
     private const val KEY_WIFI_ONLY = "wifi_only"
     private const val KEY_PENDING_EULA_UID = "pending_eula_uid"
+    private const val KEY_AI_FILES = "ai_files"
 
     private lateinit var prefs: SharedPreferences
 
@@ -37,12 +38,20 @@ object AppSettings {
     private val _wifiOnly = MutableStateFlow(false)
     val wifiOnly: StateFlow<Boolean> = _wifiOnly.asStateFlow()
 
+    /**
+     * Yapay zeka düğmesi açık işaretlenmiş dosyaların kimlikleri. Şimdilik yalnızca bu cihazda tutulur
+     * (sunucuya gitmez); yapay zeka özellikleri gelince sunucu tarafına taşınabilir.
+     */
+    private val _aiFiles = MutableStateFlow<Set<String>>(emptySet())
+    val aiFiles: StateFlow<Set<String>> = _aiFiles.asStateFlow()
+
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         appContext = context.applicationContext
         prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         _themeMode.value = storedThemeMode(appContext)
         _wifiOnly.value = prefs.getBoolean(KEY_WIFI_ONLY, false)
+        _aiFiles.value = prefs.getStringSet(KEY_AI_FILES, emptySet())?.toSet() ?: emptySet()
     }
 
     /**
@@ -69,6 +78,14 @@ object AppSettings {
         set(value) {
             prefs.edit().apply { if (value == null) remove(KEY_PENDING_EULA_UID) else putString(KEY_PENDING_EULA_UID, value) }.commit()
         }
+
+    /** Dosyanın yapay zeka düğmesini açar/kapatır. */
+    fun toggleAiFile(fileId: String) {
+        val next = _aiFiles.value.let { if (fileId in it) it - fileId else it + fileId }
+        _aiFiles.value = next
+        // getStringSet'in döndürdüğü küme değiştirilmemeli: her seferinde yeni bir küme yazılır.
+        prefs.edit().putStringSet(KEY_AI_FILES, HashSet(next)).apply()
+    }
 
     fun setWifiOnly(enabled: Boolean) {
         _wifiOnly.value = enabled

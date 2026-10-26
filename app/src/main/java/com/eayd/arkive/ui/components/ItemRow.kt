@@ -112,14 +112,28 @@ fun ItemRow(
     }
 }
 
-/** Satırın sağındaki iki düğme: favori yıldızı ve "daha fazla" menüsü ([menu] açık/kapalı durumunu alır). */
+/**
+ * Satırın sağındaki düğmeler: (varsa) yapay zeka düğmesi, favori yıldızı ve "daha fazla" menüsü ([menu] açık/kapalı
+ * durumunu alır). Yapay zeka düğmesi yıldızın soluna konur; [ai] null ise (klasörlerde) hiç gösterilmez.
+ */
 @Composable
 fun RowScope.RowActions(
     favorite: Boolean,
     onToggleFavorite: () -> Unit,
+    ai: Boolean? = null,
+    onToggleAi: () -> Unit = {},
     menu: @Composable (expanded: Boolean, onDismiss: () -> Unit) -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
+    if (ai != null) {
+        IconButton(onClick = onToggleAi, modifier = Modifier.size(width = 36.dp, height = 48.dp)) {
+            Icon(
+                imageVector = if (ai) AiIcons.Filled else AiIcons.Outlined,
+                contentDescription = if (ai) "Yapay zekayı kapat" else "Yapay zekayı aç",
+                tint = MaterialTheme.colorScheme.primary,
+            )
+        }
+    }
     IconButton(onClick = onToggleFavorite) {
         Icon(
             imageVector = if (favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,

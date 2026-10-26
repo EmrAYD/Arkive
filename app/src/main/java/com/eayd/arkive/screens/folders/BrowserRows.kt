@@ -49,6 +49,7 @@ class FolderRowActions(
 
 class FileRowActions(
     val onToggleFavorite: () -> Unit,
+    val onToggleAi: () -> Unit,
     val onDownload: () -> Unit,
     val onMove: () -> Unit,
     val onRename: () -> Unit,
@@ -103,6 +104,7 @@ fun FileRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     dimmed: Boolean = false,   // sürüklenen dosyanın yerindeki satır soluk görünür
+    ai: Boolean = false,       // yapay zeka düğmesi açık mı
 ) {
     ItemRow(
         title = file.name,
@@ -116,7 +118,7 @@ fun FileRow(
             if (selectionMode) {
                 SelectionCheck(selected)
             } else {
-                RowActions(file.favorite, actions.onToggleFavorite) { expanded, dismiss ->
+                RowActions(file.favorite, actions.onToggleFavorite, ai = ai, onToggleAi = actions.onToggleAi) { expanded, dismiss ->
                     FileActionsMenu(
                         expanded = expanded,
                         onDismiss = dismiss,

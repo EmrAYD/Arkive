@@ -1,6 +1,11 @@
 package com.eayd.arkive.ui.components
 
 import android.graphics.Paint
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -16,6 +21,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.LazyGridState
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.lazy.itemsIndexed
@@ -30,6 +36,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -37,6 +45,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
@@ -46,6 +55,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import java.util.concurrent.ConcurrentHashMap
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 // Klasör için emoji seçimi: pencerede sık kullanılan birkaç emoji + "+" tuşu; "+" tam listeyi açar.
 
@@ -59,6 +71,27 @@ private sealed interface EmojiSlot {
 private const val SLOTS_PER_ROW = 6
 
 /**
+ * Hangi emojilerin cihazda çizilebildiği (Paint.hasGlyph). Her bölüm için bir kez, arka planda hesaplanıp saklanır;
+ * böylece "+" tuşuna basınca liste çoğunlukla hazırdır. Hazır değilse seçici iskelet (skeleton) gösterir.
+ */
+internal object EmojiAvailability {
+    private val cache = ConcurrentHashMap<Int, List<String>>()
+
+    fun cached(category: Int): List<String>? = cache[category]
+
+    suspend fun load(category: Int): List<String> =
+        cache[category] ?: withContext(Dispatchers.Default) {
+            val paint = Paint()
+            EmojiCategories[category].emojis.filter { paint.hasGlyph(it) }.also { cache[category] = it }
+        }
+
+    /** Tüm bölümleri sırayla hazırlar (ilk bölüm önce). */
+    suspend fun preloadAll() {
+        for (i in EmojiCategories.indices) load(i)
+    }
+}
+
+/**
  * Emoji seçimi satırları: "yok" kutusu, temel emojiler ve "+" (tüm emojiler). [current], temel listede olmayan
  * (tam listeden seçilmiş) bir emojiyse hızlı satırda da görünür. Seçili emojiye tekrar basmak seçimi kaldırır.
  * [onSelect]: seçilen emoji; null = emoji yok.
@@ -66,6 +99,8 @@ private const val SLOTS_PER_ROW = 6
 @Composable
 fun EmojiChoices(current: String?, enabled: Boolean, onSelect: (String?) -> Unit) {
     var showAll by remember { mutableStateOf(false) }
+    // Pencere görünür olur olmaz emoji listesini arka planda hazırla; "+" tuşuna basılınca bekleme olmasın.
+    LaunchedEffect(Unit) { EmojiAvailability.preloadAll() }
 
     val extra = current?.takeIf { it !in BasicFolderEmojis }
     val slots: List<EmojiSlot> = buildList {
@@ -157,9 +192,12 @@ private fun EmojiPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
             modifier = Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.78f),
         ) {
             var category by rememberSaveable { mutableStateOf(0) }
-            val paint = remember { Paint() }
-            // Her bölüm ilk açıldığında bir kez süzülür (yüzlerce hasGlyph çağrısı, anlık).
-            val emojis = remember(category) { EmojiCategories[category].emojis.filter { paint.hasGlyph(it) } }
+            // Süzülmüş liste arka planda hazırlanır; hazır değilken null (iskelet gösterilir), hazırsa anında gelir.
+            val emojis by produceState<List<String>?>(EmojiAvailability.cached(category), category) {
+                value = EmojiAvailability.cached(category)
+                value = EmojiAvailability.load(category)
+            }
+            val gridState = remember(category) { LazyGridState() }
 
             Column(Modifier.fillMaxWidth()) {
                 Row(
@@ -203,12 +241,16 @@ private fun EmojiPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
                 }
                 HorizontalDivider()
 
-                LazyVerticalGrid(
+                val loaded = emojis
+                if (loaded == null) {
+                    EmojiSkeletonGrid(Modifier.weight(1f).fillMaxWidth())
+                } else LazyVerticalGrid(
+                    state = gridState,
                     columns = GridCells.Adaptive(minSize = 46.dp),
                     modifier = Modifier.weight(1f).fillMaxWidth(),
                     contentPadding = PaddingValues(8.dp),
                 ) {
-                    items(emojis) { value ->
+                    items(loaded, contentType = { "emoji" }) { value ->
                         Box(
                             modifier = Modifier
                                 .height(46.dp)
@@ -219,6 +261,35 @@ private fun EmojiPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
                         ) { Text(value, fontSize = 26.sp) }
                     }
                 }
+            }
+        }
+    }
+}
+
+/** Liste hazırlanırken gösterilen yer tutucu ızgara: yumuşakça yanıp sönen daireler. */
+@Composable
+private fun EmojiSkeletonGrid(modifier: Modifier = Modifier) {
+    val pulse by rememberInfiniteTransition(label = "emojiSkeleton").animateFloat(
+        initialValue = 0.35f,
+        targetValue = 0.85f,
+        animationSpec = infiniteRepeatable(tween(700), RepeatMode.Reverse),
+        label = "emojiSkeletonAlpha",
+    )
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 46.dp),
+        modifier = modifier,
+        contentPadding = PaddingValues(8.dp),
+        userScrollEnabled = false,
+    ) {
+        items(80) {
+            Box(Modifier.height(46.dp), contentAlignment = Alignment.Center) {
+                Box(
+                    Modifier
+                        .size(30.dp)
+                        .alpha(pulse)
+                        .clip(CircleShape)
+                        .background(MaterialTheme.colorScheme.surfaceVariant),
+                )
             }
         }
     }

@@ -26,6 +26,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
 import com.eayd.arkive.data.FolderLocations
@@ -174,6 +175,7 @@ private fun BrowserList(
     onDownload: (FileDto) -> Unit,
 ) {
     val selection = state.selection
+    val aiFiles by AppSettings.aiFiles.collectAsState()
     LazyColumn(
         state = listState,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -218,12 +220,14 @@ private fun BrowserList(
                 modifier = Modifier.trackBounds(dragState.itemCoords, rowKey),
                 actions = FileRowActions(
                     onToggleFavorite = { viewModel.toggleFavorite(file) },
+                    onToggleAi = { AppSettings.toggleAiFile(file.id) },
                     onDownload = { onDownload(file) },
                     onMove = { viewModel.openDialog(BrowserDialog.MoveFile(file)) },
                     onRename = { viewModel.openDialog(BrowserDialog.RenameFile(file)) },
                     onInfo = { viewModel.openDialog(BrowserDialog.FileInfo(file)) },
                     onDelete = { viewModel.openDialog(BrowserDialog.DeleteFile(file)) },
                 ),
+                ai = file.id in aiFiles,
                 dimmed = dragState.dragged?.keys?.contains(rowKey) == true,
                 selectionMode = selection.active,
                 selected = rowKey in selection.keys,

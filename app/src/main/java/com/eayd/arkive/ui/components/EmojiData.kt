@@ -9,7 +9,7 @@ internal class EmojiCategory(val label: String, val icon: String, val emojis: Li
 
 /** Klasör penceresindeki hızlı seçim satırı: sık kullanılanlar. Hepsi için "+" tuşuyla tam liste açılır. */
 internal val BasicFolderEmojis: List<String> =
-    listOf("📁", "📚", "💼", "🏠", "📷", "🎵", "🎬", "⭐", "❤\uFE0F", "🎓")
+    listOf("💙", "📚", "💼", "💚", "📷", "🎵", "🎬", "⭐", "❤\uFE0F", "🎓")
 
 /** Boşlukla ayrılmış emoji dizisini listeye çevirir. */
 private fun emojiList(blob: String): List<String> = blob.split(' ').filter { it.isNotEmpty() }
