@@ -33,6 +33,8 @@ data class TrashFolderDto(
     val id: String,
     val name: String,
     val color: String?,
+    /** Klasör simgesinin ortasındaki emoji; yoksa null. */
+    val emoji: String? = null,
     @SerializedName("file_count") val fileCount: Int,
     val size: Long,
     @SerializedName("deleted_at") val deletedAt: String,
@@ -73,6 +75,7 @@ data class FolderDto(
     val name: String,
     val location: String,
     val color: String?,       // "#RRGGBB" ya da null (renk yok)
+    val emoji: String? = null,   // simgenin ortasındaki emoji ya da null (emoji yok)
     val favorite: Boolean,
     @SerializedName("created_at") val createdAt: String,
 )
@@ -82,6 +85,7 @@ data class CreateFolderRequest(
     @SerializedName("parent_id") val parentId: String? = null,
     val location: String? = null,   // yalnızca kök klasörde gönderilir; alt klasör üstünden devralır
     val color: String? = null,
+    val emoji: String? = null,
     val favorite: Boolean = false,
 )
 

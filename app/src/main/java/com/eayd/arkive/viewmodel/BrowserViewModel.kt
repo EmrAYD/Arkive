@@ -332,23 +332,25 @@ class BrowserViewModel(
         dialogs.open(dialog)
     }
 
-    fun createFolder(name: String, color: String?) = dialogs.submit {
+    fun createFolder(name: String, color: String?, emoji: String?) = dialogs.submit {
         ApiClient.api.createFolder(
             CreateFolderRequest(
                 name = name,
                 parentId = parentId,
                 location = if (parentId == null) location else null,
                 color = color,
+                emoji = emoji,
             )
         )
         reload()
     }
 
-    fun editFolder(folder: FolderDto, newName: String, newColor: String?) = dialogs.submit {
+    fun editFolder(folder: FolderDto, newName: String, newColor: String?, newEmoji: String?) = dialogs.submit {
         // Yalnızca gerçekten değişen alanlar gönderilir (PATCH = kısmi güncelleme).
         val fields = buildMap<String, Any?> {
             if (newName != folder.name) put("name", newName)
             if (newColor != folder.color) put("color", newColor)
+            if (newEmoji != folder.emoji) put("emoji", newEmoji)   // null = emojiyi sil (serializeNulls)
         }
         if (fields.isNotEmpty()) ApiClient.api.updateFolder(folder.id, fields)
         reload()

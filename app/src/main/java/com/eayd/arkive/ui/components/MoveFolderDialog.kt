@@ -120,14 +120,7 @@ fun MoveFolderDialog(
                                 PickerRow(
                                     enabled = !moving,
                                     onClick = { viewModel.open(folder) },
-                                    icon = {
-                                        Icon(
-                                            Icons.Filled.Folder,
-                                            contentDescription = null,
-                                            tint = folderAccent(folder.color),
-                                            modifier = Modifier.size(28.dp),
-                                        )
-                                    },
+                                    icon = { FolderIcon(folderAccent(folder.color), folder.emoji, 28.dp) },
                                     label = folder.name,
                                 )
                             }

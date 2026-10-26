@@ -135,7 +135,7 @@ fun TrashScreen(
             title = "Çöp kutusu tamamen boşaltılsın mı?",
             message = "Çöp kutusundaki ${state.itemCount} öğe (klasörlerin içindekilerle birlikte) çöp kutusundan ve " +
                 "depolama alanınızdan silinecek. Bu işlem geri alınamaz.",
-            confirmLabel = "Kalıcı olarak sil",
+            confirmLabel = "Boşalt",
             saving = state.busy,
             error = null,
             onConfirm = viewModel::emptyTrash,
@@ -148,7 +148,7 @@ fun TrashScreen(
             title = "${state.selection.count} öğe kalıcı olarak silinsin mi?",
             message = "Seçilen öğeler (klasörlerin içindekilerle birlikte) çöp kutusundan ve depolama alanınızdan " +
                 "silinecek. Bu işlem geri alınamaz.",
-            confirmLabel = "Kalıcı olarak sil",
+            confirmLabel = "Kalıcı sil",
             saving = state.busy,
             error = null,
             onConfirm = viewModel::deleteSelectedForever,
@@ -196,7 +196,7 @@ private fun TrashHeader(
                 onClick = onEmpty,
                 enabled = emptyEnabled,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text("Tümünü sil") }
+            ) { Text("Boşalt") }
         }
         if (showSelect) {
             TextButton(onClick = onSelect) { Text("Seç") }
@@ -279,7 +279,7 @@ private fun TrashList(
                 title = folder.name,
                 subtitle = if (folder.fileCount == 0) "Klasör" else "${folder.fileCount} dosya · ${formatBytes(folder.size)}",
                 daysLeft = folder.daysLeft.takeUnless { inFolder },   // klasörün içindekiler klasörle birlikte silindi: aynı gün sayısını tekrarlamaya gerek yok
-                icon = { FolderGlyph(folderAccent(folder.color)) },
+                icon = { FolderGlyph(folderAccent(folder.color), folder.emoji) },
                 selecting = selection.active,
                 selected = key in selection.keys,
                 onClick = { if (selection.active) viewModel.toggle(key) else onOpenFolder(folder.id) },

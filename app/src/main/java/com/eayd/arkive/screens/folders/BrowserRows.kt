@@ -69,7 +69,7 @@ fun FolderRow(
 ) {
     ItemRow(
         title = folder.name,
-        icon = { FolderGlyph(folderAccent(folder.color)) },
+        icon = { FolderGlyph(folderAccent(folder.color), folder.emoji) },
         onClick = onOpen,
         modifier = modifier,
         selected = selected,

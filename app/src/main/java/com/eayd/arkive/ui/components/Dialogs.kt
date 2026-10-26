@@ -11,7 +11,9 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -72,8 +74,8 @@ private val FolderColorChoices: List<String?> =
     listOf(null, "#1E88E5", "#43A047", "#FB8C00", "#E53935", "#8E24AA", "#000000")
 
 /**
- * Ad (ve istenirse renk) giriş penceresi: klasör oluşturma/düzenleme ve dosya yeniden adlandırma için ortak.
- * Dosyada renk yoktur, o yüzden [showColor] = false verilir.
+ * Ad (ve istenirse renk ve emoji) giriş penceresi: klasör oluşturma/düzenleme ve dosya yeniden adlandırma için ortak.
+ * Dosyada renk ve emoji yoktur, o yüzden [showColor] = false verilir ([showEmoji] de ona uyar).
  */
 @Composable
 fun NameDialog(
@@ -83,13 +85,16 @@ fun NameDialog(
     initialName: String,
     saving: Boolean,
     serverError: String?,
-    onConfirm: (name: String, color: String?) -> Unit,
+    onConfirm: (name: String, color: String?, emoji: String?) -> Unit,
     onDismiss: () -> Unit,
     initialColor: String? = null,
+    initialEmoji: String? = null,
     showColor: Boolean = true,
+    showEmoji: Boolean = showColor,
 ) {
     var name by remember { mutableStateOf(initialName) }
     var color by remember { mutableStateOf(initialColor) }
+    var emoji by remember { mutableStateOf(initialEmoji) }
 
     // Sunucudaki kuralların aynısı istemcide de denetlenir; kullanıcı daha gönderirken uyarılır.
     val trimmed = name.trim()
@@ -104,7 +109,8 @@ fun NameDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = { Text(title) },
         text = {
-            Column {
+            // Renk ve emoji satırları eklenince pencere küçük ekranlarda taşabilir: içerik kaydırılabilir.
+            Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = name,
                     onValueChange = { name = it },
@@ -121,12 +127,18 @@ fun NameDialog(
                     Spacer(Modifier.height(8.dp))
                     ColorSwatches(current = color, enabled = !saving, onSelect = { color = it })
                 }
+                if (showEmoji) {
+                    Spacer(Modifier.height(12.dp))
+                    Text("Emoji", style = MaterialTheme.typography.labelLarge)
+                    Spacer(Modifier.height(8.dp))
+                    EmojiChoices(current = emoji, enabled = !saving, onSelect = { emoji = it })
+                }
             }
         },
         confirmButton = {
             TextButton(
                 enabled = !saving && trimmed.isNotEmpty() && localError == null,
-                onClick = { onConfirm(trimmed, color) },
+                onClick = { onConfirm(trimmed, color, emoji) },
             ) { Text(confirmLabel) }
         },
         dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("İptal") } },

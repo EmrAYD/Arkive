@@ -186,7 +186,7 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
             showColor = false,
             saving = host.saving,
             serverError = host.error,
-            onConfirm = { name, _ -> viewModel.renameFile(name) },
+            onConfirm = { name, _, _ -> viewModel.renameFile(name) },
             onDismiss = close,
         )
 

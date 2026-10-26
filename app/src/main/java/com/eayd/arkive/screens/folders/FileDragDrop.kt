@@ -44,6 +44,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.ui.components.FolderIcon
 import com.eayd.arkive.ui.components.fileTypeIcon
 import com.eayd.arkive.ui.components.folderAccent
 import com.eayd.arkive.viewmodel.SelectedItems
@@ -272,16 +273,20 @@ internal fun DragGhost(state: FileDragState) {
         ) {
             val single = item.files.singleOrNull()
             val singleFolder = item.folders.singleOrNull().takeIf { item.count == 1 }
-            Icon(
-                imageVector = when {
-                    single != null && item.count == 1 -> fileTypeIcon(single.mimeType)
-                    singleFolder != null -> Icons.Filled.Folder
-                    else -> Icons.AutoMirrored.Filled.DriveFileMove
-                },
-                contentDescription = null,
-                tint = folderAccent(singleFolder?.color),
-                modifier = Modifier.size(24.dp),
-            )
+            if (singleFolder != null && single == null) {
+                // Tek klasör sürükleniyor: klasörün rengi ve emojisiyle.
+                FolderIcon(folderAccent(singleFolder.color), singleFolder.emoji, 24.dp)
+            } else {
+                Icon(
+                    imageVector = when {
+                        single != null && item.count == 1 -> fileTypeIcon(single.mimeType)
+                        else -> Icons.AutoMirrored.Filled.DriveFileMove
+                    },
+                    contentDescription = null,
+                    tint = folderAccent(null),
+                    modifier = Modifier.size(24.dp),
+                )
+            }
             Spacer(Modifier.width(12.dp))
             Text(
                 text = item.label,

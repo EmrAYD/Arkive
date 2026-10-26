@@ -41,9 +41,10 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
             label = "Klasör adı",
             initialName = dialog.folder.name,
             initialColor = dialog.folder.color,
+            initialEmoji = dialog.folder.emoji,
             saving = host.saving,
             serverError = host.error,
-            onConfirm = { name, color -> viewModel.editFolder(dialog.folder, name, color) },
+            onConfirm = { name, color, emoji -> viewModel.editFolder(dialog.folder, name, color, emoji) },
             onDismiss = close,
         )
 
@@ -55,7 +56,7 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
             showColor = false,
             saving = host.saving,
             serverError = host.error,
-            onConfirm = { name, _ -> viewModel.renameFile(dialog.file, name) },
+            onConfirm = { name, _, _ -> viewModel.renameFile(dialog.file, name) },
             onDismiss = close,
         )
 
