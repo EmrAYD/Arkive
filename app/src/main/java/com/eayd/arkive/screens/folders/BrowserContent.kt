@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.runtime.Composable
@@ -26,10 +28,11 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
-import com.eayd.arkive.data.AppSettings
+import com.eayd.arkive.ai.AiSummarizer
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
 import com.eayd.arkive.data.FolderLocations
+import com.eayd.arkive.ui.components.AiSummaryDialogHost
 import com.eayd.arkive.ui.components.CenteredHint
 import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.NoticeEffect
@@ -48,6 +51,7 @@ import com.eayd.arkive.viewmodel.folderKey
  * Bu bileşen yalnızca çizer: liste, süzme/sıralama, seçim, pencereler ve sunucu işlemleri [BrowserViewModel]
  * içindedir; buradaki her etkileşim ViewModel'e bir çağrı olarak iletilir.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun BrowserContent(
     viewModel: BrowserViewModel,
@@ -65,6 +69,8 @@ fun BrowserContent(
 
     // Ekran her görününce liste tazelenir (başka ekranda değişmiş olabilir: ör. Favorilerim).
     LaunchedEffect(viewModel) { viewModel.onShown() }
+    // Özetleme arka planda sürer; bitince ya da olmazsa kısa bir bildirimle haber verilir.
+    LaunchedEffect(viewModel) { AiSummarizer.notices.collect(viewModel::showNotice) }
     NoticeEffect(state.notice, snackbar, viewModel::clearNotice)
 
     // Geri tuşu önce seçimi kapatır.
@@ -115,20 +121,21 @@ fun BrowserContent(
             val nothingToShow = state.folders.isEmpty() && state.files.isEmpty() && state.uploads.isEmpty()
             val nothingVisible = state.visibleFolders.isEmpty() && state.visibleFiles.isEmpty() && state.uploads.isEmpty()
             val error = state.errorMessage
+            // Listeyi (ya da boş durum yazısını) aşağı çekmek sunucudan yeniler. Boş durumlar da kaydırılabilir bir
+            // kapta durur, yoksa çekme hareketini yakalayacak bir şey olmazdı.
+            PullToRefreshBox(
+                isRefreshing = state.refreshing,
+                onRefresh = viewModel::refresh,
+                modifier = Modifier.fillMaxSize(),
+            ) {
             when {
                 state.isLoading && nothingToShow -> CircularProgressIndicator(Modifier.align(Alignment.Center))
 
-                error != null -> ErrorRetry(error, viewModel::load, Modifier.align(Alignment.Center))
+                error != null -> PullableCenter { ErrorRetry(error, viewModel::load) }
 
-                nothingToShow -> CenteredHint(
-                    text = emptyText(state, viewModel.favoritesOnly),
-                    modifier = Modifier.align(Alignment.Center),
-                )
+                nothingToShow -> PullableCenter { CenteredHint(text = emptyText(state, viewModel.favoritesOnly)) }
 
-                nothingVisible -> CenteredHint(
-                    text = "Seçili kategoriye uyan bir şey yok.",
-                    modifier = Modifier.align(Alignment.Center),
-                )
+                nothingVisible -> PullableCenter { CenteredHint(text = "Seçili kategoriye uyan bir şey yok.") }
 
                 else -> BrowserList(
                     state = state,
@@ -144,6 +151,7 @@ fun BrowserContent(
                     },
                 )
             }
+            }
 
             AutoScrollWhileDragging(dragState, listState)
             DragGhost(dragState)
@@ -156,6 +164,15 @@ fun BrowserContent(
     }
 
     BrowserDialogs(viewModel)
+    AiSummaryDialogHost()
+}
+
+/** Ortalanmış bir içerik; kaydırılabilir olduğu için aşağı çekerek yenileme boş durumlarda da çalışır. */
+@Composable
+private fun PullableCenter(content: @Composable () -> Unit) {
+    LazyColumn(Modifier.fillMaxSize()) {
+        item { Box(Modifier.fillParentMaxSize(), contentAlignment = Alignment.Center) { content() } }
+    }
 }
 
 private fun emptyText(state: BrowserUiState, favoritesOnly: Boolean): String = when {
@@ -175,7 +192,10 @@ private fun BrowserList(
     onDownload: (FileDto) -> Unit,
 ) {
     val selection = state.selection
-    val aiFiles by AppSettings.aiFiles.collectAsState()
+    // AI düğmesi, özeti olan dosyalarda dolu görünür; özet hazırlanırken yerinde yükleme simgesi döner.
+    val summarized by AiSummarizer.summarized.collectAsState()
+    val summarizing by AiSummarizer.running.collectAsState()
+    val summaryStatus by AiSummarizer.status.collectAsState()
     LazyColumn(
         state = listState,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -220,14 +240,16 @@ private fun BrowserList(
                 modifier = Modifier.trackBounds(dragState.itemCoords, rowKey),
                 actions = FileRowActions(
                     onToggleFavorite = { viewModel.toggleFavorite(file) },
-                    onToggleAi = { AppSettings.toggleAiFile(file.id) },
+                    onToggleAi = { AiSummarizer.onAiClicked(file, hasSummary = file.hasSummary || file.id in summarized) },
                     onDownload = { onDownload(file) },
                     onMove = { viewModel.openDialog(BrowserDialog.MoveFile(file)) },
                     onRename = { viewModel.openDialog(BrowserDialog.RenameFile(file)) },
                     onInfo = { viewModel.openDialog(BrowserDialog.FileInfo(file)) },
                     onDelete = { viewModel.openDialog(BrowserDialog.DeleteFile(file)) },
                 ),
-                ai = file.id in aiFiles,
+                ai = if (file.inAiResults) null else file.hasSummary || file.id in summarized,
+                aiWorking = file.id in summarizing,
+                aiStatus = summaryStatus[file.id],
                 dimmed = dragState.dragged?.keys?.contains(rowKey) == true,
                 selectionMode = selection.active,
                 selected = rowKey in selection.keys,

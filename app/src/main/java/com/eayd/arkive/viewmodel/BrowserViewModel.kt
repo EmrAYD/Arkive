@@ -57,6 +57,8 @@ sealed interface BrowserDialog {
 /** Klasör/dosya listesi ekranının tüm durumu. Ekran yalnızca bu nesneye bakarak çizilir. */
 data class BrowserUiState(
     val isLoading: Boolean = true,
+    /** Kullanıcı listeyi aşağı çekerek yeniliyor (çekerek yenileme göstergesi açık). */
+    val refreshing: Boolean = false,
     /** Sunucudan gelen listeler. Ekranda [visibleFolders] ve [visibleFiles] (süzülmüş, sıralanmış) çizilir. */
     val folders: List<FolderDto> = emptyList(),
     val files: List<FileDto> = emptyList(),
@@ -212,6 +214,26 @@ class BrowserViewModel(
                 edit { if (showSpinner) it.copy(isLoading = false, errorMessage = message) else it.copy(notice = message) }
             },
         ) { reload() }
+    }
+
+    /**
+     * Çekerek yenileme: liste ekranda kalır, üstte yenileme göstergesi döner. Başarısız olursa yalnızca kısa bir
+     * bildirim çıkar. Zaten yenileniyorsa ikinci bir istek başlatılmaz.
+     */
+    fun refresh() {
+        if (_state.value.refreshing) return
+        edit { it.copy(refreshing = true) }
+        viewModelScope.launch {
+            try {
+                reload()
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                showNotice(e.toApiErrorMessage())
+            } finally {
+                edit { it.copy(refreshing = false) }
+            }
+        }
     }
 
     /** Bir işlemden sonra listeyi yeniler; yenileme başarısız olursa işlemin kendisi başarısız sayılmaz. */
