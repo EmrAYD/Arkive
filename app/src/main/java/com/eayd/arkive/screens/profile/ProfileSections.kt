@@ -17,6 +17,7 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
@@ -41,8 +42,11 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.ai.AiMode
+import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.screens.home.ProfileAvatar
+import com.eayd.arkive.ui.components.StorageSkeleton
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.viewmodel.StorageInfo
 
@@ -159,18 +163,22 @@ internal fun AccountSection(email: String?, hasPassword: Boolean, onChangePasswo
 }
 
 /**
- * "Ayarlar": bildirimler (sistem ayarlarını açar), tema, yalnızca Wi-Fi ve çöp kutusu saklama süresi.
- * Tema ve Wi-Fi ayarı bu cihazda, saklama süresi sunucuda tutulur; süre henüz yüklenmediyse ([trashRetentionDays] null)
+ * "Ayarlar": bildirimler (sistem ayarlarını açar), tema, yalnızca Wi-Fi, yapay zeka işlem yeri,
+ * çöp kutusu saklama süresi. Tema, Wi-Fi ve yapay zeka ayarları bu cihazda, saklama süresi sunucuda tutulur; süre henüz yüklenmediyse ([trashRetentionDays] null)
  * o satır pasiftir.
  */
 @Composable
 internal fun SettingsSection(
     themeMode: ThemeMode,
     wifiOnly: Boolean,
+    aiMode: AiMode,
+    summaryTemplate: SummaryTemplate,
     trashRetentionDays: Int?,
     onNotifications: () -> Unit,
     onTheme: () -> Unit,
     onWifiOnlyChange: (Boolean) -> Unit,
+    onAiMode: () -> Unit,
+    onSummaryTemplate: () -> Unit,
     onTrashRetention: () -> Unit,
 ) {
     SectionCard("Ayarlar") {
@@ -200,6 +208,22 @@ internal fun SettingsSection(
         )
         RowDivider()
         ProfileRow(
+            icon = Icons.Filled.AutoAwesome,
+            title = "Yapay zeka işlem yeri",
+            subtitle = aiMode.label,
+            onClick = onAiMode,
+            trailing = { Chevron() },
+        )
+        RowDivider()
+        ProfileRow(
+            icon = Icons.Filled.Description,
+            title = "Özet şablonu",
+            subtitle = summaryTemplate.label,
+            onClick = onSummaryTemplate,
+            trailing = { Chevron() },
+        )
+        RowDivider()
+        ProfileRow(
             icon = Icons.Filled.Delete,
             title = "Çöp kutusu saklama süresi",
             subtitle = trashRetentionDays?.let { "$it gün" } ?: "Yükleniyor…",
@@ -218,7 +242,7 @@ internal fun PlanSection(storage: StorageInfo?, isLoading: Boolean, error: Strin
             when {
                 storage != null -> PlanDetails(storage)
 
-                isLoading -> Text("Yükleniyor…", style = MaterialTheme.typography.bodyMedium)
+                isLoading -> StorageSkeleton()
 
                 else -> {
                     Text(

@@ -2,6 +2,8 @@ package com.eayd.arkive.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.eayd.arkive.ai.AiMode
+import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.ApiClient
 import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.data.ThemeMode
@@ -28,6 +30,12 @@ sealed interface ProfileDialog {
 
     /** Tema seçimi (sistem / açık / koyu). */
     data object Theme : ProfileDialog
+
+    /** Yapay zeka işlem yeri seçimi (yerel / bulut / yerel + bulut). */
+    data object AiProcessing : ProfileDialog
+
+    /** Özet PDF'inin şablon seçimi. */
+    data object SummaryTemplateChoice : ProfileDialog
 }
 
 data class ProfileUiState(
@@ -77,6 +85,18 @@ class ProfileViewModel : ViewModel() {
     /** Bu cihaza özgü ayarlar ([AppSettings]); sunucuya gitmez. */
     val themeMode: StateFlow<ThemeMode> = AppSettings.themeMode
     val wifiOnly: StateFlow<Boolean> = AppSettings.wifiOnly
+    val aiMode: StateFlow<AiMode> = AppSettings.aiMode
+    val summaryTemplate: StateFlow<SummaryTemplate> = AppSettings.summaryTemplate
+
+    fun setSummaryTemplate(template: SummaryTemplate) {
+        AppSettings.setSummaryTemplate(template)
+        dialogs.close()
+    }
+
+    fun setAiMode(mode: AiMode) {
+        AppSettings.setAiMode(mode)
+        dialogs.close()
+    }
 
     fun setThemeMode(mode: ThemeMode) {
         AppSettings.setThemeMode(mode)
@@ -105,7 +125,7 @@ class ProfileViewModel : ViewModel() {
                 it.copy(
                     isLoading = false,
                     error = null,
-                    storage = StorageInfo(me.planName, me.usedStorage, me.storageLimit, me.maxFileSize),
+                    storage = me.toStorageInfo(),
                     trashRetentionDays = me.trashRetentionDays,
                 )
             }

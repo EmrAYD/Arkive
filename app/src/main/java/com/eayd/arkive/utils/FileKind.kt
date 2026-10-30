@@ -48,8 +48,10 @@ fun fileTypeLabel(mimeType: String?, fileName: String): String {
     return if (extension.isNotEmpty() && extension.length <= 5) "$kind ($extension)" else kind
 }
 
+private const val DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+
 /** Uygulamanın içinde gösterebildiğimiz dosya türleri. */
-enum class PreviewKind { Image, Pdf, Text, Video, Audio, None }
+enum class PreviewKind { Image, Pdf, Docx, Text, Video, Audio, None }
 
 private val textMimeTypes = setOf(
     "application/json", "application/xml", "application/javascript", "application/x-yaml",
@@ -75,6 +77,8 @@ fun previewKind(mimeType: String?, fileName: String): PreviewKind {
         mime == "image/svg+xml" -> PreviewKind.None
         kind == FileKind.Image -> PreviewKind.Image
         kind == FileKind.Pdf || ext == "pdf" -> PreviewKind.Pdf
+        // Word belgesi: metni çıkarılıp düz metin olarak gösterilir (biçim ve görseller gösterilmez).
+        mime == DOCX_MIME || ext == "docx" -> PreviewKind.Docx
         kind == FileKind.Video -> PreviewKind.Video
         kind == FileKind.Audio -> PreviewKind.Audio
         kind == FileKind.Text || mime in textMimeTypes || ext in textExtensions -> PreviewKind.Text

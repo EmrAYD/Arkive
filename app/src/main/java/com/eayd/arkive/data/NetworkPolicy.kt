@@ -14,8 +14,11 @@ class WifiRequiredException :
  */
 object NetworkPolicy {
 
+    /** Aktarım şu an yapılabilir mi? (Ayar kapalıysa ya da Wi-Fi/ethernet varsa evet.) */
+    fun isAllowed(): Boolean = !AppSettings.wifiOnly.value || isOnWifi()
+
     fun requireAllowed() {
-        if (AppSettings.wifiOnly.value && !isOnWifi()) throw WifiRequiredException()
+        if (!isAllowed()) throw WifiRequiredException()
     }
 
     private fun isOnWifi(): Boolean {

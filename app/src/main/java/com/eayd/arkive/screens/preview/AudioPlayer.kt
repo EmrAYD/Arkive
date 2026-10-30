@@ -6,6 +6,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -13,7 +14,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AudioFile
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.data.FileDto
+import com.eayd.arkive.ui.components.SkeletonBox
 
 /** Ses: [MediaPlayer] ile akıştan çalar; oynat/durdur düğmesi ve ilerleme çubuğu bu ekranda çizilir. */
 @Composable
@@ -89,7 +90,7 @@ internal fun AudioPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
         Spacer(Modifier.height(24.dp))
 
         if (!prepared) {
-            CircularProgressIndicator()
+            SkeletonBox(Modifier.fillMaxWidth().height(32.dp))
         } else {
             SeekBar(
                 position = position,

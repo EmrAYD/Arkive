@@ -5,6 +5,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import com.eayd.arkive.ui.components.ConfirmDialog
 import com.eayd.arkive.ui.components.FileInfoDialog
+import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.ui.components.MoveFolderDialog
 import com.eayd.arkive.ui.components.NameDialog
 import com.eayd.arkive.viewmodel.BrowserDialog
@@ -101,6 +102,7 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
             error = host.error,
             onMove = viewModel::confirmMove,
             onDismiss = close,
+            location = if (dialog.file.inAiResults) FolderLocations.AI_RESULTS else FolderLocations.HOME,
         )
 
         is BrowserDialog.MoveFolder -> MoveFolderDialog(
@@ -123,6 +125,7 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
             error = host.error,
             onMove = viewModel::confirmMove,
             onDismiss = close,
+            location = state.moveLocation ?: FolderLocations.HOME,
         )
 
         is BrowserDialog.FileInfo -> FileInfoDialog(file = dialog.file, storageLimit = storageLimit, onDismiss = close)

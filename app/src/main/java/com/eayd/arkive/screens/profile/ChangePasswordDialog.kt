@@ -5,16 +5,9 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Visibility
-import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,11 +17,9 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.screens.auth.PasswordRuleItem
+import com.eayd.arkive.ui.components.PasswordInput
 import com.eayd.arkive.viewmodel.PasswordRules
 
 /**
@@ -91,39 +82,6 @@ internal fun ChangePasswordDialog(
         confirmButton = {
             TextButton(enabled = canSubmit, onClick = { onConfirm(current, new) }) { Text("Değiştir") }
         },
-        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("Vazgeç") } },
-    )
-}
-
-/** Göster/gizle düğmeli şifre alanı. */
-@Composable
-private fun PasswordInput(
-    label: String,
-    value: String,
-    onValueChange: (String) -> Unit,
-    enabled: Boolean,
-    error: String?,
-    modifier: Modifier = Modifier,
-) {
-    var visible by remember { mutableStateOf(false) }
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        label = { Text(label) },
-        modifier = modifier.fillMaxWidth(),
-        singleLine = true,
-        enabled = enabled,
-        isError = error != null,
-        supportingText = { error?.let { Text(it) } },
-        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-        visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
-        trailingIcon = {
-            IconButton(onClick = { visible = !visible }) {
-                Icon(
-                    imageVector = if (visible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = if (visible) "Şifreyi gizle" else "Şifreyi göster",
-                )
-            }
-        }
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("İptal") } },
     )
 }

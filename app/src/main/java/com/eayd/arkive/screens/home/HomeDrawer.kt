@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.R
 import com.eayd.arkive.data.FolderLocations
+import com.eayd.arkive.ui.components.StorageSkeleton
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.viewmodel.StorageInfo
 
@@ -170,7 +171,7 @@ private fun StorageSection(
                 }
             }
 
-            isLoading -> Text("Yükleniyor…", style = MaterialTheme.typography.bodyMedium)
+            isLoading -> StorageSkeleton()
 
             else -> {
                 Text(

@@ -13,7 +13,9 @@ import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FileUploader
 import com.eayd.arkive.data.FolderDto
 import com.eayd.arkive.data.FolderLocations
+import com.eayd.arkive.data.ListCache
 import com.eayd.arkive.utils.toApiErrorMessage
+import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -70,8 +72,10 @@ data class BrowserUiState(
     val uploads: List<UploadItem> = emptyList(),
     /** İçinde bulunulan klasörün adı (kök listede null). */
     val title: String? = null,
-    /** Bu konuma dosya yüklenebilir mi? (Favoriler ve AI sonuçları sayfasına yüklenemez.) */
+    /** Şu an bu konuma dosya yüklenebilir mi? */
     val canUpload: Boolean = false,
+    /** Sunucuya ulaşılamadı: liste telefondaki son görüntüden gösteriliyor (yalnızca okuma). */
+    val offline: Boolean = false,
     /** Liste yüklenemedi: ekranın ortasında "Tekrar dene" ile gösterilir. */
     val errorMessage: String? = null,
     /** Kısa bildirim (Snackbar): işlem hatası ya da "taşındı" gibi sonuç mesajı. */
@@ -80,6 +84,18 @@ data class BrowserUiState(
     val selectedFiles: List<FileDto> get() = files.filter { fileKey(it.id) in selection.keys }
     val selectedFolders: List<FolderDto> get() = folders.filter { folderKey(it.id) in selection.keys }
     val selectedItems: SelectedItems get() = SelectedItems(selectedFiles, selectedFolders)
+
+    /**
+     * Seçimin taşınabileceği sayfa ([FolderLocations.HOME] ya da [FolderLocations.AI_RESULTS]); taşınamıyorsa null.
+     * Normal dosya ve klasörler ana sayfa klasörlerine, yapay zeka sonuç dosyaları AI Sonuçlarım klasörlerine taşınır;
+     * ikisi karışık seçilmişse (Favorilerim) ve AI sonuçları klasörleri seçiliyse taşıma kapalıdır.
+     */
+    val moveLocation: String? get() {
+        if (selection.keys.isEmpty()) return null
+        val areas = selectedFiles.map { if (it.inAiResults) FolderLocations.AI_RESULTS else FolderLocations.HOME }.toSet() +
+            selectedFolders.map { it.location }.toSet()
+        return areas.singleOrNull()?.takeIf { selectedFolders.none { f -> f.location == FolderLocations.AI_RESULTS } }
+    }
 }
 
 /**
@@ -98,13 +114,20 @@ class BrowserViewModel(
     val favoritesOnly: Boolean = false,
 ) : ViewModel() {
 
-    // Ana sayfada dosya vardır, AI sonuçları kökünde yoktur (oraya dosya yüklenemez). Klasörlerin içinde
-    // ve favorilerde dosyalar listelenir.
-    private val showFiles = favoritesOnly || parentId != null || location == FolderLocations.HOME
+    /** AI Sonuçlarım sayfasının en üstü mü? (Boş durum yazısı ve yükleme kuralları buna göre değişir.) */
+    val isAiResultsRoot: Boolean get() = !favoritesOnly && parentId == null && location == FolderLocations.AI_RESULTS
 
-    private val _state = MutableStateFlow(
-        BrowserUiState(canUpload = !favoritesOnly && (parentId != null || location == FolderLocations.HOME))
-    )
+    /** Bu ekranın telefondaki liste görüntüsünün adı ([ListCache]). */
+    private val cacheKey: String = when {
+        favoritesOnly -> "favorites"
+        parentId != null -> "folder_$parentId"
+        else -> "root_$location"
+    }
+
+    /** Bu konuma dosya yüklenebilir mi? (Ana sayfa ve klasör içleri; favorilere ve AI sonuçlarına yüklenemez.) */
+    private val canUploadHere = !favoritesOnly && (parentId != null || location == FolderLocations.HOME)
+
+    private val _state = MutableStateFlow(BrowserUiState(canUpload = canUploadHere))
     val state: StateFlow<BrowserUiState> = _state.asStateFlow()
 
     /** Açık pencere (yeni klasör, sil, taşı…) ve kaydediliyor/hata durumu. */
@@ -131,6 +154,9 @@ class BrowserViewModel(
     fun onShown() {
         if (skipNextShowRefresh) skipNextShowRefresh = false else fetch(showSpinner = false)
     }
+
+    /** Listeyi sessizce yeniler (yükleme çarkı çıkmaz): ör. bir dosyanın özeti bitince AI düğmesi dolsun diye. */
+    fun reloadQuietly() = fetch(showSpinner = false)
 
     /** Listeyi baştan yükler ("Tekrar dene" için). */
     fun load() = fetch(showSpinner = true)
@@ -162,43 +188,71 @@ class BrowserViewModel(
 
     // --- Yükleme (liste) ---------------------------------------------------------------------------
 
-    private class Loaded(val folder: FolderDto?, val folders: List<FolderDto>, val files: List<FileDto>)
-
     /** Sunucudan güncel listeyi çeker (klasörler ve dosyalar aynı anda istenir) ve durumu günceller. */
     private suspend fun reload() {
-        val loaded = coroutineScope {
-            val folderD = async { parentId?.let { ApiClient.api.getFolder(it) } }
-            val foldersD = async {
-                ApiClient.api.getFolders(
-                    parentId = parentId,
-                    location = if (parentId == null && !favoritesOnly) location else null,
-                    favorite = if (favoritesOnly) true else null,
-                )
-            }
-            val filesD = async {
-                if (showFiles) {
-                    ApiClient.api.getFiles(
-                        folderId = parentId,
-                        favorite = if (favoritesOnly) true else null,
-                    )
-                } else emptyList()
-            }
-            Loaded(folderD.await(), foldersD.await(), filesD.await())
+        val loaded = try {
+            download()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            if (!showOffline(e)) throw e
+            return
         }
+        withContext(Dispatchers.IO) { ListCache.save(cacheKey, loaded) }
+        apply(loaded, offline = false)
+    }
+
+    /**
+     * Sunucuya ulaşılamadığında (internet yok) ekrandaki listeyi korur ya da telefondaki son liste görüntüsünü
+     * gösterir. Görüntü yoksa ya da hata ağ hatası değilse (ör. 401, 500) false döner ve hata her zamanki gibi gösterilir.
+     */
+    private suspend fun showOffline(error: Throwable): Boolean {
+        if (error !is IOException) return false
+        val current = _state.value
+        if (!current.isLoading && (current.files.isNotEmpty() || current.folders.isNotEmpty())) {
+            // Ekranda zaten bir liste var: aynen kalır, yalnızca "internet yok" durumuna geçilir.
+            edit { it.copy(offline = true, canUpload = false) }
+            return true
+        }
+        val snapshot = withContext(Dispatchers.IO) { ListCache.load(cacheKey) } ?: return false
+        apply(snapshot, offline = true)
+        return true
+    }
+
+    private suspend fun download(): ListCache.Snapshot = coroutineScope {
+        val folderD = async { parentId?.let { ApiClient.api.getFolder(it) } }
+        val foldersD = async {
+            ApiClient.api.getFolders(
+                parentId = parentId,
+                location = if (parentId == null && !favoritesOnly) location else null,
+                favorite = if (favoritesOnly) true else null,
+            )
+        }
+        val filesD = async {
+            ApiClient.api.getFiles(
+                folderId = parentId,
+                favorite = if (favoritesOnly) true else null,
+                location = if (parentId == null && !favoritesOnly) location else null,
+            )
+        }
+        ListCache.Snapshot(folderD.await(), foldersD.await(), filesD.await())
+    }
+
+    private fun apply(loaded: ListCache.Snapshot, offline: Boolean) {
         edit {
             // Sunucu ada göre sıralı verir; sort kararlıdır. Listeden kalkmış (taşınmış, silinmiş) öğeler seçimden düşer.
             val existing = loaded.files.map { f -> fileKey(f.id) }.toSet() + loaded.folders.map { f -> folderKey(f.id) }.toSet()
             val selection = it.selection.retain(existing)
             it.copy(
                 isLoading = false,
+                offline = offline,
                 errorMessage = null,
                 folders = loaded.folders,
                 files = loaded.files,
                 selection = if (selection.keys.isEmpty()) Selection() else selection,
                 title = loaded.folder?.name ?: it.title,
-                // AI sonuçları klasörlerine dosya yüklenemez (sunucu da reddeder).
-                canUpload = !favoritesOnly && loaded.folder?.location != FolderLocations.AI_RESULTS &&
-                    (parentId != null || location == FolderLocations.HOME),
+                // İnternetsizken ve AI sonuçları klasörlerinde (sunucu da reddeder) dosya yüklenemez.
+                canUpload = canUploadHere && !offline && loaded.folder?.location != FolderLocations.AI_RESULTS,
             )
         }
     }
@@ -223,13 +277,9 @@ class BrowserViewModel(
     fun refresh() {
         if (_state.value.refreshing) return
         edit { it.copy(refreshing = true) }
-        viewModelScope.launch {
+        launchCatching(::showNotice) {
             try {
                 reload()
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                showNotice(e.toApiErrorMessage())
             } finally {
                 edit { it.copy(refreshing = false) }
             }

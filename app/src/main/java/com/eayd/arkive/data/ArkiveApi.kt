@@ -5,6 +5,7 @@ import retrofit2.http.DELETE
 import retrofit2.http.GET
 import retrofit2.http.PATCH
 import retrofit2.http.POST
+import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
@@ -68,6 +69,8 @@ interface ArkiveApi {
     suspend fun getFiles(
         @Query("folder_id") folderId: String? = null,
         @Query("favorite") favorite: Boolean? = null,
+        /** Yalnızca klasörsüz listelemede: "ai_results" AI Sonuçlarım sayfasının en üstündeki dosyaları getirir. */
+        @Query("location") location: String? = null,
     ): List<FileDto>
 
     /** Tek dosyanın bilgisi (ön izleme ekranı dosyayı yalnızca id'siyle açar). */
@@ -86,6 +89,24 @@ interface ArkiveApi {
 
     @DELETE("files/{id}")
     suspend fun deleteFile(@Path("id") id: String)
+
+    // --- Yapay zeka özeti -------------------------------------------------------------------------
+    // Özet sunucuda saklanır ve dosyanın içeriğine bağlıdır: aynı içerikli dosya tekrar yüklense de özeti hazır gelir.
+
+    /** Kayıtlı özet; dosyanın özeti yoksa 404. */
+    @GET("files/{id}/summary")
+    suspend fun getSummary(@Path("id") id: String): SummaryResponse
+
+    /**
+     * Dosyayı sunucudaki yapay zekayla özetler ve kaydeder (özet zaten varsa kayıtlı olanı döner). Yanıt uzun sürebilir;
+     * bu yüzden uygulama bu ucu uzun okuma süreli [ApiClient.aiApi] üzerinden çağırır.
+     */
+    @POST("files/{id}/summary")
+    suspend fun summarizeFile(@Path("id") id: String, @Body body: SummarizeRequest): SummaryResponse
+
+    /** Telefonda üretilen özeti kaydeder (özet zaten varsa mevcut olan korunur ve o döner). */
+    @PUT("files/{id}/summary")
+    suspend fun saveSummary(@Path("id") id: String, @Body body: SaveSummaryRequest): SummaryResponse
 
     // --- Çöp kutusu -------------------------------------------------------------------------------
     // DELETE /files|folders öğeyi çöp kutusuna taşır; kalıcı silme aşağıdaki uçlarla yapılır.

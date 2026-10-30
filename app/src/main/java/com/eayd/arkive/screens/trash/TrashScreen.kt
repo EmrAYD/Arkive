@@ -25,7 +25,6 @@ import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -52,6 +51,7 @@ import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.FileGlyph
 import com.eayd.arkive.ui.components.FolderGlyph
 import com.eayd.arkive.ui.components.ItemRow
+import com.eayd.arkive.ui.components.ListSkeleton
 import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.ui.components.SelectCircle
 import com.eayd.arkive.ui.components.folderAccent
@@ -62,9 +62,9 @@ import com.eayd.arkive.viewmodel.fileKey
 import com.eayd.arkive.viewmodel.folderKey
 
 /**
- * Çöp kutusu. Normal modda: geri oku, başlık + öğe sayısı, sağda "Boşalt" (kökte; onay sorar) ve "Seç"; altında saklama süresini anlatan bilgi
+ * Çöp kutusu. Normal modda: geri oku, başlık + öğe sayısı, sağda "Tümünü sil" (kökte; onay sorar) ve "Seç"; altında saklama süresini anlatan bilgi
  * metni ve silinen öğeler (her birinde kalıcı silinmeye kalan gün). "Seç"e ya da bir öğeye basınca seçim modu
- * açılır: solda "Hepsi", ortada başlık, sağda "İptal"; öğelerde seçim daireleri; altta "Geri yükle" ve "Kalıcı sil".
+ * açılır: solda "Hepsi", ortada başlık, sağda "İptal"; öğelerde seçim daireleri; altta "Geri yükle" ve "Kalıcı olarak sil".
  * Ekran yalnızca [TrashViewModel] durumunu çizer; seçim, geri yükleme ve silme ViewModel'dedir.
  */
 @Composable
@@ -111,7 +111,7 @@ fun TrashScreen(
             Box(Modifier.weight(1f).fillMaxWidth()) {
                 val error = state.errorMessage
                 when {
-                    state.isLoading -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                    state.isLoading -> ListSkeleton(Modifier.fillMaxSize())
                     error != null -> ErrorRetry(error, viewModel::load, Modifier.align(Alignment.Center))
                     state.itemCount == 0 -> EmptyTrash(state.retentionDays, inFolder)
                     else -> TrashList(state, viewModel, inFolder, onOpenFolder, onOpenFile)
@@ -132,10 +132,10 @@ fun TrashScreen(
 
     if (state.confirmEmpty) {
         ConfirmDialog(
-            title = "Çöp kutusu tamamen boşaltılsın mı?",
+            title = "Çöp kutusundaki her şey kalıcı olarak silinsin mi?",
             message = "Çöp kutusundaki ${state.itemCount} öğe (klasörlerin içindekilerle birlikte) çöp kutusundan ve " +
                 "depolama alanınızdan silinecek. Bu işlem geri alınamaz.",
-            confirmLabel = "Boşalt",
+            confirmLabel = "Kalıcı olarak sil",
             saving = state.busy,
             error = null,
             onConfirm = viewModel::emptyTrash,
@@ -148,7 +148,7 @@ fun TrashScreen(
             title = "${state.selection.count} öğe kalıcı olarak silinsin mi?",
             message = "Seçilen öğeler (klasörlerin içindekilerle birlikte) çöp kutusundan ve depolama alanınızdan " +
                 "silinecek. Bu işlem geri alınamaz.",
-            confirmLabel = "Kalıcı sil",
+            confirmLabel = "Kalıcı olarak sil",
             saving = state.busy,
             error = null,
             onConfirm = viewModel::deleteSelectedForever,
@@ -196,7 +196,7 @@ private fun TrashHeader(
                 onClick = onEmpty,
                 enabled = emptyEnabled,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text("Boşalt") }
+            ) { Text("Tümünü sil") }
         }
         if (showSelect) {
             TextButton(onClick = onSelect) { Text("Seç") }

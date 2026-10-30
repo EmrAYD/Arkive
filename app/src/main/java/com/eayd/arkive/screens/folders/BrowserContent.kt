@@ -3,6 +3,7 @@ package com.eayd.arkive.screens.folders
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -14,27 +15,33 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.ai.AiSummarizer
+import com.eayd.arkive.ai.InputCache
+import com.eayd.arkive.ai.SummaryStore
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
 import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.ui.components.AiSummaryDialogHost
 import com.eayd.arkive.ui.components.CenteredHint
 import com.eayd.arkive.ui.components.ErrorRetry
+import com.eayd.arkive.ui.components.ListSkeleton
 import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.ui.components.rememberFileDownloader
 import com.eayd.arkive.viewmodel.BrowserDialog
@@ -42,6 +49,8 @@ import com.eayd.arkive.viewmodel.BrowserUiState
 import com.eayd.arkive.viewmodel.BrowserViewModel
 import com.eayd.arkive.viewmodel.fileKey
 import com.eayd.arkive.viewmodel.folderKey
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 /**
  * Bir seviyedeki klasörler ve dosyalar, üstlerinde işlem satırı ("+" düğmesi, filtreler) ve devam eden yüklemeler.
@@ -71,6 +80,16 @@ fun BrowserContent(
     LaunchedEffect(viewModel) { viewModel.onShown() }
     // Özetleme arka planda sürer; bitince ya da olmazsa kısa bir bildirimle haber verilir.
     LaunchedEffect(viewModel) { AiSummarizer.notices.collect(viewModel::showNotice) }
+    // Özet bitince liste sessizce yenilenir (AI düğmesi dolar); dolu düğmeye basılınca özet dosyasının ön izlemesi açılır.
+    val openPreview by rememberUpdatedState(onOpenFile)
+    LaunchedEffect(viewModel) { AiSummarizer.completed.collect { viewModel.reloadQuietly() } }
+    LaunchedEffect(viewModel) { AiSummarizer.flushPending() } // internetsizken üretilen özetler varsa yükle
+    // Liste her yenilendiğinde küçük dosyalar arka planda telefona kopyalanır: internetsiz de yerel özetlenebilsinler.
+    LaunchedEffect(state.files, state.offline) { if (!state.offline) AiSummarizer.prefetch(state.files) }
+    // İnternet geri gelince, liste telefondaki görüntüden gösteriliyorsa sunucudan tazelenir.
+    val offlineNow by rememberUpdatedState(state.offline)
+    LaunchedEffect(viewModel) { AiSummarizer.networkBack.collect { if (offlineNow) viewModel.reloadQuietly() } }
+    LaunchedEffect(viewModel) { AiSummarizer.openFile.collect { openPreview(it) } }
     NoticeEffect(state.notice, snackbar, viewModel::clearNotice)
 
     // Geri tuşu önce seçimi kapatır.
@@ -83,12 +102,11 @@ fun BrowserContent(
 
     Column(modifier.fillMaxSize()) {
         if (selection.active) {
-            val selectedFolders = state.selectedFolders
             SelectionBar(
                 count = selection.count,
                 allFavorite = state.selectedItems.allFavorite,
-                // AI sonuçları klasörleri taşınamaz.
-                canMove = selectedFolders.all { it.location == FolderLocations.HOME },
+                // AI sonuçları klasörleri taşınamaz; normal öğeler ile yapay zeka sonuç dosyaları da birlikte taşınamaz.
+                canMove = state.moveLocation != null,
                 onClose = viewModel::clearSelection,
                 onSelectAll = viewModel::selectAllVisible,
                 onFavorite = viewModel::favoriteSelection,
@@ -105,6 +123,18 @@ fun BrowserContent(
                 filters = {
                     BrowserFilters(state.sort, state.category, viewModel::setSort, viewModel::setCategory)
                 },
+            )
+        }
+
+        if (state.offline) {
+            Text(
+                text = "Sunucuya ulaşılamadı. Liste telefondaki son kayıttan gösteriliyor; telefonda kopyası olan küçük dosyalar yine de özetlenebilir.",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSecondaryContainer,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .padding(horizontal = 16.dp, vertical = 8.dp),
             )
         }
 
@@ -129,11 +159,13 @@ fun BrowserContent(
                 modifier = Modifier.fillMaxSize(),
             ) {
             when {
-                state.isLoading && nothingToShow -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                state.isLoading && nothingToShow -> ListSkeleton(Modifier.fillMaxSize())
 
                 error != null -> PullableCenter { ErrorRetry(error, viewModel::load) }
 
-                nothingToShow -> PullableCenter { CenteredHint(text = emptyText(state, viewModel.favoritesOnly)) }
+                nothingToShow -> PullableCenter {
+                    CenteredHint(text = emptyText(state, viewModel.favoritesOnly, viewModel.isAiResultsRoot))
+                }
 
                 nothingVisible -> PullableCenter { CenteredHint(text = "Seçili kategoriye uyan bir şey yok.") }
 
@@ -175,7 +207,8 @@ private fun PullableCenter(content: @Composable () -> Unit) {
     }
 }
 
-private fun emptyText(state: BrowserUiState, favoritesOnly: Boolean): String = when {
+private fun emptyText(state: BrowserUiState, favoritesOnly: Boolean, aiResultsRoot: Boolean): String = when {
+    aiResultsRoot -> "Henüz yapay zeka sonucu yok.\nBir dosyanın yanındaki yapay zeka düğmesiyle özet oluşturabilirsiniz."
     favoritesOnly -> "Henüz favori eklemediniz.\nKlasör ya da dosyaların yanındaki yıldıza dokunun."
     state.canUpload -> "Burada henüz klasör ya da dosya yok.\nSağ üstteki + düğmesiyle ekleyebilirsiniz."
     else -> "Burada henüz klasör yok.\nSağ üstteki + düğmesiyle oluşturabilirsiniz."
@@ -193,9 +226,15 @@ private fun BrowserList(
 ) {
     val selection = state.selection
     // AI düğmesi, özeti olan dosyalarda dolu görünür; özet hazırlanırken yerinde yükleme simgesi döner.
-    val summarized by AiSummarizer.summarized.collectAsState()
     val summarizing by AiSummarizer.running.collectAsState()
+    val waitingUpload by SummaryStore.pendingIds.collectAsState() // telefonda üretilmiş, yüklenmeyi bekleyen özetler
     val summaryStatus by AiSummarizer.status.collectAsState()
+    // İnternetsizken yalnızca telefonda kopyası olan dosyalar açılabilir; diğerleri pasif görünür.
+    val availableOffline by produceState(emptySet<String>(), state.files, state.offline) {
+        value = if (!state.offline) emptySet() else withContext(Dispatchers.IO) {
+            state.files.filter { InputCache.get(it.id, it.size) != null }.map { it.id }.toSet()
+        }
+    }
     LazyColumn(
         state = listState,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -226,6 +265,7 @@ private fun BrowserList(
                     onMove = { viewModel.openDialog(BrowserDialog.MoveFolder(folder)) },
                     onDelete = { viewModel.openDialog(BrowserDialog.DeleteFolder(folder)) },
                 ),
+                menuEnabled = !state.offline,
                 highlighted = dragState.hoverFolderId == folder.id,
                 dimmed = dragState.dragged?.keys?.contains(rowKey) == true,
                 selectionMode = selection.active,
@@ -240,16 +280,18 @@ private fun BrowserList(
                 modifier = Modifier.trackBounds(dragState.itemCoords, rowKey),
                 actions = FileRowActions(
                     onToggleFavorite = { viewModel.toggleFavorite(file) },
-                    onToggleAi = { AiSummarizer.onAiClicked(file, hasSummary = file.hasSummary || file.id in summarized) },
+                    onToggleAi = { AiSummarizer.onAiClicked(file, hasSummary = file.hasSummary || file.id in waitingUpload) },
                     onDownload = { onDownload(file) },
                     onMove = { viewModel.openDialog(BrowserDialog.MoveFile(file)) },
                     onRename = { viewModel.openDialog(BrowserDialog.RenameFile(file)) },
                     onInfo = { viewModel.openDialog(BrowserDialog.FileInfo(file)) },
                     onDelete = { viewModel.openDialog(BrowserDialog.DeleteFile(file)) },
                 ),
-                ai = if (file.inAiResults) null else file.hasSummary || file.id in summarized,
+                ai = if (file.inAiResults) null else file.hasSummary || file.id in waitingUpload,
                 aiWorking = file.id in summarizing,
                 aiStatus = summaryStatus[file.id],
+                enabled = !state.offline || file.id in availableOffline,
+                menuEnabled = !state.offline,
                 dimmed = dragState.dragged?.keys?.contains(rowKey) == true,
                 selectionMode = selection.active,
                 selected = rowKey in selection.keys,

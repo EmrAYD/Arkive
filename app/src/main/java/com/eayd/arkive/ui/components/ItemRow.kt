@@ -22,6 +22,7 @@ import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -61,14 +62,16 @@ fun ItemRow(
     selectMark: Boolean? = null,
     highlighted: Boolean = false,
     dimmed: Boolean = false,
+    /** false ise satır pasiftir: soluk görünür ve tıklanamaz (ör. internetsizken telefonda kopyası olmayan dosya). */
+    enabled: Boolean = true,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .alpha(if (dimmed) 0.35f else 1f)
+            .alpha(if (dimmed) 0.35f else if (!enabled) 0.5f else 1f)
             .clip(MaterialTheme.shapes.medium)
-            .combinedClickable(onClick = onClick, onLongClick = onLongClick),
+            .combinedClickable(enabled = enabled, onClick = onClick, onLongClick = onLongClick),
         colors = CardDefaults.cardColors(
             containerColor = when {
                 highlighted -> MaterialTheme.colorScheme.primaryContainer
@@ -114,24 +117,35 @@ fun ItemRow(
 
 /**
  * Satırın sağındaki düğmeler: (varsa) yapay zeka düğmesi, favori yıldızı ve "daha fazla" menüsü ([menu] açık/kapalı
- * durumunu alır). Yapay zeka düğmesi yıldızın soluna konur; [ai] null ise (klasörlerde) hiç gösterilmez.
+ * durumunu alır). Yapay zeka düğmesi yıldızın soluna konur; [ai] null ise (klasörlerde) hiç gösterilmez. [aiWorking]
+ * iken (özet hazırlanırken) düğmenin yerinde küçük bir yükleme simgesi döner; satırın geri kalanı kullanılabilir kalır.
  */
 @Composable
 fun RowScope.RowActions(
     favorite: Boolean,
     onToggleFavorite: () -> Unit,
     ai: Boolean? = null,
+    aiWorking: Boolean = false,
     onToggleAi: () -> Unit = {},
+    menuEnabled: Boolean = true,
     menu: @Composable (expanded: Boolean, onDismiss: () -> Unit) -> Unit,
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     if (ai != null) {
+        // Yıldızla yan yana, daha dar (36dp) bir dokunma alanı: iki simge birbirine yaklaşır, dikey ortaları aynı kalır.
         IconButton(onClick = onToggleAi, modifier = Modifier.size(width = 36.dp, height = 48.dp)) {
-            Icon(
-                imageVector = if (ai) AiIcons.Filled else AiIcons.Outlined,
-                contentDescription = if (ai) "Yapay zekayı kapat" else "Yapay zekayı aç",
-                tint = MaterialTheme.colorScheme.primary,
-            )
+            if (aiWorking) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(20.dp).semantics { contentDescription = "Özetleniyor" },
+                    strokeWidth = 2.5.dp,
+                )
+            } else {
+                Icon(
+                    imageVector = if (ai) AiIcons.Filled else AiIcons.Outlined,
+                    contentDescription = if (ai) "Yapay zeka özetini göster" else "Yapay zeka ile özetle",
+                    tint = MaterialTheme.colorScheme.primary,
+                )
+            }
         }
     }
     IconButton(onClick = onToggleFavorite) {
@@ -142,7 +156,7 @@ fun RowScope.RowActions(
         )
     }
     Box {
-        IconButton(onClick = { menuOpen = true }) {
+        IconButton(onClick = { menuOpen = true }, enabled = menuEnabled) {
             Icon(Icons.Filled.MoreVert, contentDescription = "Daha fazla")
         }
         menu(menuOpen) { menuOpen = false }

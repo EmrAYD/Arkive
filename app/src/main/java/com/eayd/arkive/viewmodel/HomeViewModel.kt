@@ -2,6 +2,7 @@ package com.eayd.arkive.viewmodel
 
 import androidx.lifecycle.ViewModel
 import com.eayd.arkive.data.ApiClient
+import com.eayd.arkive.data.MeResponse
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -23,6 +24,8 @@ data class StorageInfo(
     /** 0.0 - 1.0 arası doluluk oranı (ilerleme çubuğu için). */
     val fraction: Float get() = if (limit <= 0) 0f else (used.toFloat() / limit).coerceIn(0f, 1f)
 }
+
+fun MeResponse.toStorageInfo() = StorageInfo(planName, usedStorage, storageLimit, maxFileSize)
 
 /** Ana ekranın yan menüsü ve profil düğmesi için gereken bilgiler. */
 data class HomeUiState(
@@ -60,7 +63,7 @@ class HomeViewModel : ViewModel() {
                 it.copy(
                     isLoading = false,
                     error = null,
-                    storage = StorageInfo(me.planName, me.usedStorage, me.storageLimit, me.maxFileSize),
+                    storage = me.toStorageInfo(),
                 )
             }
         }

@@ -67,6 +67,7 @@ fun FolderRow(
     selected: Boolean = false,
     highlighted: Boolean = false,   // sürüklenen öğe şu an bu klasörün üstünde
     dimmed: Boolean = false,        // sürüklenen klasörün yerindeki satır soluk görünür
+    menuEnabled: Boolean = true,    // internetsizken 3 nokta menüsü pasiftir
 ) {
     ItemRow(
         title = folder.name,
@@ -80,7 +81,7 @@ fun FolderRow(
             if (selectionMode) {
                 SelectionCheck(selected)
             } else {
-                RowActions(folder.favorite, actions.onToggleFavorite) { expanded, dismiss ->
+                RowActions(folder.favorite, actions.onToggleFavorite, menuEnabled = menuEnabled) { expanded, dismiss ->
                     FolderActionsMenu(
                         expanded = expanded,
                         onDismiss = dismiss,
@@ -104,21 +105,29 @@ fun FileRow(
     selectionMode: Boolean = false,
     selected: Boolean = false,
     dimmed: Boolean = false,   // sürüklenen dosyanın yerindeki satır soluk görünür
-    ai: Boolean = false,       // yapay zeka düğmesi açık mı
+    ai: Boolean? = false,      // dosyanın özeti var mı (AI düğmesi dolu görünür); null ise düğme hiç gösterilmez
+    aiWorking: Boolean = false, // özet hazırlanıyor mu (AI düğmesi yerine yükleme simgesi)
+    aiStatus: String? = null,   // özetleme sürerken hangi adımda olduğu (boyutun yanında gösterilir)
+    enabled: Boolean = true,    // false: satır pasif (internetsizken telefonda kopyası olmayan dosya)
+    menuEnabled: Boolean = true, // internetsizken 3 nokta menüsü pasiftir
 ) {
     ItemRow(
         title = file.name,
-        subtitle = formatBytes(file.size),
+        subtitle = if (aiStatus != null) "${formatBytes(file.size)} · $aiStatus" else formatBytes(file.size),
         icon = { FileGlyph(file.mimeType) },
         onClick = onOpen,
         modifier = modifier,
         selected = selected,
         dimmed = dimmed,
+        enabled = enabled,
         trailing = {
             if (selectionMode) {
                 SelectionCheck(selected)
             } else {
-                RowActions(file.favorite, actions.onToggleFavorite, ai = ai, onToggleAi = actions.onToggleAi) { expanded, dismiss ->
+                RowActions(
+                    file.favorite, actions.onToggleFavorite,
+                    ai = ai, aiWorking = aiWorking, onToggleAi = actions.onToggleAi, menuEnabled = menuEnabled,
+                ) { expanded, dismiss ->
                     FileActionsMenu(
                         expanded = expanded,
                         onDismiss = dismiss,

@@ -26,7 +26,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -38,6 +37,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clipToBounds
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.TransformOrigin
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.graphicsLayer
@@ -47,6 +47,7 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.data.PdfDoc
+import com.eayd.arkive.ui.components.SkeletonBox
 import kotlin.math.roundToInt
 
 private const val PDF_MAX_ZOOM = 4f
@@ -218,7 +219,7 @@ private fun PdfPage(doc: PdfDoc, index: Int, widthPx: Int) {
                 modifier = Modifier.fillMaxSize(),
             )
         } else {
-            CircularProgressIndicator(Modifier.size(28.dp))
+            SkeletonBox(Modifier.fillMaxSize(), RectangleShape)
         }
     }
 }

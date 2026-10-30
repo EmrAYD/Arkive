@@ -2,17 +2,15 @@ package com.eayd.arkive.screens.preview
 
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.MoreVert
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -41,9 +39,12 @@ import com.eayd.arkive.ui.components.ConfirmDialog
 import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.FileActionsMenu
 import com.eayd.arkive.ui.components.FileInfoDialog
+import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.ui.components.MoveFolderDialog
 import com.eayd.arkive.ui.components.NameDialog
 import com.eayd.arkive.ui.components.NoticeEffect
+import com.eayd.arkive.ui.components.PasswordDialog
+import com.eayd.arkive.ui.components.SkeletonBox
 import com.eayd.arkive.ui.components.TrashedFileActionsMenu
 import com.eayd.arkive.ui.components.rememberFileDownloader
 import com.eayd.arkive.viewmodel.PreviewContent
@@ -125,22 +126,14 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
 
         Box(Modifier.weight(1f).fillMaxWidth()) {
             when (val s = state) {
-                is PreviewState.Loading -> Column(
-                    Modifier.align(Alignment.Center),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                ) {
-                    val progress = s.progress
-                    if (progress != null) CircularProgressIndicator(progress = { progress })
-                    else CircularProgressIndicator()
-                    if (progress != null) {
-                        Spacer(Modifier.height(8.dp))
-                        Text("%${(progress * 100).toInt()}", style = MaterialTheme.typography.bodySmall)
-                    }
-                }
+                is PreviewState.Loading -> PreviewSkeleton(s.progress)
 
                 is PreviewState.Error -> ErrorRetry(s.message, viewModel::load, Modifier.align(Alignment.Center))
 
-                is PreviewState.Ready -> PreviewContentView(s.file, s.content, download)
+                is PreviewState.Ready -> PreviewContentView(
+                    s.file, s.content, download,
+                    onEnterPassword = { viewModel.openDialog(PreviewDialog.Password) },
+                )
             }
 
             SnackbarHost(
@@ -156,7 +149,7 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
 
 /** Dosyanın türüne uygun görüntüleyiciyi seçer. */
 @Composable
-private fun PreviewContentView(file: FileDto, content: PreviewContent, download: () -> Unit) {
+private fun PreviewContentView(file: FileDto, content: PreviewContent, download: () -> Unit, onEnterPassword: () -> Unit) {
     when (content) {
         is PreviewContent.Image -> ZoomableImage(content.bitmap, file.name)
         is PreviewContent.Pdf -> PdfViewer(content.doc)
@@ -164,6 +157,7 @@ private fun PreviewContentView(file: FileDto, content: PreviewContent, download:
         is PreviewContent.Media ->
             if (content.isAudio) AudioPlayer(content.url, file, download)
             else VideoPlayer(content.url, file, download)
+        is PreviewContent.PasswordProtected -> PasswordProtectedMessage(file, onEnterPassword, download)
         is PreviewContent.NoPreview -> NoPreviewMessage(file, content.reason, download)
     }
 }
@@ -198,9 +192,21 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
             error = host.error,
             onMove = viewModel::moveFile,
             onDismiss = close,
+            location = if (file.inAiResults) FolderLocations.AI_RESULTS else FolderLocations.HOME,
         )
 
         PreviewDialog.Info -> FileInfoDialog(file = file, storageLimit = storageLimit, onDismiss = close)
+
+        PreviewDialog.Password -> PasswordDialog(
+            title = "Dosya parolalı",
+            message = "“${file.name}” parola ile korunuyor. Ön izlemek için parolayı girin.",
+            note = "Parola yalnızca bu telefonda dosyayı açmak için kullanılır; sunucuya gönderilmez ve kaydedilmez.",
+            confirmLabel = "Aç",
+            busy = host.saving,
+            error = host.error,
+            onConfirm = viewModel::unlock,
+            onDismiss = close,
+        )
 
         PreviewDialog.Delete -> ConfirmDialog(
             title = "Dosya çöp kutusuna taşınsın mı?",
@@ -211,5 +217,14 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
             onConfirm = viewModel::deleteFile,
             onDismiss = close,
         )
+    }
+}
+
+/** Ön izleme hazırlanırken: sayfa şeklinde iskelet; dosya iniyorsa ortasında yüzde görünür. */
+@Composable
+private fun PreviewSkeleton(progress: Float?) {
+    Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
+        SkeletonBox(Modifier.fillMaxSize(), RoundedCornerShape(12.dp))
+        if (progress != null) Text("%${(progress * 100).toInt()}", style = MaterialTheme.typography.titleMedium)
     }
 }

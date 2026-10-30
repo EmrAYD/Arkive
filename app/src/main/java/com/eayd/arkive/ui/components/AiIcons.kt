@@ -9,7 +9,7 @@ import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
 /**
- * Yapay zekâ düğmesinin simgesi: yüzeyleri çizili bir elmas ve sağ üstünde bir parıltı. Favori yıldızı gibi iki hâli var:
+ * Yapay zeka düğmesinin simgesi: yüzeyleri çizili bir elmas ve sağ üstünde bir parıltı. Favori yıldızı gibi iki hali var:
  *  - [Outlined] (kapalı): yalnızca çizgiler; elmas, yüzey çizgileri ve parıltının dış hattı.
  *  - [Filled] (açık): elmasın yüzeyleri neredeyse tam dolu (yalnızca üst yüzey ve orta yüzey biraz açık bırakılır), parıltı tamamen dolu.
  * Rengi `Icon(tint = …)` belirler; buradaki siyah yalnızca şekli (ve yüzeylerin saydamlığını) çizer.

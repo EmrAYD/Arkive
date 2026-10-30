@@ -34,7 +34,7 @@ fun Throwable.toApiErrorMessage(): String = when (this) {
         else -> "İstek başarısız oldu ($c)."
     }
     is SocketTimeoutException -> "Sunucu yanıt vermedi."
-    is UnknownHostException, is ConnectException -> "Sunucuya ulaşılamıyor. Backend çalışıyor mu?"
+    is UnknownHostException, is ConnectException -> "Sunucuya ulaşılamadı. Backend çalışıyor mu?"
     is IOException -> message ?: "Bağlantı hatası."
     else -> message ?: "Beklenmeyen bir hata oluştu."
 }

@@ -3,6 +3,7 @@ package com.eayd.arkive.ui.components
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,9 +16,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -32,6 +31,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.viewmodel.MoveFolderViewModel
 
 /**
@@ -53,10 +53,12 @@ fun MoveFolderDialog(
     error: String?,
     onMove: (targetFolderId: String?, targetName: String) -> Unit,
     onDismiss: () -> Unit,
+    /** Hangi sayfanın klasörleri gösterilir: ana sayfa (varsayılan) ya da yapay zeka sonuçları ([FolderLocations.AI_RESULTS]). */
+    location: String = FolderLocations.HOME,
     viewModel: MoveFolderViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
-    LaunchedEffect(viewModel) { viewModel.start() }
+    LaunchedEffect(viewModel, location) { viewModel.start(location) }
     // Pencere kapanınca gezinti sıfırlanır: bir sonraki açılışta eski liste bir an görünmesin.
     DisposableEffect(viewModel) { onDispose { viewModel.clear() } }
 
@@ -105,7 +107,7 @@ fun MoveFolderDialog(
                     when {
                         loadError != null -> ErrorRetry(loadError, viewModel::retry, Modifier.align(Alignment.Center))
 
-                        list == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
+                        list == null -> ListSkeleton(Modifier.fillMaxWidth(), rows = 3, contentPadding = PaddingValues(0.dp))
 
                         list.isEmpty() -> Text(
                             "Bu klasörde alt klasör yok.",
@@ -148,7 +150,7 @@ fun MoveFolderDialog(
                 onClick = { onMove(state.currentId, state.currentName) },
             ) { Text("Buraya taşı") }
         },
-        dismissButton = { TextButton(enabled = !moving, onClick = onDismiss) { Text("Vazgeç") } },
+        dismissButton = { TextButton(enabled = !moving, onClick = onDismiss) { Text("İptal") } },
     )
 }
 

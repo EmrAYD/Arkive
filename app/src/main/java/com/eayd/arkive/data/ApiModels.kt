@@ -99,6 +99,10 @@ data class FileDto(
     val favorite: Boolean,
     val status: String,
     @SerializedName("created_at") val createdAt: String,
+    /** Dosyanın (ya da aynı içerikli bir kopyasının) yapay zeka özeti var mı; AI düğmesi buna göre dolu görünür. */
+    @SerializedName("has_summary") val hasSummary: Boolean = false,
+    /** Dosya "AI Sonuçlarım" sayfasında (yapay zekanın ürettiği bir sonuç); bunlar özetlenmez, AI düğmesi gösterilmez. */
+    @SerializedName("in_ai_results") val inAiResults: Boolean = false,
 )
 
 /** Yüklemeyi başlatırken gönderilen bilgi: dosyanın kendisi değil, yalnızca adı/boyutu/türü. */
@@ -123,4 +127,33 @@ data class InitUploadResponse(
 data class DownloadUrlResponse(
     val url: String,
     @SerializedName("expires_in") val expiresIn: Int,
+)
+
+/**
+ * Dosyanın kayıtlı yapay zeka özeti (GET/POST/PUT /files/{id}/summary). [source]: "local" (telefonda) ya da "cloud"
+ * (sunucuda). [truncated]: dosya çok uzun olduğu için yalnızca ilk bölümü özetlendi (sunucu bunu özet metnine de yazar).
+ */
+data class SummaryResponse(
+    val summary: String,
+    val source: String = "cloud",
+    val model: String? = null,
+    val truncated: Boolean = false,
+    /** Özetin "AI Sonuçlarım" sayfasındaki PDF dosyası; düğmeye basınca bu dosyanın ön izlemesi açılır. */
+    @SerializedName("result_file_id") val resultFileId: String? = null,
+)
+
+/**
+ * Dosyanın bulutta özetlenmesi (POST /files/{id}/summary). [password]: yalnızca parolalı dosyada; bu istekte gider,
+ * sunucu saklamaz. [template]: özet PDF'inin şablon adı ([com.eayd.arkive.ai.SummaryTemplate.id]).
+ */
+data class SummarizeRequest(val password: String? = null, val template: String? = null)
+
+/** Telefonda üretilen özetin sunucuya kaydı (PUT /files/{id}/summary). */
+data class SaveSummaryRequest(
+    val summary: String,
+    val model: String? = null,
+    /** Özet PDF'inin şablon adı ([com.eayd.arkive.ai.SummaryTemplate.id]). */
+    val template: String? = null,
+    /** Telefonun ürettiği özet PDF'i (base64). Yoksa sunucu PDF'i kendisi üretir. */
+    @SerializedName("pdf_base64") val pdfBase64: String? = null,
 )

@@ -7,8 +7,14 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.initializer
 import androidx.lifecycle.viewmodel.viewModelFactory
 import com.eayd.arkive.data.ApiClient
+import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.data.FileDownloader
+import com.eayd.arkive.ai.DocumentReader
+import com.eayd.arkive.ai.InputCache
+import com.eayd.arkive.ai.PasswordException
+import com.eayd.arkive.ai.UnreadableDocumentException
 import com.eayd.arkive.data.FileDto
+import com.eayd.arkive.data.ListCache
 import com.eayd.arkive.data.NetworkPolicy
 import com.eayd.arkive.data.PdfDoc
 import com.eayd.arkive.utils.PreviewKind
@@ -30,6 +36,8 @@ sealed interface PreviewContent {
     class Image(val bitmap: Bitmap) : PreviewContent
     class Pdf(val doc: PdfDoc) : PreviewContent
     class Text(val text: String, val truncated: Boolean) : PreviewContent
+    /** Dosya parola ile korunuyor; parola girilince ön izleme açılır ([PreviewViewModel.unlock]). */
+    data object PasswordProtected : PreviewContent
     /** Video ve ses, indirilmeden doğrudan imzalı adresten akış olarak oynatılır. */
     class Media(val url: String, val isAudio: Boolean) : PreviewContent
     /** Ön izleme yapılamıyor (tür desteklenmiyor, dosya çok büyük…); ekranda neden ve "indir" düğmesi gösterilir. */
@@ -44,15 +52,17 @@ sealed interface PreviewState {
 }
 
 /** Ön izleme ekranının 3 nokta menüsünden açılan pencereler. Aynı anda en fazla biri açıktır ([DialogHost]). */
-enum class PreviewDialog { Rename, Move, Info, Delete }
+enum class PreviewDialog { Rename, Move, Info, Delete, Password }
 
 /**
  * Tek bir dosyanın ön izlemesini hazırlar: dosya bilgisini ve imzalı adresi sunucudan alır, türüne göre
  *  - resim / PDF  → dosyayı geçici olarak telefonun önbelleğine indirir ve çözer,
+ *  - Word (DOCX)  → dosyayı indirir, metnini çıkarıp düz metin olarak gösterir (biçim ve görseller yok),
  *  - metin        → ilk 512 KB'ı okur,
+ *  - parolalı PDF/DOCX → parola istenir; PDF'in parolasız bir kopyası önbelleğe yazılır (çizici parolalı PDF açamaz),
  *  - video / ses  → yalnızca adresi verir (oynatıcı akıştan okur),
  *  - diğerleri    → "ön izleme yok" der.
- * Ekrandan çıkılınca ([onCleared]) indirilen geçici dosya silinir ve PDF belgesi kapatılır.
+ * Ekrandan çıkılınca ([onCleared]) indirilen geçici dosyalar (parolasız kopya dahil) silinir ve PDF belgesi kapatılır.
  */
 class PreviewViewModel(
     private val fileId: String,
@@ -83,7 +93,11 @@ class PreviewViewModel(
     val deleted: StateFlow<Boolean> = _deleted.asStateFlow()
 
     private val tempFile = File(cacheDir, "preview/$fileId")
+    private val unlockedFile = File(cacheDir, "preview/$fileId.unlocked")
     private var pdf: PdfDoc? = null
+
+    /** Parola bekleyen dosya (indirilmiş geçici kopya ya da telefondaki kopya) ve türü. */
+    private var locked: Pair<PreviewKind, File>? = null
     private var job: Job? = null
 
     init {
@@ -94,13 +108,30 @@ class PreviewViewModel(
         job?.cancel()
         _state.value = PreviewState.Loading()
         job = launchCatching(onError = { _state.value = PreviewState.Error(it) }) {
-            val file = ApiClient.api.getFile(fileId)
+            val file = try {
+                ApiClient.api.getFile(fileId)
+            } catch (e: IOException) {
+                // İnternet yok: dosya telefonda kayıtlıysa (liste kaydı + dosya kopyası) ön izleme oradan açılır.
+                val offline = withContext(Dispatchers.IO) {
+                    ListCache.findFile(fileId)?.let { f -> InputCache.get(f.id, f.size)?.let { f to it } }
+                } ?: throw IOException("Sunucuya ulaşılamadı ve bu dosya telefonda kayıtlı değil.", e)
+                _title.value = offline.first.name
+                show(offline.first, buildContent(offline.first, offline.second))
+                return@launchCatching
+            }
             _title.value = file.name
-            _state.value = PreviewState.Ready(file, buildContent(file))
+            show(file, buildContent(file))
         }
     }
 
-    private suspend fun buildContent(file: FileDto): PreviewContent {
+    private fun show(file: FileDto, content: PreviewContent) {
+        _state.value = PreviewState.Ready(file, content)
+        // Parolalı dosyada parola penceresi kendiliğinden açılır; kapatılırsa ekrandaki düğmeden yeniden açılır.
+        if (content is PreviewContent.PasswordProtected) dialogs.open(PreviewDialog.Password)
+    }
+
+    /** [local] doluysa içerik internetsiz, telefondaki kopyadan hazırlanır (video/ses gibi akış türleri hariç). */
+    private suspend fun buildContent(file: FileDto, local: File? = null): PreviewContent {
         val kind = previewKind(file.mimeType, file.name)
         if (kind == PreviewKind.None) {
             return PreviewContent.NoPreview("Bu dosya türü için ön izleme desteklenmiyor.")
@@ -110,11 +141,14 @@ class PreviewViewModel(
         val limit = when (kind) {
             PreviewKind.Image -> MAX_IMAGE_BYTES
             PreviewKind.Pdf -> MAX_PDF_BYTES
+            PreviewKind.Docx -> MAX_DOCX_BYTES
             else -> Long.MAX_VALUE
         }
         if (file.size > limit) {
             return PreviewContent.NoPreview("Dosya ön izleme için çok büyük (${formatBytes(file.size)}).")
         }
+
+        if (local != null) return buildLocalContent(kind, local)
 
         NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa dosya içeriği indirilmez
         val url = ApiClient.api.getDownloadUrl(fileId).url
@@ -130,33 +164,100 @@ class PreviewViewModel(
 
             PreviewKind.Image -> {
                 downloadToTemp(url, limit)
-                val bitmap = withContext(Dispatchers.IO) {
-                    try {
-                        decodeScaledBitmap(tempFile)
-                    } catch (e: OutOfMemoryError) {
-                        null
-                    }
-                }
-                if (bitmap != null) PreviewContent.Image(bitmap)
-                else PreviewContent.NoPreview("Bu görüntü biçimi telefonda açılamıyor.")
+                decodeImage(tempFile)
             }
 
             PreviewKind.Pdf -> {
                 downloadToTemp(url, limit)
-                try {
-                    val doc = PdfDoc.open(tempFile)
-                    pdf = doc
-                    if (doc.pageCount == 0) PreviewContent.NoPreview("PDF'te sayfa yok.")
-                    else PreviewContent.Pdf(doc)
-                } catch (e: SecurityException) {
-                    PreviewContent.NoPreview("Bu PDF şifreli, ön izlenemiyor.")
-                } catch (e: IOException) {
-                    PreviewContent.NoPreview("PDF açılamadı; dosya bozuk olabilir.")
-                }
+                openPdf(tempFile)
+            }
+
+            PreviewKind.Docx -> {
+                downloadToTemp(url, limit)
+                openDocx(tempFile, password = null)
             }
 
             PreviewKind.None -> PreviewContent.NoPreview("Bu dosya türü için ön izleme desteklenmiyor.")
         }
+    }
+
+    /** İnternetsiz: yalnızca telefonda kopyası tutulan türler (metin, PDF) açılır; kopya yalnızca bunlar için alınır. */
+    private suspend fun buildLocalContent(kind: PreviewKind, local: File): PreviewContent = when (kind) {
+        PreviewKind.Text -> withContext(Dispatchers.IO) {
+            val bytes = local.readBytes()
+            PreviewContent.Text(
+                String(bytes, 0, minOf(bytes.size, MAX_TEXT_BYTES), Charsets.UTF_8),
+                truncated = bytes.size > MAX_TEXT_BYTES,
+            )
+        }
+
+        PreviewKind.Pdf -> openPdf(local)
+
+        PreviewKind.Docx -> openDocx(local, password = null)
+
+        else -> PreviewContent.NoPreview("Sunucuya ulaşılamadığında bu dosya türü ön izlenemiyor.")
+    }
+
+    private suspend fun decodeImage(file: File): PreviewContent {
+        val bitmap = withContext(Dispatchers.IO) {
+            try {
+                decodeScaledBitmap(file)
+            } catch (e: OutOfMemoryError) {
+                null
+            }
+        }
+        return if (bitmap != null) PreviewContent.Image(bitmap)
+        else PreviewContent.NoPreview("Bu görüntü biçimi telefonda açılamıyor.")
+    }
+
+    private suspend fun openPdf(file: File): PreviewContent = try {
+        val doc = PdfDoc.open(file)
+        pdf = doc
+        if (doc.pageCount == 0) PreviewContent.NoPreview("PDF'te sayfa yok.") else PreviewContent.Pdf(doc)
+    } catch (e: SecurityException) {
+        // Android'in PDF çizicisi parolalı dosyayı açamaz: parola istenir, çözülmüş kopya çizilir ([unlock]).
+        locked = PreviewKind.Pdf to file
+        PreviewContent.PasswordProtected
+    } catch (e: IOException) {
+        PreviewContent.NoPreview("PDF açılamadı; dosya bozuk olabilir.")
+    }
+
+    /**
+     * Word belgesini metne çevirip gösterir. Parola gerekiyorsa ve [password] yoksa [PreviewContent.PasswordProtected];
+     * [password] yanlışsa hata fırlatılır (parola penceresinde gösterilir).
+     */
+    private suspend fun openDocx(file: File, password: String?): PreviewContent = try {
+        val text = DocumentReader.readDocxFile(file, password).text
+        when {
+            text.isBlank() -> PreviewContent.NoPreview("Belgede gösterilecek metin yok.")
+            text.length > MAX_TEXT_BYTES -> PreviewContent.Text(text.take(MAX_TEXT_BYTES), truncated = true)
+            else -> PreviewContent.Text(text, truncated = false)
+        }
+    } catch (e: PasswordException) {
+        if (e.wrong) throw e
+        locked = PreviewKind.Docx to file
+        PreviewContent.PasswordProtected
+    } catch (e: UnreadableDocumentException) {
+        PreviewContent.NoPreview("Belge açılamadı: ${e.message}")
+    }
+
+    /**
+     * Parola penceresinde "Aç": parola doğruysa ön izleme açılır ve pencere kapanır; yanlışsa pencerede
+     * "Parola yanlış." görünür. Parola yalnızca bu telefonda, dosyayı açmak için kullanılır; sunucuya gitmez.
+     */
+    fun unlock(password: String) = dialogs.submit {
+        val (kind, source) = locked ?: return@submit
+        val file = (_state.value as? PreviewState.Ready)?.file ?: return@submit
+        val content = when (kind) {
+            PreviewKind.Docx -> openDocx(source, password)
+            else -> {
+                unlockedFile.parentFile?.mkdirs()
+                DocumentReader.unlockPdf(AppSettings.appContext, source, password, unlockedFile)
+                openPdf(unlockedFile)
+            }
+        }
+        locked = null
+        _state.value = PreviewState.Ready(file, content)
     }
 
     private suspend fun downloadToTemp(url: String, maxBytes: Long) {
@@ -216,11 +317,13 @@ class PreviewViewModel(
     override fun onCleared() {
         pdf?.closeAsync()
         tempFile.delete()
+        unlockedFile.delete() // parolasız kopya telefonda kalmasın
     }
 
     companion object {
         private const val MAX_IMAGE_BYTES = 30L * 1024 * 1024
         private const val MAX_PDF_BYTES = 50L * 1024 * 1024
+        private const val MAX_DOCX_BYTES = 20L * 1024 * 1024
         private const val MAX_TEXT_BYTES = 512 * 1024
 
         fun factory(fileId: String, cacheDir: File): ViewModelProvider.Factory = viewModelFactory {

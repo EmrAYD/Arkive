@@ -48,6 +48,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eayd.arkive.ai.AiMode
+import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.utils.openNotificationSettings
@@ -71,6 +73,8 @@ fun ProfileScreen(
     val state by viewModel.state.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
     val wifiOnly by viewModel.wifiOnly.collectAsState()
+    val aiMode by viewModel.aiMode.collectAsState()
+    val summaryTemplate by viewModel.summaryTemplate.collectAsState()
     val context = LocalContext.current
     val snackbar = remember { SnackbarHostState() }
     NoticeEffect(state.notice, snackbar, viewModel::clearNotice)
@@ -109,6 +113,8 @@ fun ProfileScreen(
                 SettingsSection(
                     themeMode = themeMode,
                     wifiOnly = wifiOnly,
+                    aiMode = aiMode,
+                    summaryTemplate = summaryTemplate,
                     // Değer sunucudan gelene kadar satır pasif kalır.
                     trashRetentionDays = if (state.storage != null) state.trashRetentionDays else null,
                     onNotifications = {
@@ -116,6 +122,8 @@ fun ProfileScreen(
                     },
                     onTheme = { viewModel.openDialog(ProfileDialog.Theme) },
                     onWifiOnlyChange = viewModel::setWifiOnly,
+                    onAiMode = { viewModel.openDialog(ProfileDialog.AiProcessing) },
+                    onSummaryTemplate = { viewModel.openDialog(ProfileDialog.SummaryTemplateChoice) },
                     onTrashRetention = { viewModel.openDialog(ProfileDialog.TrashRetention) },
                 )
 
@@ -155,6 +163,8 @@ fun ProfileScreen(
 private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
     val host by viewModel.dialogs.state.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
+    val aiMode by viewModel.aiMode.collectAsState()
+    val summaryTemplate by viewModel.summaryTemplate.collectAsState()
     val close = viewModel.dialogs::close
 
     when (host.current) {
@@ -176,6 +186,31 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
             saving = false,
             error = null,
             onSave = viewModel::setThemeMode,
+            onDismiss = close,
+        )
+
+        ProfileDialog.AiProcessing -> ChoiceDialog(
+            title = "Yapay zeka işlem yeri",
+            description = AiMode.entries.joinToString("\n\n") { "${it.label}: ${it.description}" },
+            options = AiMode.entries,
+            current = aiMode,
+            optionLabel = { it.label },
+            saving = false,
+            error = null,
+            onSave = viewModel::setAiMode,
+            onDismiss = close,
+        )
+
+        ProfileDialog.SummaryTemplateChoice -> ChoiceDialog(
+            title = "Özet şablonu",
+            description = SummaryTemplate.entries.joinToString("\n\n") { "${it.label}: ${it.description}" } +
+                "\n\nŞablon yalnızca bundan sonra üretilen özetler için geçerlidir.",
+            options = SummaryTemplate.entries,
+            current = summaryTemplate,
+            optionLabel = { it.label },
+            saving = false,
+            error = null,
+            onSave = viewModel::setSummaryTemplate,
             onDismiss = close,
         )
 
@@ -247,6 +282,6 @@ private fun <T> ChoiceDialog(
             }
         },
         confirmButton = { TextButton(enabled = !saving, onClick = { onSave(selected) }) { Text("Kaydet") } },
-        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("Vazgeç") } },
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("İptal") } },
     )
 }

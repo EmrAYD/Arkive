@@ -2,6 +2,9 @@ package com.eayd.arkive.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.eayd.arkive.ai.AiMode
+import com.eayd.arkive.ai.AiSummarizer
+import com.eayd.arkive.ai.SummaryTemplate
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,7 +17,7 @@ enum class ThemeMode(val label: String) {
 }
 
 /**
- * Bu cihaza özgü uygulama ayarları (tema, yalnızca Wi-Fi ile aktarım). Sunucuya gitmez; SharedPreferences'ta
+ * Bu cihaza özgü uygulama ayarları (tema, yalnızca Wi-Fi ile aktarım, yapay zeka işlem yeri). Sunucuya gitmez; SharedPreferences'ta
  * saklanır, değerler StateFlow olarak dinlenir. [init] uygulama açılırken (MainActivity) bir kez çağrılır.
  */
 object AppSettings {
@@ -23,7 +26,8 @@ object AppSettings {
     private const val KEY_THEME = "theme_mode"
     private const val KEY_WIFI_ONLY = "wifi_only"
     private const val KEY_PENDING_EULA_UID = "pending_eula_uid"
-    private const val KEY_AI_FILES = "ai_files"
+    private const val KEY_AI_MODE = "ai_mode"
+    private const val KEY_SUMMARY_TEMPLATE = "summary_template"
 
     private lateinit var prefs: SharedPreferences
 
@@ -39,11 +43,15 @@ object AppSettings {
     val wifiOnly: StateFlow<Boolean> = _wifiOnly.asStateFlow()
 
     /**
-     * Yapay zeka düğmesi açık işaretlenmiş dosyaların kimlikleri. Şimdilik yalnızca bu cihazda tutulur
-     * (sunucuya gitmez); yapay zeka özellikleri gelince sunucu tarafına taşınabilir.
+     * Yapay zeka özetlemesinin nerede yapılacağı: yerel (telefon), bulut (sunucu) ya da ikisi (uygun olan yerel,
+     * olmayan bulut). Varsayılan ikisi. Kurallar için bkz. [com.eayd.arkive.ai.AiPolicy].
      */
-    private val _aiFiles = MutableStateFlow<Set<String>>(emptySet())
-    val aiFiles: StateFlow<Set<String>> = _aiFiles.asStateFlow()
+    private val _aiMode = MutableStateFlow(AiMode.Hybrid)
+    val aiMode: StateFlow<AiMode> = _aiMode.asStateFlow()
+
+    /** Yeni üretilen özet PDF'inin şablonu; sunucuya her özet isteğiyle birlikte gider. Varsayılan klasik. */
+    private val _summaryTemplate = MutableStateFlow(SummaryTemplate.Default)
+    val summaryTemplate: StateFlow<SummaryTemplate> = _summaryTemplate.asStateFlow()
 
     fun init(context: Context) {
         if (::prefs.isInitialized) return
@@ -51,7 +59,9 @@ object AppSettings {
         prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
         _themeMode.value = storedThemeMode(appContext)
         _wifiOnly.value = prefs.getBoolean(KEY_WIFI_ONLY, false)
-        _aiFiles.value = prefs.getStringSet(KEY_AI_FILES, emptySet())?.toSet() ?: emptySet()
+        _aiMode.value = AiMode.entries.firstOrNull { it.name == prefs.getString(KEY_AI_MODE, null) } ?: AiMode.Hybrid
+        _summaryTemplate.value = SummaryTemplate.fromId(prefs.getString(KEY_SUMMARY_TEMPLATE, null))
+        AiSummarizer.start(appContext) // bekleyen telefon özetlerini yükler
     }
 
     /**
@@ -79,12 +89,14 @@ object AppSettings {
             prefs.edit().apply { if (value == null) remove(KEY_PENDING_EULA_UID) else putString(KEY_PENDING_EULA_UID, value) }.commit()
         }
 
-    /** Dosyanın yapay zeka düğmesini açar/kapatır. */
-    fun toggleAiFile(fileId: String) {
-        val next = _aiFiles.value.let { if (fileId in it) it - fileId else it + fileId }
-        _aiFiles.value = next
-        // getStringSet'in döndürdüğü küme değiştirilmemeli: her seferinde yeni bir küme yazılır.
-        prefs.edit().putStringSet(KEY_AI_FILES, HashSet(next)).apply()
+    fun setAiMode(mode: AiMode) {
+        _aiMode.value = mode
+        prefs.edit().putString(KEY_AI_MODE, mode.name).apply()
+    }
+
+    fun setSummaryTemplate(template: SummaryTemplate) {
+        _summaryTemplate.value = template
+        prefs.edit().putString(KEY_SUMMARY_TEMPLATE, template.id).apply()
     }
 
     fun setWifiOnly(enabled: Boolean) {

@@ -21,11 +21,16 @@ data class MoveFolderState(
     val path: List<FolderDto> = emptyList(),
     val folders: List<FolderDto>? = null,
     val error: String? = null,
+    /** Gezinilen sayfa: [FolderLocations.HOME] ya da [FolderLocations.AI_RESULTS]. */
+    val location: String = FolderLocations.HOME,
 ) {
-    /** Şu anki klasörün kimliği (null = ana sayfanın en üstü). */
+    /** Sayfanın en üstünün adı. */
+    val rootName: String get() = if (location == FolderLocations.AI_RESULTS) "AI Sonuçlarım" else "Ana Sayfa"
+
+    /** Şu anki klasörün kimliği (null = sayfanın en üstü). */
     val currentId: String? get() = path.lastOrNull()?.id
-    val currentName: String get() = path.lastOrNull()?.name ?: "Ana Sayfa"
-    val breadcrumb: String get() = (listOf("Ana Sayfa") + path.map { it.name }).joinToString("  ›  ")
+    val currentName: String get() = path.lastOrNull()?.name ?: rootName
+    val breadcrumb: String get() = (listOf(rootName) + path.map { it.name }).joinToString("  ›  ")
 }
 
 class MoveFolderViewModel : ViewModel() {
@@ -35,8 +40,11 @@ class MoveFolderViewModel : ViewModel() {
 
     private var job: Job? = null
 
-    /** Pencere her açıldığında çağrılır: en üstten başlar. */
-    fun start() = go(emptyList())
+    /** Pencere her açıldığında çağrılır: [location] sayfasının en üstünden başlar. */
+    fun start(location: String = FolderLocations.HOME) {
+        _state.value = MoveFolderState(location = location)
+        go(emptyList())
+    }
 
     fun open(folder: FolderDto) = go(_state.value.path + folder)
 
@@ -47,18 +55,19 @@ class MoveFolderViewModel : ViewModel() {
     /** Pencere kapandı: bekleyen istek iptal edilir, gezinti sıfırlanır. */
     fun clear() {
         job?.cancel()
-        _state.value = MoveFolderState()
+        _state.value = MoveFolderState(location = _state.value.location)
     }
 
     private fun go(path: List<FolderDto>) {
         job?.cancel()
-        _state.value = MoveFolderState(path = path)
+        val location = _state.value.location
+        _state.value = MoveFolderState(path = path, location = location)
         val parentId = path.lastOrNull()?.id
         job = launchCatching(onError = { message -> _state.update { it.copy(error = message) } }) {
-            // Dosyalar yalnızca "home" konumuna taşınabildiği için kökte yalnızca onun klasörleri istenir.
+            // Normal dosyalar ana sayfaya, yapay zeka sonuç dosyaları AI Sonuçlarım'a taşınır: kökte yalnızca o sayfanın klasörleri istenir.
             val children = ApiClient.api.getFolders(
                 parentId = parentId,
-                location = if (parentId == null) FolderLocations.HOME else null,
+                location = if (parentId == null) location else null,
             ).sortedBy { it.name.lowercase() }
             _state.update { it.copy(folders = children) }
         }

@@ -30,9 +30,9 @@ data class TrashUiState(
     val selection: Selection = Selection(),
     /** Geri yükleme / silme isteği sürüyor: düğmeler kilitlenir. */
     val busy: Boolean = false,
-    /** "Kalıcı sil" onay penceresi açık mı. */
+    /** "Kalıcı olarak sil" onay penceresi açık mı. */
     val confirmDelete: Boolean = false,
-    /** "Çöp kutusunu boşalt" onay penceresi açık mı. */
+    /** "Tümünü sil" onay penceresi açık mı. */
     val confirmEmpty: Boolean = false,
 ) {
     val itemCount: Int get() = files.size + folders.size
@@ -146,7 +146,7 @@ class TrashViewModel(private val folderId: String? = null) : ViewModel() {
     /** Çöp kutusundaki HER ŞEYİ kalıcı siler (DELETE /trash). */
     fun emptyTrash() {
         if (isFolderView || _state.value.busy) return
-        // "Boşalt"a basılır basılmaz onay penceresi kapanır; iş arka planda sürer, sonucu bildirim olarak gelir.
+        // "Kalıcı olarak sil"e basılır basılmaz onay penceresi kapanır; iş arka planda sürer, sonucu bildirim olarak gelir.
         _state.update { it.copy(busy = true, confirmEmpty = false) }
         launchCatching(
             onError = { message -> _state.update { it.copy(busy = false, notice = message) } },
@@ -174,7 +174,7 @@ class TrashViewModel(private val folderId: String? = null) : ViewModel() {
         val current = _state.value
         if (current.selection.count == 0 || current.busy) return
         val ids = TrashIdsRequest(fileIds = current.selection.fileIds, folderIds = current.selection.folderIds)
-        // "Kalıcı sil"e basılır basılmaz onay penceresi kapanır (confirmDelete = false); düğmeler busy ile kilitlenir.
+        // "Kalıcı olarak sil"e basılır basılmaz onay penceresi kapanır (confirmDelete = false); düğmeler busy ile kilitlenir.
         _state.update { it.copy(busy = true, confirmDelete = false) }
         launchCatching(
             onError = { message -> _state.update { it.copy(busy = false, notice = message) } },

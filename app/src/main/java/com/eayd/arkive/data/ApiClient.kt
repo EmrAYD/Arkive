@@ -89,14 +89,23 @@ object ApiClient {
         .callTimeout(0, TimeUnit.SECONDS)
         .build()
 
-    /** Kullanım: `ApiClient.api.getMe()` (bir coroutine içinden). */
-    val api: ArkiveApi by lazy {
+    private fun retrofit(client: OkHttpClient): ArkiveApi =
         Retrofit.Builder()
             .baseUrl("${ApiConfig.BASE_URL}/")   // Retrofit taban adresin "/" ile bitmesini ister
-            .client(http)
+            .client(client)
             // serializeNulls: Map içindeki null değerler de JSON'a yazılsın ("color": null = rengi sil).
             .addConverterFactory(GsonConverterFactory.create(GsonBuilder().serializeNulls().create()))
             .build()
             .create(ArkiveApi::class.java)
+
+    /** Kullanım: `ApiClient.api.getMe()` (bir coroutine içinden). */
+    val api: ArkiveApi by lazy { retrofit(http) }
+
+    /**
+     * Yapay zeka (bulut özetleme) çağrıları için: aynı oturum/kimlik doğrulama, ama sunucudaki dil modelinin yanıtı
+     * dakikalar sürebildiği için okuma süresi uzundur. Yalnızca `summarizeFile` bunu kullanır.
+     */
+    val aiApi: ArkiveApi by lazy {
+        retrofit(http.newBuilder().readTimeout(180, TimeUnit.SECONDS).build())
     }
 }
