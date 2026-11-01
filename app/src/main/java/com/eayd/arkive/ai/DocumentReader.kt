@@ -121,6 +121,8 @@ object DocumentReader {
         }
         document.use { doc ->
             val pages = doc.numberOfPages
+            // Yerelde özetlenemeyecek kadar uzunsa metni okumak boşa emektir; [AiPolicy.localRejection] yalnızca sayfa sayısına bakar.
+            if (pages > AiPolicy.LOCAL_MAX_PAGES) return ReadDocument("", DocumentStats(words = 0, pages = pages, images = 0))
             val text = PDFTextStripper().getText(doc).trim()
             var images = 0
             for (page in doc.pages) {

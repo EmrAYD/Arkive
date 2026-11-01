@@ -14,9 +14,10 @@ package com.eayd.arkive.ai
 
 /** Ayarlardaki "yapay zeka işlem yeri". */
 enum class AiMode(val label: String, val description: String) {
-    Local("Yerel", "Özetleme yalnızca bu telefonda yapılır (telefonda kayıtlı dosyalarda internet gerekmez); özet belgenin en önemli cümlelerinden oluşur. Yalnızca küçük (en çok 1 MB), metin ağırlıklı dosyalar özetlenebilir."),
+    Local("Yerel", "Özetleme yalnızca bu telefonda yapılır (telefonda kayıtlı dosyalarda internet gerekmez); özet belgenin en önemli cümlelerinden oluşur. Yalnızca küçük (en çok 1 MB ve 10 sayfa), metin ağırlıklı dosyalar özetlenebilir."),
     Cloud("Bulut", "Özetleme her zaman sunucudaki yapay zeka ile yapılır; özet yeniden yazılır. Büyük ve görsel ağırlıklı dosyalar dahil hepsi özetlenebilir."),
-    Hybrid("Yerel + Bulut", "Uygun dosyalar telefonda, uygun olmayanlar (büyük, çok görselli) sunucuda özetlenir.");
+    Hybrid("Yerel + Bulut", "Uygun dosyalar telefonda, uygun olmayanlar (büyük, 10 sayfadan uzun, çok görselli) sunucuda özetlenir."),
+    ;
 
     val allowsLocal: Boolean get() = this != Cloud
     val allowsCloud: Boolean get() = this != Local
@@ -31,6 +32,7 @@ data class DocumentStats(val words: Int, val pages: Int?, val images: Int)
 /** Dosyanın yerelde özetlenememe nedeni. [message] kullanıcıya gösterilir. */
 enum class LocalRejection(val message: String) {
     TooBig("Dosya yerelde özetlenemeyecek kadar büyük."),
+    TooManyPages("Dosya yerelde özetlenemeyecek kadar uzun (en çok 10 sayfa)."),
     ImageHeavy("Dosya çok fazla görsel içeriyor."),
     NoText("Dosyadan okunabilir metin çıkarılamadı."),
 }
@@ -51,6 +53,15 @@ object AiPolicy {
 
     /** Bundan büyük dosyalar yerelde özetlenmez (bayt). */
     const val LOCAL_MAX_BYTES: Long = 1L * 1024 * 1024
+
+    /** Bundan çok sayfalı belgeler yerelde özetlenmez (PDF, DOCX ve düz metin). */
+    const val LOCAL_MAX_PAGES: Int = 10
+
+    /** Sayfa sayısı bilinmeyen belgede (düz metin, DOCX) sayfa, kelime sayısından kabaca hesaplanır: sayfa başına bu kadar kelime. */
+    const val WORDS_PER_PAGE: Int = 1000
+
+    /** Belgenin sayfa sayısı: PDF'te gerçek değer, düz metin ve DOCX'te kelime sayısından tahmin ([WORDS_PER_PAGE]). */
+    fun pagesOf(stats: DocumentStats): Int = stats.pages ?: ((stats.words + WORDS_PER_PAGE - 1) / WORDS_PER_PAGE)
 
     /** Bir PDF'te bu kadar ya da daha fazla görsel varsa ve sayfa başına oranı aşıldıysa "görsel ağırlıklı" sayılır. */
     const val IMAGE_HEAVY_MIN_IMAGES: Int = 4
@@ -81,8 +92,12 @@ object AiPolicy {
         }
     }
 
-    /** Belge yerelde özetlenemiyorsa nedeni; uygunsa null. Boyut denetimi [precheck]'tedir. Görsel denetimi metinsizlikten önce gelir. */
+    /**
+     * Belge yerelde özetlenemiyorsa nedeni; uygunsa null. Boyut denetimi [precheck]'tedir. Sayfa sınırı ilk bakılandır
+     * (çok sayfalı PDF'in metni okunmaz, [stats] boş gelir; düz metin ve DOCX'te sayfa sayısı kelimeden tahmin edilir); görsel denetimi metinsizlikten önce gelir.
+     */
     fun localRejection(stats: DocumentStats): LocalRejection? = when {
+        pagesOf(stats) > LOCAL_MAX_PAGES -> LocalRejection.TooManyPages
         isImageHeavy(stats) -> LocalRejection.ImageHeavy
         stats.words == 0 -> LocalRejection.NoText
         else -> null
