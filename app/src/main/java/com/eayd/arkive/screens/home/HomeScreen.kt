@@ -128,6 +128,7 @@ fun HomeScreen(
                             onBack = { section = HomeSection.Files },
                             onOpenFolder = onOpenTrashFolder,
                             onOpenFile = onOpenTrashFile,
+                            onOpenMenu = { scope.launch { drawerState.open() } },
                         )
 
                         HomeSection.Favorites -> BrowserContent(

@@ -22,6 +22,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
+import androidx.compose.material.icons.filled.Menu
 import androidx.compose.material.icons.filled.Restore
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -62,7 +63,7 @@ import com.eayd.arkive.viewmodel.fileKey
 import com.eayd.arkive.viewmodel.folderKey
 
 /**
- * Çöp kutusu. Normal modda: geri oku, başlık + öğe sayısı, sağda "Tümünü sil" (kökte; onay sorar) ve "Seç"; altında saklama süresini anlatan bilgi
+ * Çöp kutusu. Normal modda: solda geri oku (ana ekranın içindeyken, yani [onOpenMenu] verilmişse bunun yerine menü düğmesi), başlık + öğe sayısı, sağda "Tümünü sil" (kökte; onay sorar) ve "Seç"; altında saklama süresini anlatan bilgi
  * metni ve silinen öğeler (her birinde kalıcı silinmeye kalan gün). "Seç"e ya da bir öğeye basınca seçim modu
  * açılır: solda "Hepsi", ortada başlık, sağda "İptal"; öğelerde seçim daireleri; altta "Geri yükle" ve "Kalıcı olarak sil".
  * Ekran yalnızca [TrashViewModel] durumunu çizer; seçim, geri yükleme ve silme ViewModel'dedir.
@@ -73,6 +74,11 @@ fun TrashScreen(
     onBack: () -> Unit,
     onOpenFolder: (folderId: String) -> Unit,
     onOpenFile: (fileId: String) -> Unit,
+    /**
+     * Ana ekranın içindeki (kök) çöp kutusunda verilir: soldaki geri oku yerine, diğer sayfalardaki gibi yan menüyü açan
+     * hamburger düğmesi gösterilir. Çöpteki bir klasörün içinde (ayrı ekran) verilmez; orada geri oku kalır.
+     */
+    onOpenMenu: (() -> Unit)? = null,
 ) {
     val state by viewModel.state.collectAsState()
     val notices = rememberNoticeHostState()
@@ -103,6 +109,7 @@ fun TrashScreen(
                     showEmpty = !state.isLoading && state.itemCount > 0 && !inFolder,
                     emptyEnabled = !state.busy,
                     onBack = onBack,
+                    onOpenMenu = onOpenMenu,
                     onSelect = viewModel::startSelecting,
                     onEmpty = viewModel::askEmptyTrash,
                 )
@@ -167,6 +174,7 @@ private fun TrashHeader(
     showEmpty: Boolean,
     emptyEnabled: Boolean,
     onBack: () -> Unit,
+    onOpenMenu: (() -> Unit)?,
     onSelect: () -> Unit,
     onEmpty: () -> Unit,
 ) {
@@ -174,8 +182,14 @@ private fun TrashHeader(
         modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onBack) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+        if (onOpenMenu != null) {
+            IconButton(onClick = onOpenMenu) {
+                Icon(Icons.Filled.Menu, contentDescription = "Menüyü aç")
+            }
+        } else {
+            IconButton(onClick = onBack) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+            }
         }
         Column(Modifier.weight(1f)) {
             Text(
