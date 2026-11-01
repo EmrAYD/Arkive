@@ -18,13 +18,12 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberUpdatedState
@@ -34,15 +33,18 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.ai.AiSummarizer
 import com.eayd.arkive.ai.InputCache
+import com.eayd.arkive.ai.SummaryDone
 import com.eayd.arkive.ai.SummaryStore
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
 import com.eayd.arkive.data.FolderLocations
-import com.eayd.arkive.ui.components.AiSummaryDialogHost
 import com.eayd.arkive.ui.components.CenteredHint
 import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.ListSkeleton
 import com.eayd.arkive.ui.components.NoticeEffect
+import com.eayd.arkive.ui.components.NoticeHost
+import com.eayd.arkive.ui.components.rememberNoticeHostState
+import com.eayd.arkive.ui.components.SummaryDoneBanner
 import com.eayd.arkive.ui.components.rememberFileDownloader
 import com.eayd.arkive.viewmodel.BrowserDialog
 import com.eayd.arkive.viewmodel.BrowserUiState
@@ -70,7 +72,7 @@ fun BrowserContent(
 ) {
     val state by viewModel.state.collectAsState()
     val selection = state.selection
-    val snackbar = remember { SnackbarHostState() }
+    val notices = rememberNoticeHostState()
     val context = LocalContext.current
     val startDownload = rememberFileDownloader(viewModel::showNotice)
     val listState = rememberLazyListState()
@@ -80,8 +82,11 @@ fun BrowserContent(
     LaunchedEffect(viewModel) { viewModel.onShown() }
     // Özetleme arka planda sürer; bitince ya da olmazsa kısa bir bildirimle haber verilir.
     LaunchedEffect(viewModel) { AiSummarizer.notices.collect(viewModel::showNotice) }
-    // Özet bitince liste sessizce yenilenir (AI düğmesi dolar); dolu düğmeye basılınca özet dosyasının ön izlemesi açılır.
-    val openPreview by rememberUpdatedState(onOpenFile)
+    // "Özetleme bitti" kartı (telefonda da bulutta da): dokunulunca özet açılır. Aynı anda birkaç özet biterse sırayla gösterilir.
+    val finished = remember { mutableStateListOf<SummaryDone>() }
+    LaunchedEffect(viewModel) { AiSummarizer.done.collect { finished.add(it) } }
+    // Özet bitince liste sessizce yenilenir (AI düğmesi dolar). Dolu düğmeye basılınca özet dosyasının ön izlemesinin
+    // açılması ve özet penceresi, tüm ekranlar için ortak olarak ArkiveNavHost'tadır.
     LaunchedEffect(viewModel) { AiSummarizer.completed.collect { viewModel.reloadQuietly() } }
     LaunchedEffect(viewModel) { AiSummarizer.flushPending() } // internetsizken üretilen özetler varsa yükle
     // Liste her yenilendiğinde küçük dosyalar arka planda telefona kopyalanır: internetsiz de yerel özetlenebilsinler.
@@ -89,8 +94,7 @@ fun BrowserContent(
     // İnternet geri gelince, liste telefondaki görüntüden gösteriliyorsa sunucudan tazelenir.
     val offlineNow by rememberUpdatedState(state.offline)
     LaunchedEffect(viewModel) { AiSummarizer.networkBack.collect { if (offlineNow) viewModel.reloadQuietly() } }
-    LaunchedEffect(viewModel) { AiSummarizer.openFile.collect { openPreview(it) } }
-    NoticeEffect(state.notice, snackbar, viewModel::clearNotice)
+    NoticeEffect(state.notice, notices, viewModel::clearNotice)
 
     // Geri tuşu önce seçimi kapatır.
     BackHandler(enabled = selection.active, onBack = viewModel::clearSelection)
@@ -188,15 +192,23 @@ fun BrowserContent(
             AutoScrollWhileDragging(dragState, listState)
             DragGhost(dragState)
 
-            SnackbarHost(
-                hostState = snackbar,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
-            )
+            // Ekranın en altında: "özetleme bitti" kartı ve (varsa) kısa bildirim üst üste durur, bildirim kartın üstünde.
+            Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)) {
+                NoticeHost(notices)
+                SummaryDoneBanner(
+                    done = finished.firstOrNull(),
+                    onOpen = { done ->
+                        finished.remove(done)
+                        AiSummarizer.openSummary(done.file)
+                    },
+                    onDismiss = { done -> finished.remove(done) },
+                    modifier = Modifier.padding(horizontal = 12.dp),
+                )
+            }
         }
     }
 
     BrowserDialogs(viewModel)
-    AiSummaryDialogHost()
 }
 
 /** Ortalanmış bir içerik; kaydırılabilir olduğu için aşağı çekerek yenileme boş durumlarda da çalışır. */

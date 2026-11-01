@@ -21,6 +21,8 @@ import com.eayd.arkive.utils.PreviewKind
 import com.eayd.arkive.utils.decodeScaledBitmap
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.utils.previewKind
+import com.eayd.arkive.word.WordDoc
+import com.eayd.arkive.word.WordLoader
 import java.io.File
 import java.io.IOException
 import kotlinx.coroutines.Dispatchers
@@ -36,6 +38,8 @@ sealed interface PreviewContent {
     class Image(val bitmap: Bitmap) : PreviewContent
     class Pdf(val doc: PdfDoc) : PreviewContent
     class Text(val text: String, val truncated: Boolean) : PreviewContent
+    /** Word belgesi (.docx ya da eski .doc); biçimiyle çizilir ([com.eayd.arkive.screens.preview.WordViewer]). */
+    class Word(val doc: WordDoc) : PreviewContent
     /** Dosya parola ile korunuyor; parola girilince ön izleme açılır ([PreviewViewModel.unlock]). */
     data object PasswordProtected : PreviewContent
     /** Video ve ses, indirilmeden doğrudan imzalı adresten akış olarak oynatılır. */
@@ -57,7 +61,7 @@ enum class PreviewDialog { Rename, Move, Info, Delete, Password }
 /**
  * Tek bir dosyanın ön izlemesini hazırlar: dosya bilgisini ve imzalı adresi sunucudan alır, türüne göre
  *  - resim / PDF  → dosyayı geçici olarak telefonun önbelleğine indirir ve çözer,
- *  - Word (DOCX)  → dosyayı indirir, metnini çıkarıp düz metin olarak gösterir (biçim ve görseller yok),
+ *  - Word (DOCX, DOC) → dosyayı indirir, biçimiyle (başlık, liste, tablo, görsel) gösterilecek hale getirir,
  *  - metin        → ilk 512 KB'ı okur,
  *  - parolalı PDF/DOCX → parola istenir; PDF'in parolasız bir kopyası önbelleğe yazılır (çizici parolalı PDF açamaz),
  *  - video / ses  → yalnızca adresi verir (oynatıcı akıştan okur),
@@ -141,7 +145,7 @@ class PreviewViewModel(
         val limit = when (kind) {
             PreviewKind.Image -> MAX_IMAGE_BYTES
             PreviewKind.Pdf -> MAX_PDF_BYTES
-            PreviewKind.Docx -> MAX_DOCX_BYTES
+            PreviewKind.Word -> MAX_WORD_BYTES
             else -> Long.MAX_VALUE
         }
         if (file.size > limit) {
@@ -172,9 +176,9 @@ class PreviewViewModel(
                 openPdf(tempFile)
             }
 
-            PreviewKind.Docx -> {
+            PreviewKind.Word -> {
                 downloadToTemp(url, limit)
-                openDocx(tempFile, password = null)
+                openWord(tempFile, password = null)
             }
 
             PreviewKind.None -> PreviewContent.NoPreview("Bu dosya türü için ön izleme desteklenmiyor.")
@@ -193,7 +197,7 @@ class PreviewViewModel(
 
         PreviewKind.Pdf -> openPdf(local)
 
-        PreviewKind.Docx -> openDocx(local, password = null)
+        PreviewKind.Word -> openWord(local, password = null)
 
         else -> PreviewContent.NoPreview("Sunucuya ulaşılamadığında bu dosya türü ön izlenemiyor.")
     }
@@ -223,22 +227,20 @@ class PreviewViewModel(
     }
 
     /**
-     * Word belgesini metne çevirip gösterir. Parola gerekiyorsa ve [password] yoksa [PreviewContent.PasswordProtected];
-     * [password] yanlışsa hata fırlatılır (parola penceresinde gösterilir).
+     * Word belgesini (.docx ya da eski .doc) biçimiyle gösterilecek hale getirir. Parola gerekiyorsa ve [password]
+     * yoksa [PreviewContent.PasswordProtected]; [password] yanlışsa hata fırlatılır (parola penceresinde gösterilir).
      */
-    private suspend fun openDocx(file: File, password: String?): PreviewContent = try {
-        val text = DocumentReader.readDocxFile(file, password).text
-        when {
-            text.isBlank() -> PreviewContent.NoPreview("Belgede gösterilecek metin yok.")
-            text.length > MAX_TEXT_BYTES -> PreviewContent.Text(text.take(MAX_TEXT_BYTES), truncated = true)
-            else -> PreviewContent.Text(text, truncated = false)
-        }
+    private suspend fun openWord(file: File, password: String?): PreviewContent = try {
+        val doc = withContext(Dispatchers.IO) { WordLoader.load(file.readBytes(), password) }
+        if (doc.isBlank()) PreviewContent.NoPreview("Belgede gösterilecek metin yok.") else PreviewContent.Word(doc)
     } catch (e: PasswordException) {
         if (e.wrong) throw e
-        locked = PreviewKind.Docx to file
+        locked = PreviewKind.Word to file
         PreviewContent.PasswordProtected
     } catch (e: UnreadableDocumentException) {
         PreviewContent.NoPreview("Belge açılamadı: ${e.message}")
+    } catch (e: IOException) {
+        PreviewContent.NoPreview("Belge okunamadı.")
     }
 
     /**
@@ -249,7 +251,7 @@ class PreviewViewModel(
         val (kind, source) = locked ?: return@submit
         val file = (_state.value as? PreviewState.Ready)?.file ?: return@submit
         val content = when (kind) {
-            PreviewKind.Docx -> openDocx(source, password)
+            PreviewKind.Word -> openWord(source, password)
             else -> {
                 unlockedFile.parentFile?.mkdirs()
                 DocumentReader.unlockPdf(AppSettings.appContext, source, password, unlockedFile)
@@ -323,7 +325,7 @@ class PreviewViewModel(
     companion object {
         private const val MAX_IMAGE_BYTES = 30L * 1024 * 1024
         private const val MAX_PDF_BYTES = 50L * 1024 * 1024
-        private const val MAX_DOCX_BYTES = 20L * 1024 * 1024
+        private const val MAX_WORD_BYTES = 20L * 1024 * 1024
         private const val MAX_TEXT_BYTES = 512 * 1024
 
         fun factory(fileId: String, cacheDir: File): ViewModelProvider.Factory = viewModelFactory {

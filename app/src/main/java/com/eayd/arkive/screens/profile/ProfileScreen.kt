@@ -28,8 +28,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.RadioButton
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -52,6 +50,8 @@ import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.ui.components.NoticeEffect
+import com.eayd.arkive.ui.components.NoticeHost
+import com.eayd.arkive.ui.components.rememberNoticeHostState
 import com.eayd.arkive.utils.openNotificationSettings
 import com.eayd.arkive.viewmodel.ProfileDialog
 import com.eayd.arkive.viewmodel.ProfileUiState
@@ -76,8 +76,8 @@ fun ProfileScreen(
     val aiMode by viewModel.aiMode.collectAsState()
     val summaryTemplate by viewModel.summaryTemplate.collectAsState()
     val context = LocalContext.current
-    val snackbar = remember { SnackbarHostState() }
-    NoticeEffect(state.notice, snackbar, viewModel::clearNotice)
+    val notices = rememberNoticeHostState()
+    NoticeEffect(state.notice, notices, viewModel::clearNotice)
 
     // Sayfa her açıldığında plan bilgisi tazelenir (ViewModel sayfa kapanınca da yaşar).
     LaunchedEffect(viewModel) { viewModel.load() }
@@ -148,10 +148,7 @@ fun ProfileScreen(
                 }
             }
 
-            SnackbarHost(
-                hostState = snackbar,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
-            )
+            NoticeHost(notices, Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
         }
     }
 

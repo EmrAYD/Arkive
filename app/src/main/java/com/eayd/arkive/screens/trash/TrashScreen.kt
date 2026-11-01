@@ -30,8 +30,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -53,6 +51,8 @@ import com.eayd.arkive.ui.components.FolderGlyph
 import com.eayd.arkive.ui.components.ItemRow
 import com.eayd.arkive.ui.components.ListSkeleton
 import com.eayd.arkive.ui.components.NoticeEffect
+import com.eayd.arkive.ui.components.NoticeHost
+import com.eayd.arkive.ui.components.rememberNoticeHostState
 import com.eayd.arkive.ui.components.SelectCircle
 import com.eayd.arkive.ui.components.folderAccent
 import com.eayd.arkive.utils.formatBytes
@@ -75,11 +75,11 @@ fun TrashScreen(
     onOpenFile: (fileId: String) -> Unit,
 ) {
     val state by viewModel.state.collectAsState()
-    val snackbar = remember { SnackbarHostState() }
+    val notices = rememberNoticeHostState()
     val inFolder = viewModel.isFolderView
 
     LaunchedEffect(viewModel) { viewModel.onShown() }
-    NoticeEffect(state.notice, snackbar, viewModel::clearNotice)
+    NoticeEffect(state.notice, notices, viewModel::clearNotice)
 
     // Geri tuşu: önce seçim modundan çıkar, sonra çöp kutusundan.
     BackHandler { if (state.selection.active) viewModel.stopSelecting() else onBack() }
@@ -127,7 +127,7 @@ fun TrashScreen(
             }
         }
 
-        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter))
+        NoticeHost(notices, Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
     }
 
     if (state.confirmEmpty) {

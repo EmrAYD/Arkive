@@ -6,6 +6,7 @@ import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
 import com.tom_roush.pdfbox.pdmodel.graphics.image.PDImageXObject
 import com.tom_roush.pdfbox.text.PDFTextStripper
+import com.eayd.arkive.word.WordLoader
 import java.io.File
 import java.io.IOException
 import java.nio.ByteBuffer
@@ -41,7 +42,7 @@ object DocumentReader {
     private const val MAX_XML_BYTES = 8 * 1024 * 1024
 
     /**
-     * [password]: parolalı PDF/DOCX için kullanıcının girdiği parola (yoksa null). Parola gerekiyorsa ya da yanlışsa
+     * [password]: parolalı PDF/Word için kullanıcının girdiği parola (yoksa null). Parola gerekiyorsa ya da yanlışsa
      * [PasswordException] atılır; parola yalnızca bu telefonda, dosyayı açmak için kullanılır.
      */
     suspend fun read(context: Context, file: File, kind: SummarizableKind, password: String? = null): ReadDocument =
@@ -57,7 +58,7 @@ object DocumentReader {
             }
         }
 
-    /** Context gerektirmeyen DOCX okuma (ön izleme için). Parola kuralları [read] ile aynıdır. */
+    /** Context gerektirmeyen Word (DOCX ve DOC) okuma. Parola kuralları [read] ile aynıdır. */
     suspend fun readDocxFile(file: File, password: String? = null): ReadDocument = withContext(Dispatchers.IO) {
         try {
             readDocx(file, password)
@@ -136,11 +137,25 @@ object DocumentReader {
     }
 
     /**
-     * DOCX bir zip'tir: metin word/document.xml içindedir, görseller word/media/ altındadır. Parolalı DOCX zip değil,
-     * şifreli bir OLE kapsayıcısıdır ([OfficeCrypto]); önce parolayla çözülüp zip'e dönüştürülür.
+     * Eski .doc (Word 97-2003; parolalısı da): ayrıştırma ve şifre çözme [WordLoader]'dadır. Parola gerekiyorsa ya da
+     * yanlışsa [PasswordException], dosya bozuksa ya da desteklenmeyen bir yöntemle şifreliyse [UnreadableDocumentException].
+     * Metin .docx ile aynı biçimde çıkar (paragraf başına bir satır; tablo hücrelerindeki paragraflar da sırayla).
+     */
+    internal fun readLegacyWord(bytes: ByteArray, password: String?): ReadDocument {
+        val doc = WordLoader.load(bytes, password)
+        val text = doc.summaryText()
+        return ReadDocument(text, DocumentStats(words = countWords(text), pages = null, images = doc.imageCount))
+    }
+
+    /**
+     * Word belgesi. İçeriğe bakılır, uzantıya değil (yeniden adlandırılmış dosyalar da açılır):
+     *  - eski .doc (OLE kapsayıcı): [readLegacyWord],
+     *  - DOCX bir zip'tir: metin word/document.xml içindedir, görseller word/media/ altındadır. Parolalı DOCX zip değil,
+     *    şifreli bir OLE kapsayıcısıdır ([OfficeCrypto]); önce parolayla çözülüp zip'e dönüştürülür.
      */
     private fun readDocx(file: File, password: String?): ReadDocument {
         var bytes = file.readBytes()
+        if (AiPolicy.isLegacyOffice(bytes)) return readLegacyWord(bytes, password)
         if (AiPolicy.isEncryptedOffice(bytes)) {
             if (password.isNullOrEmpty()) throw PasswordException(wrong = false)
             bytes = try {

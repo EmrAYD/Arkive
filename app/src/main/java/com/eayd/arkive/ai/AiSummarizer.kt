@@ -10,7 +10,6 @@ import com.eayd.arkive.data.SaveSummaryRequest
 import com.eayd.arkive.data.SummarizeRequest
 import com.eayd.arkive.data.SummaryResponse
 import com.eayd.arkive.utils.toApiErrorMessage
-import java.io.File
 import java.io.IOException
 import android.content.Context
 import android.net.ConnectivityManager
@@ -20,7 +19,6 @@ import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
-import kotlinx.coroutines.NonCancellable
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -28,6 +26,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -69,13 +68,20 @@ sealed interface SummaryUi {
 }
 
 /**
+ * Biten özetleme: uygulama içinde kart olarak gösterilir, dokunulunca [file]'ın özeti açılır. [savedOnPhoneOnly]: özet
+ * telefonda saklandı, sunucuya henüz yüklenemedi.
+ */
+class SummaryDone(val file: FileDto, val savedOnPhoneOnly: Boolean)
+
+/**
  * AI düğmesinin akışı:
  *  - Dosyanın özeti varsa: düğme dolu görünür, basınca özetin PDF dosyasının ön izlemesi doğrudan açılır
  *    ([openFile]); yeniden özetlenmez. Dosya yoksa (oluşturulamamışsa) özet küçük bir pencerede gösterilir. Özet dosyası
  *    çöp kutusundan da silinirse özet kaydı silinir ve düğme boşalır: dosya yeniden özetlenebilir.
  *  - Yoksa: basınca önce onay sorulur ("Bu dosyayı özetlemek istiyor musunuz?"). "Özetle" denince pencere kapanır ve
  *    özetleme arka planda sürer; o dosyanın satırında AI düğmesi yerine yükleme simgesi görünür ([running]), kullanıcı
- *    beklerken uygulamayı kullanmaya devam eder. Bitince [completed] ile listeler yenilenir (düğme dolar) ve [notices] ile haber verilir.
+ *    beklerken uygulamayı kullanmaya devam eder. Bitince [completed] ile listeler yenilenir (düğme dolar) ve haber verilir: uygulama açıksa [done] kartıyla, arka plandaysa ya da kapalıysa
+ *    sistem bildirimiyle ([SummaryNotifier]). İkisine de dokunulunca özet açılır ([openSummary]).
  *
  * Özetlemenin yeri ([AiPolicy]): ayara ve dosyaya göre telefonda ya da sunucuda. Her iki durumda da özet sunucuya
  * kaydedilir; özet dosyanın içeriğine bağlıdır, bu yüzden aynı içerikle yeniden yüklenen dosyanın özeti hazır gelir.
@@ -102,21 +108,6 @@ object AiSummarizer {
 
     private fun setStatus(fileId: String, text: String) = _status.update { it + (fileId to text) }
 
-    /** Dosya "çalışıyor" olarak işaretlenir: satırda yükleme simgesi çıkar, [text] adım olarak gösterilir. */
-    private fun begin(fileId: String, text: String) {
-        _running.update { it + fileId }
-        setStatus(fileId, text)
-    }
-
-    private fun finish(fileId: String) {
-        _running.update { it - fileId }
-        _status.update { it - fileId }
-    }
-
-    /** Sunucudan gelen özetin kopyası telefonda tutulur: internet yokken de okunur. */
-    private fun remember(file: FileDto, saved: SummaryResponse) =
-        SummaryStore.put(StoredSummary(file.id, file.name, saved.summary, saved.source, saved.model, pending = false))
-
     private val _completed = MutableSharedFlow<String>(extraBufferCapacity = 8)
 
     /** Özetlemesi biten dosyanın kimliği. Açık liste bunu görünce kendini sessizce yeniler ([FileDto.hasSummary] güncellenir). */
@@ -132,38 +123,80 @@ object AiSummarizer {
 
     private val _notices = MutableSharedFlow<String>(extraBufferCapacity = 8)
 
-    /** Kısa bildirimler: özetleme bitti / başarısız oldu. */
+    /** Kısa bildirimler: özetleme başarısız oldu / durduruldu… ("özetleme bitti" için bkz. [done]). */
     val notices: SharedFlow<String> = _notices.asSharedFlow()
+
+    private val _done = MutableSharedFlow<SummaryDone>(extraBufferCapacity = 8)
+
+    /**
+     * Özetleme başarıyla bitti (telefonda da bulutta da). Açık olan liste ekranı bunu dokunulabilir bir kart olarak
+     * gösterir ([com.eayd.arkive.ui.components.SummaryDoneBanner]); dokunulunca [openSummary] ile özet açılır.
+     */
+    val done: SharedFlow<SummaryDone> = _done.asSharedFlow()
+
+    /**
+     * Bitmiş özetin kendisini açar (özetin PDF dosyası varsa onun ön izlemesi, yoksa özet penceresi). "Özetleme bitti"
+     * kartına dokunulunca çağrılır. Dosya hala özetleniyorsa ya da özet zaten açılıyorsa bir şey yapmaz.
+     */
+    fun openSummary(file: FileDto) = openSummary(file.id, file.name)
+
+    /** Aynısı, yalnızca kimlik ve adla (bildirime dokunulunca elde dosyanın kendisi yoktur, bunlar vardır). */
+    fun openSummary(fileId: String, fileName: String) {
+        if (fileId in opening || fileId in _running.value) return
+        openSaved(fileId, fileName)
+    }
+
+    private val _pendingOpen = MutableStateFlow<SummaryOpenRequest?>(null)
+
+    /**
+     * Bildirime dokunularak gelen, henüz yerine getirilmemiş "şu dosyanın özetini aç" isteği. Uygulama kapalıyken
+     * dokunulduysa oturum/açılış ekranları bitmeden gezinilemez; bu yüzden istek burada bekler, ana gezinme
+     * ([com.eayd.arkive.navigation.ArkiveNavHost]) hazır olunca alıp yerine getirir.
+     */
+    val pendingOpen: StateFlow<SummaryOpenRequest?> = _pendingOpen.asStateFlow()
+
+    /** Bildirimden gelen isteği kaydeder ([MainActivity]). */
+    fun requestOpenSummary(request: SummaryOpenRequest) {
+        _pendingOpen.value = request
+    }
+
+    /** Bekleyen isteği alır ve siler (iki yerde birden yerine getirilmesin); yoksa null. */
+    fun takePendingOpen(): SummaryOpenRequest? = _pendingOpen.getAndUpdate { null }
 
     /** AI düğmesine basıldı. [hasSummary]: dosyanın özeti var mı (düğme dolu mu). */
     fun onAiClicked(file: FileDto, hasSummary: Boolean) {
         when {
             file.id in opening -> Unit
             file.id in _running.value -> _ui.value = SummaryUi.StopAsk(file)
-            hasSummary -> openSaved(file)
+            hasSummary -> openSaved(file.id, file.name)
             AiPolicy.kindOf(file.mimeType, file.name) == null -> _notices.tryEmit(UNSUPPORTED_MESSAGE)
             else -> _ui.value = SummaryUi.Confirm(file)
         }
     }
 
     /**
-     * Onay penceresinde "Özetle": pencere kapanır, özetleme arka planda başlar. [password]: parolalı PDF/DOCX için
+     * Onay penceresinde "Özetle": pencere kapanır, özetleme arka planda başlar. [password]: parolalı PDF/Word için
      * kullanıcının girdiği parola. Önce telefonda doğrulanır; dosya bulutta özetlenecekse (telefona uygun değilse ya da
      * ayar "Bulut" ise) yalnızca o isteğe eklenir. Hiçbir yerde saklanmaz.
      */
     fun confirm(file: FileDto, password: String? = null) {
         _ui.value = null
         if (file.id in _running.value) return
-        begin(file.id, "Hazırlanıyor…")
+        _running.update { it + file.id }
+        setStatus(file.id, "Hazırlanıyor…")
         // Uygulama arka plana alınsa da iş sürsün: ön plan servisi süreci canlı tutar.
         runCatching { SummaryService.start(AppSettings.appContext) }
         jobs[file.id] = scope.launch {
             try {
                 summarize(file, password)
                 _completed.tryEmit(file.id)
-                // Telefonda üretilip internet yüzünden yüklenemeyen özet için ayrı bir bildirim zaten gösterildi.
-                if (SummaryStore.get(file.id)?.pending != true) {
-                    _notices.tryEmit("“${file.name}” özetlendi. Özet, AI Sonuçlarım sayfasına dosya olarak da kaydedildi.")
+                // Telefonda üretilip internet yüzünden yüklenemeyen özet de açılabilir (telefondaki kopyadan); kart bunu belirtir.
+                val onPhoneOnly = SummaryStore.get(file.id)?.pending == true
+                if (SummaryDoneDelivery.useNotification(AppVisibility.visible, _done.subscriptionCount.value)) {
+                    // Uygulama arka planda/kapalı (ya da mesajı gösterecek ekran yok): sistem bildirimi; dokununca özet açılır.
+                    SummaryNotifier.notifyDone(AppSettings.appContext, SummaryOpenRequest(file.id, file.name), onPhoneOnly)
+                } else {
+                    _done.tryEmit(SummaryDone(file, savedOnPhoneOnly = onPhoneOnly))
                 }
             } catch (e: CancellationException) {
                 throw e
@@ -174,7 +207,8 @@ object AiSummarizer {
             } catch (e: Exception) {
                 _notices.tryEmit(e.toApiErrorMessage())
             } finally {
-                finish(file.id)
+                _running.update { it - file.id }
+                _status.update { it - file.id }
                 jobs.remove(file.id)
             }
         }
@@ -197,23 +231,25 @@ object AiSummarizer {
      * Kayıtlı özeti açar: özetin PDF dosyası varsa doğrudan onun ön izlemesine gidilir ([openFile]); dosya yoksa ya da
      * alınamazsa özet metni küçük bir pencerede gösterilir. Bu sırada satırda yükleme simgesi döner.
      */
-    private fun openSaved(file: FileDto) {
-        val local = SummaryStore.get(file.id)
+    private fun openSaved(fileId: String, fileName: String) {
+        val local = SummaryStore.get(fileId)
         if (local != null && local.pending) {
             // Telefonda üretildi ama henüz sunucuya yüklenmedi: özet telefondaki kopyadan gösterilir, yükleme yeniden denenir.
             _ui.value = SummaryUi.Viewing(
-                file.name, local.summary, SummarySource.fromKey(local.source),
+                fileName, local.summary, SummarySource.fromKey(local.source),
                 note = "Henüz sunucuya yüklenmedi; internet gelince otomatik yüklenecek.",
             )
             scope.launch { flushPending() }
             return
         }
-        opening += file.id
-        begin(file.id, "Özet açılıyor…")
+        opening += fileId
+        _running.update { it + fileId }
+        setStatus(fileId, "Özet açılıyor…")
         scope.launch {
             try {
-                val saved = ApiClient.api.getSummary(file.id)
-                remember(file, saved)
+                val saved = ApiClient.api.getSummary(fileId)
+                // Sonraki açılışlar internetsiz de çalışsın diye metnin kopyası telefonda tutulur.
+                SummaryStore.put(StoredSummary(fileId, fileName, saved.summary, saved.source, saved.model, pending = false))
                 val resultFile = saved.resultFileId?.let { id ->
                     try {
                         ApiClient.api.getFile(id)
@@ -226,24 +262,25 @@ object AiSummarizer {
                 if (resultFile != null) {
                     _openFile.tryEmit(resultFile)
                 } else {
-                    _ui.value = SummaryUi.Viewing(file.name, saved.summary, SummarySource.fromKey(saved.source))
+                    _ui.value = SummaryUi.Viewing(fileName, saved.summary, SummarySource.fromKey(saved.source))
                 }
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
                 // İnternet yok: telefondaki kopya varsa özet oradan gösterilir.
-                val cached = SummaryStore.get(file.id)
+                val cached = SummaryStore.get(fileId)
                 if (cached != null && e !is HttpException) {
                     _ui.value = SummaryUi.Viewing(
-                        file.name, cached.summary, SummarySource.fromKey(cached.source),
+                        fileName, cached.summary, SummarySource.fromKey(cached.source),
                         note = "Sunucuya ulaşılamadı; özet telefondaki kopyadan gösteriliyor.",
                     )
                 } else {
                     _notices.tryEmit(e.toApiErrorMessage())
                 }
             } finally {
-                opening -= file.id
-                finish(file.id)
+                opening -= fileId
+                _running.update { it - fileId }
+                _status.update { it - fileId }
             }
         }
     }
@@ -265,15 +302,18 @@ object AiSummarizer {
                     throw e
                 } catch (e: PasswordException) {
                     throw e // parola gerekiyor ya da yanlış: kullanıcıdan istenir
+                } catch (e: UnreadableDocumentException) {
+                    // Dosya telefonda açılamadı (bozuk olabilir): bulut izinliyse orada denenir.
+                    if (mode.allowsCloud) return summarizeInCloud(file, password)
+                    throw AiFailure("“${file.name}” özetlenemedi: ${e.message}")
                 } catch (e: Exception) {
                     // Dosyanın telefonda kopyası yok ve internet de yok: bulut da işe yaramaz, nedeni söylenir.
                     if (e is IOException && e !is WifiRequiredException) {
                         throw AiFailure("“${file.name}” telefonda kayıtlı değil ve sunucuya ulaşılamadı. Bağlantı gelince tekrar deneyin.")
                     }
-                    // Dosya telefonda açılamadı (bozuk, boyut tutmuyor…): bulut izinliyse orada denenir, değilse nedeni söylenir.
+                    // Dosya telefonda açılamadı: bulut izinliyse orada denenir, değilse nedeni söylenir.
                     if (mode.allowsCloud) return summarizeInCloud(file, password)
-                    val reason = e.message ?: "Dosya açılamadı."
-                    throw AiFailure(if (e is UnreadableDocumentException) "“${file.name}” özetlenemedi: $reason" else reason)
+                    throw AiFailure(e.message ?: "Dosya açılamadı.")
                 }
                 // Parola (varsa) burada telefonda doğrulanmış demektir; bulut gerekirse yalnızca doğru parola gider.
                 when (val route = AiPolicy.afterInspection(mode, doc.stats)) {
@@ -298,25 +338,25 @@ object AiSummarizer {
      * dosya sonraki sefer için kopya olarak saklanır.
      */
     private suspend fun inspect(file: FileDto, kind: SummarizableKind, password: String?): ReadDocument {
+        val context = AppSettings.appContext
         setStatus(file.id, "Dosya okunuyor…")
-        // Kopya önce saklanır, sonra okunur: parola girilip yeniden denenirse dosya yeniden indirilmez.
-        val copy = InputCache.get(file.id, file.size) ?: run {
-            NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa dosya indirilmez
-            downloadCopy(file.id, file.size) ?: throw UnreadableDocumentException("İndirilen dosyanın boyutu beklenenden farklı.")
-        }
-        return DocumentReader.read(AppSettings.appContext, copy, kind, password)
-    }
-
-    /** Dosyayı indirip telefondaki kopya olarak saklar ([InputCache]); kopyayı döner (boyut tutmazsa null). */
-    private suspend fun downloadCopy(fileId: String, size: Long): File? {
-        val temp = InputCache.tempFile(fileId)
+        InputCache.get(file.id, file.size)?.let { return DocumentReader.read(context, it, kind, password) }
+        NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa dosya indirilmez
+        val temp = InputCache.tempFile(file.id)
         try {
-            val url = ApiClient.api.getDownloadUrl(fileId).url
+            val url = ApiClient.api.getDownloadUrl(file.id).url
             FileDownloader.downloadTo(url, temp, maxBytes = AiPolicy.LOCAL_MAX_BYTES + 64 * 1024) {}
-            withContext(Dispatchers.IO) { InputCache.adopt(temp, fileId, size) }
-            return InputCache.get(fileId, size)
+            val document = try {
+                DocumentReader.read(context, temp, kind, password)
+            } catch (e: PasswordException) {
+                // Parola girilip yeniden denenecek: dosya yeniden indirilmesin.
+                withContext(Dispatchers.IO) { InputCache.adopt(temp, file.id, file.size) }
+                throw e
+            }
+            withContext(Dispatchers.IO) { InputCache.adopt(temp, file.id, file.size) }
+            return document
         } finally {
-            withContext(NonCancellable + Dispatchers.IO) { temp.delete() }
+            withContext(Dispatchers.IO) { temp.delete() }
         }
     }
 
@@ -331,20 +371,29 @@ object AiSummarizer {
         scope.launch {
             if (!prefetching.tryLock()) return@launch
             try {
-                if (!NetworkPolicy.isAllowed()) return@launch
+                try {
+                    NetworkPolicy.requireAllowed()
+                } catch (e: Exception) {
+                    return@launch
+                }
                 val wanted = files.filter {
                     it.status == "ready" && it.id !in _running.value && it.size in 1..AiPolicy.LOCAL_MAX_BYTES &&
                         AiPolicy.kindOf(it.mimeType, it.name) != null && InputCache.get(it.id, it.size) == null
                 }.sortedBy { it.hasSummary || it.inAiResults }.take(InputCache.MAX_PER_PASS)
                 for (f in wanted) {
+                    val temp = InputCache.tempFile(f.id)
                     try {
-                        downloadCopy(f.id, f.size)
+                        val url = ApiClient.api.getDownloadUrl(f.id).url
+                        FileDownloader.downloadTo(url, temp, maxBytes = AiPolicy.LOCAL_MAX_BYTES + 64 * 1024) {}
+                        withContext(Dispatchers.IO) { InputCache.adopt(temp, f.id, f.size) }
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: IOException) {
                         break // internet yok: kalanları denemenin anlamı yok
                     } catch (e: Exception) {
                         continue
+                    } finally {
+                        withContext(Dispatchers.IO) { temp.delete() }
                     }
                 }
             } finally {
@@ -374,9 +423,8 @@ object AiSummarizer {
         // Sonra sunucuya kaydedilir; aynı içerikli dosyalar da böylece "özetlendi" olur.
         when (upload(file.id, summary, ExtractiveSummarizer.NAME)) {
             Upload.Done -> Unit
-            Upload.Later -> {
-                _notices.tryEmit("“${file.name}” özetlendi ama sunucuya ulaşılamadı. Özet telefonda saklandı, bağlantı gelince yüklenecek.")
-            }
+            // Özet telefonda saklandı, bağlantı gelince yüklenecek; "özetlendi" mesajını [confirm] bunu belirterek verir.
+            Upload.Later -> Unit
             Upload.Rejected -> throw AiFailure("“${file.name}” özeti sunucuya kaydedilemedi.")
         }
     }
@@ -416,8 +464,10 @@ object AiSummarizer {
                 SummaryStore.remove(fileId)
                 Upload.Rejected
             }
+        } catch (e: IOException) {
+            Upload.Later
         } catch (e: Exception) {
-            Upload.Later // internet yok / beklenmedik hata: özet telefonda bekler
+            Upload.Later
         }
 
     private val flushLock = Mutex()
@@ -430,7 +480,11 @@ object AiSummarizer {
         SummaryStore.publish() // hesap değişmiş olabilir
         val waiting = SummaryStore.pending().filter { it.fileId !in _running.value }
         if (waiting.isEmpty()) return@withLock
-        if (!NetworkPolicy.isAllowed()) return@withLock
+        try {
+            NetworkPolicy.requireAllowed()
+        } catch (e: Exception) {
+            return@withLock
+        }
         for (entry in waiting) {
             when (upload(entry.fileId, entry.summary, entry.model)) {
                 Upload.Done -> {
@@ -479,7 +533,8 @@ object AiSummarizer {
                 template = AppSettings.summaryTemplate.value.id,
             )
             val saved = ApiClient.aiApi.summarizeFile(file.id, request)
-            remember(file, saved)
+            // Özetin kopyası telefonda tutulur: internet yokken de okunur.
+            SummaryStore.put(StoredSummary(file.id, file.name, saved.summary, saved.source, saved.model, pending = false))
         } catch (e: HttpException) {
             // 423: dosya parolalı (parola gerekiyor ya da yanlış). Parola penceresi açılır.
             if (e.code() == 423) throw PasswordException(wrong = e.passwordInvalid(sent = !password.isNullOrEmpty()))
@@ -514,5 +569,5 @@ object AiSummarizer {
     }
 
     private const val UNSUPPORTED_MESSAGE =
-        "Bu dosya türü özetlenemiyor. Metin, PDF ve DOCX dosyaları özetlenebilir."
+        "Bu dosya türü özetlenemiyor. Metin, PDF ve Word (DOCX, DOC) dosyaları özetlenebilir."
 }

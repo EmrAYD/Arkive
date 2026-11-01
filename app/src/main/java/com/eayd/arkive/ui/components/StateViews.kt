@@ -6,7 +6,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -48,14 +47,17 @@ fun CenteredHint(text: String, modifier: Modifier = Modifier) {
 }
 
 /**
- * ViewModel'in [notice] (kısa bildirim) alanı dolunca Snackbar gösterir, ardından [onShown] ile alanı temizletir.
- * Liste, çöp kutusu ve ön izleme ekranları aynı kuralı kullanır.
+ * ViewModel'in [notice] (kısa bildirim) alanı dolunca bildirimi [host]'a (NoticeHost kartı) verir ve alanı hemen
+ * temizletir ([onShown]). Liste, çöp kutusu, profil ve ön izleme ekranları aynı kuralı kullanır.
+ *
+ * Alan HEMEN temizlenir: ViewModel ekrandan uzun yaşar; bildirim kartı kapanmadan ekrandan çıkılırsa alan dolu kalırdı
+ * ve ekrana dönünce aynı bildirim yeniden çıkardı. Kartın süresi [host]'a aittir, bu etkiye değil.
  */
 @Composable
-fun NoticeEffect(notice: String?, snackbar: SnackbarHostState, onShown: () -> Unit) {
+fun NoticeEffect(notice: String?, host: NoticeHostState, onShown: () -> Unit) {
     LaunchedEffect(notice) {
         val message = notice ?: return@LaunchedEffect
-        snackbar.showSnackbar(message)
+        host.show(message)
         onShown()
     }
 }

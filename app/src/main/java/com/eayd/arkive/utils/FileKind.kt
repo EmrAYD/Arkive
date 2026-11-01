@@ -48,10 +48,20 @@ fun fileTypeLabel(mimeType: String?, fileName: String): String {
     return if (extension.isNotEmpty() && extension.length <= 5) "$kind ($extension)" else kind
 }
 
-private const val DOCX_MIME = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+private val wordMimeTypes = setOf(
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.template",
+    "application/msword",
+    "application/vnd.ms-word",
+    "application/vnd.ms-word.document.macroenabled.12",
+    "application/vnd.ms-word.template.macroenabled.12",
+)
 
-/** Uygulamanın içinde gösterebildiğimiz dosya türleri. */
-enum class PreviewKind { Image, Pdf, Docx, Text, Video, Audio, None }
+// docx/docm/dotx/dotm aynı zip biçimindedir; doc/dot eski ikili biçimdir. İkisi de aynı görüntüleyiciyle açılır.
+private val wordExtensions = setOf("docx", "docm", "dotx", "dotm", "doc", "dot")
+
+/** Uygulamanın içinde gösterebildiğimiz dosya türleri. [Word]: .docx ve eski .doc. */
+enum class PreviewKind { Image, Pdf, Word, Text, Video, Audio, None }
 
 private val textMimeTypes = setOf(
     "application/json", "application/xml", "application/javascript", "application/x-yaml",
@@ -77,8 +87,8 @@ fun previewKind(mimeType: String?, fileName: String): PreviewKind {
         mime == "image/svg+xml" -> PreviewKind.None
         kind == FileKind.Image -> PreviewKind.Image
         kind == FileKind.Pdf || ext == "pdf" -> PreviewKind.Pdf
-        // Word belgesi: metni çıkarılıp düz metin olarak gösterilir (biçim ve görseller gösterilmez).
-        mime == DOCX_MIME || ext == "docx" -> PreviewKind.Docx
+        // Word belgesi (.docx ve eski .doc): biçimiyle (başlık, liste, tablo, görsel) çizilir.
+        mime in wordMimeTypes || ext in wordExtensions -> PreviewKind.Word
         kind == FileKind.Video -> PreviewKind.Video
         kind == FileKind.Audio -> PreviewKind.Audio
         kind == FileKind.Text || mime in textMimeTypes || ext in textExtensions -> PreviewKind.Text

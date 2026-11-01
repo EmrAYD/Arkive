@@ -15,8 +15,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
@@ -43,6 +41,8 @@ import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.ui.components.MoveFolderDialog
 import com.eayd.arkive.ui.components.NameDialog
 import com.eayd.arkive.ui.components.NoticeEffect
+import com.eayd.arkive.ui.components.NoticeHost
+import com.eayd.arkive.ui.components.rememberNoticeHostState
 import com.eayd.arkive.ui.components.PasswordDialog
 import com.eayd.arkive.ui.components.SkeletonBox
 import com.eayd.arkive.ui.components.TrashedFileActionsMenu
@@ -70,10 +70,10 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
     val title by viewModel.title.collectAsState()
     val notice by viewModel.notice.collectAsState()
     val deleted by viewModel.deleted.collectAsState()
-    val snackbar = remember { SnackbarHostState() }
+    val notices = rememberNoticeHostState()
     var menuOpen by remember { mutableStateOf(false) }
 
-    NoticeEffect(notice, snackbar, viewModel::clearNotice)
+    NoticeEffect(notice, notices, viewModel::clearNotice)
     // Dosya silinince ön izlenecek bir şey kalmaz: listeye dön.
     LaunchedEffect(deleted) { if (deleted) onBack() }
 
@@ -136,10 +136,7 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
                 )
             }
 
-            SnackbarHost(
-                hostState = snackbar,
-                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 16.dp),
-            )
+            NoticeHost(notices, Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp))
         }
     }
 
@@ -154,6 +151,7 @@ private fun PreviewContentView(file: FileDto, content: PreviewContent, download:
         is PreviewContent.Image -> ZoomableImage(content.bitmap, file.name)
         is PreviewContent.Pdf -> PdfViewer(content.doc)
         is PreviewContent.Text -> TextViewer(content.text, content.truncated)
+        is PreviewContent.Word -> WordViewer(content.doc)
         is PreviewContent.Media ->
             if (content.isAudio) AudioPlayer(content.url, file, download)
             else VideoPlayer(content.url, file, download)

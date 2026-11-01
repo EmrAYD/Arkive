@@ -23,10 +23,10 @@ enum class AiMode(val label: String, val description: String) {
     val allowsCloud: Boolean get() = this != Local
 }
 
-/** Özetlenebilen dosya türleri. */
+/** Özetlenebilen dosya türleri. [Docx]: Word belgeleri; hem .docx hem eski .doc (parolalıları dahil). */
 enum class SummarizableKind { Text, Pdf, Docx }
 
-/** Telefonda açılan belgenin ölçüleri. [pages] bilinmiyorsa null (düz metin, DOCX). */
+/** Telefonda açılan belgenin ölçüleri. [pages] bilinmiyorsa null (düz metin, Word belgesi). */
 data class DocumentStats(val words: Int, val pages: Int?, val images: Int)
 
 /** Dosyanın yerelde özetlenememe nedeni. [message] kullanıcıya gösterilir. */
@@ -58,7 +58,7 @@ object AiPolicy {
     const val LOCAL_MAX_PAGES: Int = 10
 
     /** Sayfa sayısı bilinmeyen belgede (düz metin, DOCX) sayfa, kelime sayısından kabaca hesaplanır: sayfa başına bu kadar kelime. */
-    const val WORDS_PER_PAGE: Int = 1000
+    const val WORDS_PER_PAGE: Int = 500
 
     /** Belgenin sayfa sayısı: PDF'te gerçek değer, düz metin ve DOCX'te kelime sayısından tahmin ([WORDS_PER_PAGE]). */
     fun pagesOf(stats: DocumentStats): Int = stats.pages ?: ((stats.words + WORDS_PER_PAGE - 1) / WORDS_PER_PAGE)
@@ -119,13 +119,19 @@ object AiPolicy {
     private val oleMagic = byteArrayOf(0xD0.toByte(), 0xCF.toByte(), 0x11, 0xE0.toByte(), 0xA1.toByte(), 0xB1.toByte(), 0x1A, 0xE1.toByte())
     private val encryptedPackageName = "EncryptedPackage".toByteArray(Charsets.UTF_16LE)
 
+    private fun isOle(bytes: ByteArray): Boolean =
+        bytes.size > oleMagic.size && oleMagic.indices.all { bytes[it] == oleMagic[it] }
+
     /**
      * Parola ile korunmuş bir Office dosyası (şifreli .docx) mı? Şifrelenen .docx, zip yerine eski OLE kapsayıcısına
      * sarılır ve içinde "EncryptedPackage" adlı bir akış bulunur (adı UTF-16 olarak saklanır). Eski .doc dosyaları da
-     * OLE'dir ama bu akışı taşımaz; onlar şifreli sayılmaz.
+     * OLE'dir ama bu akışı taşımaz; onlar bu işlevde şifreli sayılmaz (parolalı .doc'u [isLegacyOffice] yakalar ve
+     * parolayı kendi okuyucusu ister).
      */
-    fun isEncryptedOffice(bytes: ByteArray): Boolean =
-        bytes.size > oleMagic.size && oleMagic.indices.all { bytes[it] == oleMagic[it] } && indexOf(bytes, encryptedPackageName) >= 0
+    fun isEncryptedOffice(bytes: ByteArray): Boolean = isOle(bytes) && indexOf(bytes, encryptedPackageName) >= 0
+
+    /** Eski Office kapsayıcısı (OLE) mı ve şifreli .docx DEĞİL mi? Yani eski .doc (parolalı ya da parolasız). */
+    fun isLegacyOffice(bytes: ByteArray): Boolean = isOle(bytes) && !isEncryptedOffice(bytes)
 
     private fun indexOf(haystack: ByteArray, needle: ByteArray): Int {
         outer@ for (start in 0..haystack.size - needle.size) {
@@ -139,20 +145,28 @@ object AiPolicy {
         "txt", "md", "markdown", "csv", "tsv", "json", "xml", "yaml", "yml", "log", "ini", "conf", "html", "htm",
     )
 
+    private val wordMimeTypes = setOf(
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "application/msword",
+        "application/vnd.ms-word",
+    )
+
+    // Backend'deki summarize.py ile aynı olmalı. docm/dotx/dotm özetlenmez (ön izleme açar, özet için desteklenmeyen tür).
+    private val wordExtensions = setOf("docx", "doc", "dot")
+
     /**
-     * Özetlenebilen dosya türleri: düz metin, PDF ve DOCX. Birini kapatmak için buradan çıkarın (backend'de karşılığı
-     * SUMMARY_FILE_KINDS ayarıdır).
+     * Özetlenebilen dosya türleri: düz metin, PDF ve Word (DOCX ve eski DOC). Birini kapatmak için buradan çıkarın
+     * (backend'de karşılığı SUMMARY_FILE_KINDS ayarıdır; "docx" her iki Word biçimini de kapsar).
      */
     val SUPPORTED_KINDS: Set<SummarizableKind> = setOf(SummarizableKind.Text, SummarizableKind.Pdf, SummarizableKind.Docx)
 
-    /** Dosyanın hangi özetlenebilir sınıfa girdiği; desteklenmiyorsa (resim, video, ses, eski .doc…) null. */
+    /** Dosyanın hangi özetlenebilir sınıfa girdiği; desteklenmiyorsa (resim, video, ses…) null. */
     fun kindOf(mimeType: String?, fileName: String): SummarizableKind? {
         val mime = mimeType?.lowercase().orEmpty()
         val ext = fileName.substringAfterLast('.', "").lowercase()
         val kind = when {
             mime == "application/pdf" || ext == "pdf" -> SummarizableKind.Pdf
-            mime == "application/vnd.openxmlformats-officedocument.wordprocessingml.document" || ext == "docx" ->
-                SummarizableKind.Docx
+            mime in wordMimeTypes || ext in wordExtensions -> SummarizableKind.Docx
             mime.startsWith("text/") || ext in textExtensions -> SummarizableKind.Text
             else -> null
         }

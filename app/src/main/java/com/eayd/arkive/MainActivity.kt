@@ -1,6 +1,7 @@
 package com.eayd.arkive
 
 import android.content.Context
+import android.content.Intent
 import android.content.res.Configuration
 import android.graphics.Color
 import android.os.Bundle
@@ -17,6 +18,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
+import com.eayd.arkive.ai.AiSummarizer
+import com.eayd.arkive.ai.AppVisibility
+import com.eayd.arkive.ai.SummaryOpenRequest
 import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.navigation.ArkiveNavHost
@@ -48,9 +52,41 @@ class MainActivity : ComponentActivity() {
         applyOverrideConfiguration(Configuration().apply { uiMode = nightMode })
     }
 
+    /** Uygulama zaten açıkken özetleme bildirimine dokunuldu. */
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        openSummaryFrom(intent)
+    }
+
+    /** Intent özetleme bildiriminden geliyorsa isteği kaydeder (gezinme [com.eayd.arkive.navigation.ArkiveNavHost]'ta). */
+    private fun openSummaryFrom(intent: Intent?) {
+        val request = SummaryOpenRequest.fromExtras(
+            intent?.getStringExtra(SummaryOpenRequest.EXTRA_FILE_ID),
+            intent?.getStringExtra(SummaryOpenRequest.EXTRA_FILE_NAME),
+        ) ?: return
+        // Bir kez işlenir: Activity yeniden kurulsa da aynı Intent ikinci kez özet açmasın.
+        intent?.removeExtra(SummaryOpenRequest.EXTRA_FILE_ID)
+        intent?.removeExtra(SummaryOpenRequest.EXTRA_FILE_NAME)
+        AiSummarizer.requestOpenSummary(request)
+    }
+
+    override fun onStart() {
+        super.onStart()
+        AppVisibility.visible = true
+    }
+
+    override fun onStop() {
+        AppVisibility.visible = false
+        super.onStop()
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppSettings.init(this) // tema ve "yalnızca Wi-Fi" ayarları ekranlardan önce okunur
+        // Özetleme bildirimine dokunularak açıldıysa o dosyanın özeti açılır. Yeniden kurulumda (tema değişimi, döndürme)
+        // aynı Intent yeniden gelir; yalnızca ilk kurulumda işlenir.
+        if (savedInstanceState == null) openSummaryFrom(intent)
         enableEdgeToEdge()
         setContent {
             val themeMode by AppSettings.themeMode.collectAsState()
