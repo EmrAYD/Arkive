@@ -37,9 +37,9 @@ import com.eayd.arkive.ai.SummaryDone
 import com.eayd.arkive.ai.SummaryStore
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
-import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.ui.components.CenteredHint
 import com.eayd.arkive.ui.components.ErrorRetry
+import com.eayd.arkive.ui.components.LeaveEffect
 import com.eayd.arkive.ui.components.ListSkeleton
 import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.ui.components.NoticeHost
@@ -69,6 +69,8 @@ fun BrowserContent(
     onOpenFolder: (FolderDto) -> Unit,
     onOpenFile: (FileDto) -> Unit,
     modifier: Modifier = Modifier,
+    /** false: sayfa şu an görünmüyor (üstünde profil sayfası açık); seçim modu kapatılır. */
+    active: Boolean = true,
 ) {
     val state by viewModel.state.collectAsState()
     val selection = state.selection
@@ -80,6 +82,11 @@ fun BrowserContent(
 
     // Ekran her görününce liste tazelenir (başka ekranda değişmiş olabilir: ör. Favorilerim).
     LaunchedEffect(viewModel) { viewModel.onShown() }
+    // Sayfadan çıkılınca (menüden başka bölüme geçildi, bir klasöre girildi, geri dönüldü) seçim modu kapanır: ViewModel
+    // sayfadan uzun yaşadığı için seçim kapatılmazsa geri gelince olduğu gibi dururdu. Üstüne profil açılınca da kapanır.
+    // Ekran döndürülünce kapanmaz.
+    LeaveEffect(viewModel) { viewModel.clearSelection() }
+    LaunchedEffect(active) { if (!active) viewModel.clearSelection() }
     // Özetleme arka planda sürer; bitince ya da olmazsa kısa bir bildirimle haber verilir.
     LaunchedEffect(viewModel) { AiSummarizer.notices.collect(viewModel::showNotice) }
     // "Özetleme bitti" kartı (telefonda da bulutta da): dokunulunca özet açılır. Aynı anda birkaç özet biterse sırayla gösterilir.
@@ -110,7 +117,8 @@ fun BrowserContent(
                 count = selection.count,
                 allFavorite = state.selectedItems.allFavorite,
                 // AI sonuçları klasörleri taşınamaz; normal öğeler ile yapay zeka sonuç dosyaları da birlikte taşınamaz.
-                canMove = state.moveLocation != null,
+                // Favorilerim'de hiç taşıma yoktur (öğeler başka yerlerden yıldızlanmıştır; yerleri orada değiştirilir).
+                canMove = !viewModel.favoritesOnly && state.moveLocation != null,
                 onClose = viewModel::clearSelection,
                 onSelectAll = viewModel::selectAllVisible,
                 onFavorite = viewModel::favoriteSelection,
@@ -148,7 +156,8 @@ fun BrowserContent(
                 .fillMaxWidth()
                 .itemDragSource(
                     state = dragState,
-                    onLongPress = viewModel::longPress,
+                    // Uzun basış öğeyi seçer; Favorilerim'de sürükleyip taşıma yoktur (null: sürükleme başlamaz).
+                    onLongPress = { key -> viewModel.longPress(key).takeUnless { viewModel.favoritesOnly } },
                     onDrop = viewModel::dropItems,
                 )
         ) {
@@ -263,18 +272,19 @@ private fun BrowserList(
         }
         items(state.visibleFolders, key = { folderKey(it.id) }) { folder ->
             val rowKey = folderKey(folder.id)
-            var rowModifier = Modifier.trackBounds(dragState.itemCoords, rowKey)
-            // Dosyalar ve klasörler yalnızca "Ana Sayfa" klasörlerine bırakılabilir (AI sonuçları klasörlerine değil).
-            if (folder.location == FolderLocations.HOME) {
-                rowModifier = rowModifier.trackBounds(dragState.folderCoords, folder.id)
-            }
+            // Her klasör bırakma hedefidir; öğeler yalnızca kendi sayfalarının klasörlerine bırakılır (ana sayfa öğeleri
+            // ana sayfa klasörlerine, AI sonuçları AI sonuçları klasörlerine). Seçim [FileDragState]'tedir.
+            val rowModifier = Modifier
+                .trackBounds(dragState.itemCoords, rowKey)
+                .trackDropFolder(dragState, folder.id, folder.location)
             FolderRow(
                 folder = folder,
                 modifier = rowModifier,
                 actions = FolderRowActions(
                     onToggleFavorite = { viewModel.toggleFavorite(folder) },
                     onEdit = { viewModel.openDialog(BrowserDialog.EditFolder(folder)) },
-                    onMove = { viewModel.openDialog(BrowserDialog.MoveFolder(folder)) },
+                    // Favorilerim'de "Taşı" yoktur.
+                    onMove = if (viewModel.favoritesOnly) null else ({ viewModel.openDialog(BrowserDialog.MoveFolder(folder)) }),
                     onDelete = { viewModel.openDialog(BrowserDialog.DeleteFolder(folder)) },
                 ),
                 menuEnabled = !state.offline,
@@ -294,7 +304,7 @@ private fun BrowserList(
                     onToggleFavorite = { viewModel.toggleFavorite(file) },
                     onToggleAi = { AiSummarizer.onAiClicked(file, hasSummary = file.hasSummary || file.id in waitingUpload) },
                     onDownload = { onDownload(file) },
-                    onMove = { viewModel.openDialog(BrowserDialog.MoveFile(file)) },
+                    onMove = if (viewModel.favoritesOnly) null else ({ viewModel.openDialog(BrowserDialog.MoveFile(file)) }),
                     onRename = { viewModel.openDialog(BrowserDialog.RenameFile(file)) },
                     onInfo = { viewModel.openDialog(BrowserDialog.FileInfo(file)) },
                     onDelete = { viewModel.openDialog(BrowserDialog.DeleteFile(file)) },

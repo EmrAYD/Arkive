@@ -14,7 +14,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
@@ -44,8 +43,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.ai.SummaryTemplate
+import com.eayd.arkive.data.PlusPlan
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.screens.home.ProfileAvatar
+import com.eayd.arkive.ui.components.AiIcons
 import com.eayd.arkive.ui.components.StorageSkeleton
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.viewmodel.StorageInfo
@@ -208,7 +209,7 @@ internal fun SettingsSection(
         )
         RowDivider()
         ProfileRow(
-            icon = Icons.Filled.AutoAwesome,
+            icon = AiIcons.Filled, // uygulamanın yapay zeka simgesi (elmas ve parıltı)
             title = "Yapay zeka işlem yeri",
             subtitle = aiMode.label,
             onClick = onAiMode,
@@ -299,7 +300,7 @@ private fun LimitRow(label: String, value: String) {
 
 /**
  * Yalnızca ücretsiz plandaki kullanıcıya gösterilen Plus tanıtımı: avantajlar ve "Plus'a geç" düğmesi.
- * Düğme şimdilik bir şey yapmaz; ödeme ekranı eklenince [onUpgrade] oraya bağlanacak.
+ * [onUpgrade]: tam ekran Plus tanıtımını açar (PlusOfferDialog).
  */
 @Composable
 internal fun PlusPromo(storage: StorageInfo, onUpgrade: () -> Unit) {
@@ -311,13 +312,14 @@ internal fun PlusPromo(storage: StorageInfo, onUpgrade: () -> Unit) {
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(Icons.Filled.AutoAwesome, contentDescription = null)
+                Icon(AiIcons.Filled, contentDescription = null) // uygulamanın yapay zeka simgesi (elmas ve parıltı)
                 Spacer(Modifier.width(12.dp))
                 Text("Plus ile daha fazlası", style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(12.dp))
-            PlusBenefit("Dosya başına ??GB yükleme (şu an ${formatBytes(storage.maxFileSize)})")
-            PlusBenefit("??GB toplam depolama alanı (şu an ${formatBytes(storage.limit)})")
+            PlusBenefit("Dosya başına 2 GB yükleme (şu an ${formatBytes(storage.maxFileSize)})")
+            PlusBenefit("20 GB toplam depolama alanı (şu an ${formatBytes(storage.limit)})")
+            PlusBenefit("Sınırsız yapay zeka özeti, bulutta da (şu an ${PlusPlan.FREE_SUMMARY_LIMIT} dosya, yalnızca telefonda)")
             Spacer(Modifier.height(16.dp))
             Button(onClick = onUpgrade, modifier = Modifier.fillMaxWidth()) { Text("Plus'a geç") }
         }

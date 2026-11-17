@@ -23,6 +23,7 @@ import com.eayd.arkive.screens.home.HomeScreen
 import com.eayd.arkive.screens.preview.PreviewScreen
 import com.eayd.arkive.screens.trash.TrashScreen
 import com.eayd.arkive.ui.components.AiSummaryDialogHost
+import com.eayd.arkive.ui.components.PlusOfferHost
 import com.eayd.arkive.viewmodel.AuthViewModel
 import com.eayd.arkive.viewmodel.TrashViewModel
 
@@ -30,6 +31,7 @@ import com.eayd.arkive.viewmodel.TrashViewModel
 @Composable
 fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
     SummaryNavigation(navController)
+    PlusOfferHost() // tam ekran Plus tanıtımı (AI düğmesi, yan menü ve profil açar)
     NavHost(navController = navController, startDestination = Routes.SPLASH) {
 
         composable(Routes.SPLASH) { entry ->

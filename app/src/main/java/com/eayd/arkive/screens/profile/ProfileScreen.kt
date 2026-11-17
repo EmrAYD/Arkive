@@ -21,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.HorizontalDivider
@@ -47,6 +48,8 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eayd.arkive.ai.AiMode
+import com.eayd.arkive.data.PlanStatus
+import com.eayd.arkive.data.PlusOffer
 import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.ui.components.NoticeEffect
@@ -81,6 +84,12 @@ fun ProfileScreen(
 
     // Sayfa her açıldığında plan bilgisi tazelenir (ViewModel sayfa kapanınca da yaşar).
     LaunchedEffect(viewModel) { viewModel.load() }
+    // Plan başka yerden değişince (Plus tanıtımından Plus'a geçildi) plan bilgisi de tazelenir.
+    val planName = PlanStatus.quota.collectAsState().value?.planName
+    LaunchedEffect(planName) {
+        val shown = state.storage?.planName
+        if (planName != null && shown != null && planName != shown) viewModel.load()
+    }
 
     // Kendi arka planı var: sayfa ana ekranın üstüne kayarak gelirken alttaki ekran görünmesin.
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
@@ -131,7 +140,13 @@ fun ProfileScreen(
 
                 // Plus'taki kullanıcı yalnızca plan bilgisini görür; tanıtım ve düğme ücretsiz plana özel.
                 state.storage?.takeIf { it.isFree }?.let { storage ->
-                    PlusPromo(storage, onUpgrade = { /* Şimdilik bir şey yapmaz. */ })
+                    PlusPromo(storage, onUpgrade = { PlusOffer.show() }) // tam ekran Plus tanıtımı
+                }
+                // DENEME İÇİN: ödeme sistemi yokken Plus'ı denedikten sonra ücretsiz plana dönülebilsin.
+                if (state.storage?.isFree == false) {
+                    OutlinedButton(onClick = viewModel::switchToFree, modifier = Modifier.fillMaxWidth()) {
+                        Text("Ücretsiz plana dön (deneme)")
+                    }
                 }
 
                 Button(

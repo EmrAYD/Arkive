@@ -16,7 +16,18 @@ data class MeResponse(
     @SerializedName("max_file_size") val maxFileSize: Long,
     /** Çöp kutusunda saklama süresi (gün). */
     @SerializedName("trash_retention_days") val trashRetentionDays: Int = 30,
-)
+    /** Kullanıcının tamamlanmış yapay zeka özeti sayısı. */
+    @SerializedName("summary_count") val summaryCount: Int = 0,
+    /** Plana göre en çok kaç dosya özetlenebilir; null: sınırsız (Plus). */
+    @SerializedName("summary_limit") val summaryLimit: Int? = null,
+    /** Bulutta (sunucudaki yapay zekayla) özetleyebilir mi (Plus). */
+    @SerializedName("cloud_summary") val cloudSummary: Boolean = false,
+) {
+    fun summaryQuota() = SummaryQuota(planName, summaryCount, summaryLimit, cloudSummary)
+}
+
+/** POST /me/plan gövdesi (deneme için plan değiştirme): "Plus" ya da "Free". */
+data class ChangePlanRequest(val plan: String)
 
 /** Çöp kutusundaki dosya. [daysLeft]: kalıcı silinmesine kalan gün (sunucu hesaplar). */
 data class TrashFileDto(
@@ -144,9 +155,15 @@ data class SummaryResponse(
 
 /**
  * Dosyanın bulutta özetlenmesi (POST /files/{id}/summary). [password]: yalnızca parolalı dosyada; bu istekte gider,
- * sunucu saklamaz. [template]: özet PDF'inin şablon adı ([com.eayd.arkive.ai.SummaryTemplate.id]).
+ * sunucu saklamaz. [template]: özet PDF'inin şablon adı ([com.eayd.arkive.ai.SummaryTemplate.id]). [joinOnly]: yalnızca
+ * sunucuda süren özetlemeye katıl (uygulama yeniden açılınca); süren iş ya da kayıtlı özet yoksa sunucu yenisini
+ * başlatmaz, 404 döner.
  */
-data class SummarizeRequest(val password: String? = null, val template: String? = null)
+data class SummarizeRequest(
+    val password: String? = null,
+    val template: String? = null,
+    @SerializedName("join_only") val joinOnly: Boolean = false,
+)
 
 /** Telefonda üretilen özetin sunucuya kaydı (PUT /files/{id}/summary). */
 data class SaveSummaryRequest(

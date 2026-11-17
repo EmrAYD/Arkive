@@ -16,7 +16,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Star
@@ -46,6 +45,8 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.R
 import com.eayd.arkive.data.FolderLocations
+import com.eayd.arkive.data.PlusOffer
+import com.eayd.arkive.ui.components.AiIcons
 import com.eayd.arkive.ui.components.StorageSkeleton
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.viewmodel.StorageInfo
@@ -61,7 +62,8 @@ internal enum class HomeSection(
 ) {
     Files("Ana Sayfa", Icons.Filled.Home, FolderLocations.HOME),
     Favorites("Favorilerim", Icons.Filled.Star, null),
-    AiResults("AI Sonuçlarım", Icons.Filled.AutoAwesome, FolderLocations.AI_RESULTS),
+    // Uygulamanın yapay zeka simgesi (elmas ve parıltı); dosya satırlarındaki AI düğmesiyle aynı.
+    AiResults("AI Sonuçlarım", AiIcons.Filled, FolderLocations.AI_RESULTS),
     Trash("Çöp kutusu", Icons.Filled.Delete, null),
 }
 
@@ -112,8 +114,7 @@ internal fun ArkiveDrawerSheet(
 
 /**
  * "Depolama alanı" bölümü: bulut simgesi + başlık, kalın kullanım çubuğu, "X toplam depolama alanından Y kadarı
- * kullanılıyor" metni ve "Daha fazla depolama alanı alın" düğmesi (şimdilik bir şey yapmaz; ödeme/plan
- * ekranı eklenince buraya bağlanacak).
+ * kullanılıyor" metni ve "Daha fazla depolama alanı alın" düğmesi (tam ekran Plus tanıtımını açar).
  */
 @Composable
 private fun StorageSection(
@@ -157,7 +158,7 @@ private fun StorageSection(
                 }
                 Spacer(Modifier.height(16.dp))
                 OutlinedButton(
-                    onClick = { /* Şimdilik bir şey yapmaz. */ },
+                    onClick = { PlusOffer.show() }, // tam ekran Plus tanıtımı
                     modifier = Modifier.fillMaxWidth(),
                     shape = CircleShape,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),

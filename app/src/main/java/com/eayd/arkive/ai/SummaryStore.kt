@@ -1,15 +1,20 @@
 package com.eayd.arkive.ai
 
 import android.content.Context
+import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.utils.writeTextAtomically
 import com.google.firebase.auth.FirebaseAuth
+import com.google.gson.Gson
 import java.io.File
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
 
-/** Telefonda saklanan bir özet. [pending]: henüz sunucuya yüklenmedi (internet gelince yüklenecek). */
+/**
+ * Telefonda saklanan bir özet. [pending]: henüz sunucuya yüklenmedi (internet gelince yüklenecek). [resultFile]: özetin
+ * "AI Sonuçlarım"daki PDF dosyası (biliniyorsa); kopyası [InputCache]'te tutulur, internetsiz de ön izlenir.
+ */
 data class StoredSummary(
     val fileId: String,
     val fileName: String,
@@ -17,13 +22,15 @@ data class StoredSummary(
     val source: String,
     val model: String?,
     val pending: Boolean,
+    val resultFile: FileDto? = null,
 )
 
 /**
  * Özetlerin telefondaki kopyası. İki işe yarar:
  *  1. Telefonda üretilen özet sunucuya yüklenemezse (internet yok) burada bekler ([StoredSummary.pending]) ve internet
  *     gelince yüklenir; o zamana kadar AI düğmesi dolu görünür ve özet okunabilir.
- *  2. Yüklenmiş ya da sunucudan okunmuş özetlerin kopyası kalır: internet yokken de özet metni görülebilir.
+ *  2. Yüklenmiş ya da sunucudan okunmuş özetlerin kopyası kalır: internet yokken de özet görülebilir. Özetin PDF
+ *     dosyasının bilgisi de burada, PDF'in kopyası [InputCache]'tedir; internetsizken özet PDF olarak açılır.
  *
  * Her özet `files/ai_summaries/<dosya kimliği>.json` dosyasındadır. Telefonda üretilen özetin PDF'i yüklenene kadar yanında
  * `<dosya kimliği>.pdf` olarak bekler ([putPdf]); yüklenince silinir. Kayıtlar oturum açmış kullanıcıya aittir: başka bir
@@ -32,6 +39,7 @@ data class StoredSummary(
 object SummaryStore {
 
     private lateinit var dir: File
+    private val gson = Gson()
     private val _pendingIds = MutableStateFlow<Set<String>>(emptySet())
 
     /** Yüklenmeyi bekleyen özetlerin dosya kimlikleri; liste bu dosyalarda AI düğmesini dolu gösterir. */
@@ -58,6 +66,7 @@ object SummaryStore {
             .put("source", entry.source)
             .put("model", entry.model ?: JSONObject.NULL)
             .put("pending", entry.pending)
+            .put("resultFile", entry.resultFile?.let { gson.toJson(it) } ?: JSONObject.NULL)
         fileOf(entry.fileId).writeTextAtomically(json.toString())
         publish()
     }
@@ -76,6 +85,11 @@ object SummaryStore {
     /** Bekleyen özetin PDF'i; yoksa (üretilememiş ya da silinmiş) null: o zaman sunucu PDF'i kendisi üretir. */
     @Synchronized
     fun getPdf(fileId: String): ByteArray? = pdfOf(fileId).takeIf { it.isFile }?.readBytes()
+
+    /** Kimliği [resultFileId] olan özet PDF'inin bilgisi (internetsiz ön izleme için); bilinmiyorsa null. */
+    @Synchronized
+    fun findResultFile(resultFileId: String): FileDto? =
+        all().firstNotNullOfOrNull { entry -> entry.resultFile?.takeIf { it.id == resultFileId } }
 
     /** Yüklenmeyi bekleyen kayıtlar (şu anki kullanıcıya ait olanlar). */
     @Synchronized
@@ -109,6 +123,13 @@ object SummaryStore {
                 source = json.optString("source", "local"),
                 model = json.optString("model").takeIf { it.isNotEmpty() && it != "null" },
                 pending = json.optBoolean("pending", false),
+                resultFile = json.optString("resultFile").takeIf { it.isNotEmpty() && it != "null" }?.let {
+                    try {
+                        gson.fromJson(it, FileDto::class.java)
+                    } catch (e: Exception) {
+                        null // eski ya da bozuk kayıt: PDF bilgisi yok sayılır, metin yine okunur
+                    }
+                },
             )
         } catch (e: Exception) {
             null // bozuk dosya yok sayılır

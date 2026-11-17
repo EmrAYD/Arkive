@@ -50,6 +50,7 @@ import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.FileGlyph
 import com.eayd.arkive.ui.components.FolderGlyph
 import com.eayd.arkive.ui.components.ItemRow
+import com.eayd.arkive.ui.components.LeaveEffect
 import com.eayd.arkive.ui.components.ListSkeleton
 import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.ui.components.NoticeHost
@@ -79,12 +80,18 @@ fun TrashScreen(
      * hamburger düğmesi gösterilir. Çöpteki bir klasörün içinde (ayrı ekran) verilmez; orada geri oku kalır.
      */
     onOpenMenu: (() -> Unit)? = null,
+    /** false: sayfa şu an görünmüyor (üstünde profil sayfası açık); seçim modu kapatılır. */
+    active: Boolean = true,
 ) {
     val state by viewModel.state.collectAsState()
     val notices = rememberNoticeHostState()
     val inFolder = viewModel.isFolderView
 
     LaunchedEffect(viewModel) { viewModel.onShown() }
+    // Sayfadan çıkılınca (menüden başka bölüme geçildi, bir klasöre girildi) seçim modu kapanır; geri gelince sürmez.
+    // Ekran döndürülünce kapanmaz.
+    LeaveEffect(viewModel) { viewModel.stopSelecting() }
+    LaunchedEffect(active) { if (!active) viewModel.stopSelecting() }
     NoticeEffect(state.notice, notices, viewModel::clearNotice)
 
     // Geri tuşu: önce seçim modundan çıkar, sonra çöp kutusundan.

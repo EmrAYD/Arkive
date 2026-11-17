@@ -12,6 +12,8 @@ import com.eayd.arkive.data.FileDownloader
 import com.eayd.arkive.ai.DocumentReader
 import com.eayd.arkive.ai.InputCache
 import com.eayd.arkive.ai.PasswordException
+import com.eayd.arkive.ai.SummaryCopyPolicy
+import com.eayd.arkive.ai.SummaryStore
 import com.eayd.arkive.ai.UnreadableDocumentException
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.ListCache
@@ -115,9 +117,11 @@ class PreviewViewModel(
             val file = try {
                 ApiClient.api.getFile(fileId)
             } catch (e: IOException) {
-                // İnternet yok: dosya telefonda kayıtlıysa (liste kaydı + dosya kopyası) ön izleme oradan açılır.
+                // İnternet yok: dosya telefonda kayıtlıysa (liste kaydı ya da özet kaydı + dosya kopyası) ön izleme
+                // oradan açılır. Özet PDF'leri, özetin kaydıyla birlikte saklandığı için listeler hiç açılmamış olsa da bulunur.
                 val offline = withContext(Dispatchers.IO) {
-                    ListCache.findFile(fileId)?.let { f -> InputCache.get(f.id, f.size)?.let { f to it } }
+                    (ListCache.findFile(fileId) ?: SummaryStore.findResultFile(fileId))
+                        ?.let { f -> InputCache.get(f.id, f.size)?.let { f to it } }
                 } ?: throw IOException("Sunucuya ulaşılamadı ve bu dosya telefonda kayıtlı değil.", e)
                 _title.value = offline.first.name
                 show(offline.first, buildContent(offline.first, offline.second))
@@ -173,6 +177,10 @@ class PreviewViewModel(
 
             PreviewKind.Pdf -> {
                 downloadToTemp(url, limit)
+                // Özet PDF'inin kopyası telefonda tutulur: sunucuya ulaşılamayınca da özet PDF olarak açılır.
+                if (file.inAiResults && SummaryCopyPolicy.canKeepCopy(file.size)) {
+                    withContext(Dispatchers.IO) { InputCache.keepCopy(tempFile, file.id, file.size) }
+                }
                 openPdf(tempFile)
             }
 

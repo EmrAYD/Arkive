@@ -40,18 +40,20 @@ import com.eayd.arkive.viewmodel.UploadPhase
 // Liste ekranının satırları. Hepsi ortak [ItemRow] üzerine kurulu; fark yalnızca içerik ve menülerdir.
 
 /** Satırda yapılabilecek işlemler: ekran bunları ViewModel'e bağlar. */
+/** [onMove] null ise menüde "Taşı" gösterilmez (Favorilerim'de taşıma yoktur). */
 class FolderRowActions(
     val onToggleFavorite: () -> Unit,
     val onEdit: () -> Unit,
-    val onMove: () -> Unit,
+    val onMove: (() -> Unit)?,
     val onDelete: () -> Unit,
 )
 
+/** [onMove] null ise menüde "Taşı" gösterilmez (Favorilerim'de taşıma yoktur). */
 class FileRowActions(
     val onToggleFavorite: () -> Unit,
     val onToggleAi: () -> Unit,
     val onDownload: () -> Unit,
-    val onMove: () -> Unit,
+    val onMove: (() -> Unit)?,
     val onRename: () -> Unit,
     val onInfo: () -> Unit,
     val onDelete: () -> Unit,
@@ -85,9 +87,9 @@ fun FolderRow(
                     FolderActionsMenu(
                         expanded = expanded,
                         onDismiss = dismiss,
-                        canMove = folder.location == FolderLocations.HOME,
+                        canMove = folder.location == FolderLocations.HOME && actions.onMove != null,
                         onEdit = actions.onEdit,
-                        onMove = actions.onMove,
+                        onMove = { actions.onMove?.invoke() },
                         onDelete = actions.onDelete,
                     )
                 }

@@ -40,6 +40,25 @@ object InputCache {
         return ok
     }
 
+    /**
+     * [source]'un (ör. ön izleme için indirilmiş dosya) bir kopyasını telefonda tutar; [source] yerinde kalır.
+     * Kopyalanamazsa false.
+     */
+    @Synchronized
+    fun keepCopy(source: File, fileId: String, size: Long): Boolean {
+        if (!source.isFile || source.length() != size) return false
+        if (get(fileId, size) != null) return true
+        val temp = File(dir, "$fileId.copy.part")
+        return try {
+            source.copyTo(temp, overwrite = true)
+            adopt(temp, fileId, size)
+        } catch (e: Exception) {
+            false
+        } finally {
+            temp.delete()
+        }
+    }
+
     /** Bu dosyanın tüm kopyalarını siler. */
     @Synchronized
     fun evict(fileId: String) {

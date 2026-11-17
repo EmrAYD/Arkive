@@ -6,6 +6,10 @@ import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.ApiClient
 import com.eayd.arkive.data.AppSettings
+import com.eayd.arkive.data.PlanPolicy
+import com.eayd.arkive.data.PlanStatus
+import com.eayd.arkive.data.PlanSwitcher
+import com.eayd.arkive.data.PlusOffer
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.utils.toAuthErrorMessage
 import com.google.firebase.auth.EmailAuthProvider
@@ -94,8 +98,13 @@ class ProfileViewModel : ViewModel() {
     }
 
     fun setAiMode(mode: AiMode) {
-        AppSettings.setAiMode(mode)
         dialogs.close()
+        // Bulut özeti Plus'a özel: ücretsiz planda "Bulut" ve "Yerel + Bulut" seçilince ayar değişmez, Plus tanıtılır.
+        if (mode.allowsCloud && PlanStatus.quota.value?.cloud == false) {
+            PlusOffer.show(PlanPolicy.CLOUD_MODE_MESSAGE)
+            return
+        }
+        AppSettings.setAiMode(mode)
     }
 
     fun setThemeMode(mode: ThemeMode) {
@@ -121,6 +130,7 @@ class ProfileViewModel : ViewModel() {
             },
         ) {
             val me = ApiClient.api.getMe()
+            PlanStatus.update(me.summaryQuota())
             _state.update {
                 it.copy(
                     isLoading = false,
@@ -129,6 +139,14 @@ class ProfileViewModel : ViewModel() {
                     trashRetentionDays = me.trashRetentionDays,
                 )
             }
+        }
+    }
+
+    /** DENEME İÇİN: ücretsiz plana döner (ödeme sistemi yokken Plus'ı denedikten sonra geri dönmek için). */
+    fun switchToFree() {
+        launchCatching(onError = { message -> _state.update { it.copy(notice = message) } }) {
+            val me = PlanSwitcher.switchTo("Free")
+            _state.update { it.copy(storage = me.toStorageInfo(), notice = "Ücretsiz plana dönüldü") }
         }
     }
 

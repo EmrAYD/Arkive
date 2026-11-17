@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.screens.folders.BrowserContent
 import com.eayd.arkive.screens.profile.ProfileScreen
 import com.eayd.arkive.screens.trash.TrashScreen
@@ -78,6 +79,12 @@ fun HomeScreen(
     // Menü her açıldığında kullanım bilgisi sunucudan tazelenir.
     LaunchedEffect(drawerState.currentValue) {
         if (drawerState.currentValue == DrawerValue.Open) homeViewModel.refresh()
+    }
+    // Plan değişince (Plus tanıtımından Plus'a geçildi / ücretsiz plana dönüldü) menüdeki kullanım bilgisi de tazelenir.
+    val planName = PlanStatus.quota.collectAsState().value?.planName
+    LaunchedEffect(planName) {
+        val shown = state.storage?.planName
+        if (planName != null && shown != null && planName != shown) homeViewModel.refresh()
     }
 
     Box(Modifier.fillMaxSize()) {
@@ -128,7 +135,9 @@ fun HomeScreen(
                             onBack = { section = HomeSection.Files },
                             onOpenFolder = onOpenTrashFolder,
                             onOpenFile = onOpenTrashFile,
+                            // Çöp kutusunun kendi başlığı var; geri oku yerine diğer sayfalardaki gibi menü düğmesi olsun.
                             onOpenMenu = { scope.launch { drawerState.open() } },
+                            active = !showProfile, // profil açılınca seçim modu kapanır
                         )
 
                         HomeSection.Favorites -> BrowserContent(
@@ -138,6 +147,7 @@ fun HomeScreen(
                             ),
                             onOpenFolder = { onOpenFolder(it.id) },
                             onOpenFile = { onOpenFile(it.id) },
+                            active = !showProfile,
                         )
 
                         HomeSection.Files, HomeSection.AiResults -> BrowserContent(
@@ -147,6 +157,7 @@ fun HomeScreen(
                             ),
                             onOpenFolder = { onOpenFolder(it.id) },
                             onOpenFile = { onOpenFile(it.id) },
+                            active = !showProfile,
                         )
                     }
                 }

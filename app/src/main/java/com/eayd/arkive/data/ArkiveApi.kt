@@ -23,6 +23,10 @@ interface ArkiveApi {
     @PATCH("me")
     suspend fun updateMe(@Body fields: Map<String, @JvmSuppressWildcards Any?>): MeResponse
 
+    /** DENEME İÇİN ödeme almadan planı değiştirir ("Plus" / "Free"); bkz. [PlanSwitcher]. */
+    @POST("me/plan")
+    suspend fun changePlan(@Body body: ChangePlanRequest): MeResponse
+
     /**
      * Bir seviyedeki klasörler. parentId verilirse o klasörün alt klasörleri,
      * verilmezse `location` sayfasının kök klasörleri gelir. null parametreler isteğe eklenmez.
@@ -103,6 +107,13 @@ interface ArkiveApi {
      */
     @POST("files/{id}/summary")
     suspend fun summarizeFile(@Path("id") id: String, @Body body: SummarizeRequest): SummaryResponse
+
+    /**
+     * Sunucuda süren bulut özetlemesini durdurur ("Durdur"). Özetleme uygulamanın bağlantısından bağımsızdır: uygulama
+     * kapanınca sürer, yalnızca bu uç onu durdurur.
+     */
+    @POST("files/{id}/summary/cancel")
+    suspend fun cancelSummary(@Path("id") id: String)
 
     /** Telefonda üretilen özeti kaydeder (özet zaten varsa mevcut olan korunur ve o döner). */
     @PUT("files/{id}/summary")

@@ -3,6 +3,7 @@ package com.eayd.arkive.viewmodel
 import androidx.lifecycle.ViewModel
 import com.eayd.arkive.data.ApiClient
 import com.eayd.arkive.data.MeResponse
+import com.eayd.arkive.data.PlanStatus
 import com.google.firebase.auth.FirebaseAuth
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -59,6 +60,7 @@ class HomeViewModel : ViewModel() {
             onError = { message -> _state.update { it.copy(isLoading = false, error = message) } },
         ) {
             val me = ApiClient.api.getMe()
+            PlanStatus.update(me.summaryQuota()) // AI düğmesi planın haklarını buradan da bilsin
             _state.update {
                 it.copy(
                     isLoading = false,

@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.ui.components.FolderIcon
 import com.eayd.arkive.ui.components.fileTypeIcon
 import com.eayd.arkive.ui.components.folderAccent
@@ -62,6 +63,7 @@ class FileDragState {
     // Ekrandaki (oluşturulmuş) satırların yerleri. Ekrandan çıkan satır kendini listeden siler ([trackBounds]).
     internal val itemCoords = HashMap<String, LayoutCoordinates>()     // tüm satırlar (uzun basış için)
     internal val folderCoords = HashMap<String, LayoutCoordinates>()   // bırakılabilir klasörler (anahtar: klasör id)
+    internal val folderAreas = HashMap<String, String>()               // bırakılabilir klasörün sayfası (ana sayfa / AI sonuçları)
     internal var listCoords: LayoutCoordinates? = null
 
     /** Sürüklenenler; null ise sürükleme yok. */
@@ -83,11 +85,19 @@ class FileDragState {
             k !in except && c.isAttached && c.boundsInRoot().contains(pos)
         }?.key
 
-    // Sürüklenen klasörler kendi üstlerine bırakılamaz.
-    private fun folderAt(pos: Offset): String? =
-        hit(folderCoords, pos, except = dragged?.folders?.map { it.id }?.toSet().orEmpty())
+    /** Sürüklenenlerin sayfası: ana sayfa öğeleri ya da AI sonuçları; ikisi karışıksa null (hiçbir klasöre bırakılamaz). */
+    private var draggedArea: String? = null
+
+    // Sürüklenen klasörler kendi üstlerine bırakılamaz. Öğeler yalnızca kendi sayfalarının klasörlerine bırakılır:
+    // ana sayfa öğeleri ana sayfa klasörlerine, AI sonuçları AI sonuçları klasörlerine (sunucu da başkasına izin vermez).
+    private fun folderAt(pos: Offset): String? {
+        val except = dragged?.folders?.map { it.id }?.toSet().orEmpty() +
+            folderAreas.filterValues { it != draggedArea }.keys
+        return hit(folderCoords, pos, except = except)
+    }
 
     internal fun start(payload: SelectedItems, pos: Offset) {
+        draggedArea = areaOf(payload)
         dragged = payload
         position = pos
         hoverFolderId = folderAt(pos)
@@ -113,6 +123,29 @@ class FileDragState {
     internal fun cancel() {
         dragged = null
         hoverFolderId = null
+    }
+}
+
+/** Sürüklenen öğelerin hangi sayfaya ait olduğu (hepsi aynıysa); karışıksa null. */
+private fun areaOf(items: SelectedItems): String? =
+    (items.files.map { if (it.inAiResults) FolderLocations.AI_RESULTS else FolderLocations.HOME } +
+        items.folders.map { it.location }).toSet().singleOrNull()
+
+/**
+ * Klasör satırını bırakma hedefi olarak kaydeder: ekrandaki yeri ve hangi sayfanın klasörü olduğu ([area]). Hangi
+ * sürüklemenin bu klasöre bırakılabileceğine [FileDragState] karar verir. Satır ekrandan kalkınca kayıt silinir.
+ */
+@Composable
+internal fun Modifier.trackDropFolder(state: FileDragState, folderId: String, area: String): Modifier {
+    DisposableEffect(state, folderId) {
+        onDispose {
+            state.folderCoords.remove(folderId)
+            state.folderAreas.remove(folderId)
+        }
+    }
+    return onGloballyPositioned {
+        state.folderCoords[folderId] = it
+        state.folderAreas[folderId] = area
     }
 }
 

@@ -16,21 +16,21 @@ import androidx.compose.ui.graphics.vector.ImageVector
 
 /**
  * Bir dosyanın 3 nokta menüsü. Dosya listesinde ve ön izleme ekranında aynı menü kullanılır:
- * İndir, Taşı, Yeniden adlandır, Bilgi, Sil (kırmızı).
+ * İndir, Taşı, Yeniden adlandır, Bilgi, Sil (kırmızı). [onMove] null ise "Taşı" gösterilmez (Favorilerim).
  */
 @Composable
 fun FileActionsMenu(
     expanded: Boolean,
     onDismiss: () -> Unit,
     onDownload: () -> Unit,
-    onMove: () -> Unit,
+    onMove: (() -> Unit)?,
     onRename: () -> Unit,
     onInfo: () -> Unit,
     onDelete: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
         MenuItem("İndir", Icons.Filled.Download) { onDismiss(); onDownload() }
-        MenuItem("Taşı", Icons.AutoMirrored.Filled.DriveFileMove) { onDismiss(); onMove() }
+        if (onMove != null) MenuItem("Taşı", Icons.AutoMirrored.Filled.DriveFileMove) { onDismiss(); onMove() }
         MenuItem("Yeniden adlandır", Icons.Filled.Edit) { onDismiss(); onRename() }
         MenuItem("Bilgi", Icons.Outlined.Info) { onDismiss(); onInfo() }
         MenuItem("Sil", Icons.Filled.Delete, destructive = true) { onDismiss(); onDelete() }
