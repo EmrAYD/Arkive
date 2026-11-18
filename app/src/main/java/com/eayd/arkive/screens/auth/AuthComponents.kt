@@ -19,6 +19,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.Button
@@ -30,6 +31,7 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -47,6 +49,10 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.R
+import com.eayd.arkive.data.AppSettings
+import com.eayd.arkive.i18n.AppLanguage
+import com.eayd.arkive.i18n.Lang
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.theme.arkiveColors
 import com.eayd.arkive.ui.theme.arkiveGradientBackground
 import com.eayd.arkive.utils.getGoogleIdToken
@@ -78,18 +84,31 @@ fun AuthScreenLayout(title: String, content: @Composable ColumnScope.() -> Unit)
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "Arkive Logosu",
+                    contentDescription = Txt.auth.logoA11y,
                     modifier = Modifier.size(192.dp),
                     tint = Color.Unspecified,
                 )
                 Spacer(Modifier.height(12.dp))
-                Text("Arkive'e hoşgeldiniz!", style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
+                Text(Txt.auth.welcome, style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Normal)
                 Spacer(Modifier.height(24.dp))
                 Text(title, style = MaterialTheme.typography.headlineMedium)
                 Spacer(Modifier.height(24.dp))
                 content()
             }
         }
+        // Giriş ve kayıt ekranında dil değiştirilebilir (hesap açmadan önce de): sağ üstte öteki dilin adı yazar.
+        LanguageSwitch(Modifier.align(Alignment.TopEnd).padding(8.dp))
+    }
+}
+
+/** Türkçe ⇄ English düğmesi. Seçim kaydedilir; Activity yeniden kurulur ve ekran yeni dilde açılır. */
+@Composable
+private fun LanguageSwitch(modifier: Modifier = Modifier) {
+    val other = if (Lang.app == AppLanguage.Turkish) AppLanguage.English else AppLanguage.Turkish
+    TextButton(onClick = { AppSettings.setAppLanguage(other) }, modifier = modifier) {
+        Icon(Icons.Filled.Language, contentDescription = Txt.language.changeA11y, modifier = Modifier.size(18.dp))
+        Spacer(Modifier.width(6.dp))
+        Text(other.nativeName)
     }
 }
 
@@ -110,9 +129,9 @@ fun EmailField(value: String, check: EmailCheck, onValueChange: (String) -> Unit
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text("E-posta") },
+        label = { Text(Txt.auth.email) },
         isError = check == EmailCheck.Invalid,
-        supportingText = { if (check == EmailCheck.Invalid) Text("Geçerli bir e-posta adresi giriniz.") },
+        supportingText = { if (check == EmailCheck.Invalid) Text(Txt.auth.invalidEmail) },
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = if (valid) MaterialTheme.arkiveColors.success else MaterialTheme.colorScheme.primary,
             unfocusedBorderColor = if (valid) MaterialTheme.arkiveColors.success else MaterialTheme.colorScheme.outline,
@@ -128,7 +147,7 @@ fun PasswordField(value: String, onValueChange: (String) -> Unit, modifier: Modi
     OutlinedTextField(
         value = value,
         onValueChange = onValueChange,
-        label = { Text("Şifre") },
+        label = { Text(Txt.auth.password) },
         modifier = modifier.fillMaxWidth(),
         singleLine = true,
         visualTransformation = if (visible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -136,7 +155,7 @@ fun PasswordField(value: String, onValueChange: (String) -> Unit, modifier: Modi
             IconButton(onClick = { visible = !visible }) {
                 Icon(
                     imageVector = if (visible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = if (visible) "Şifreyi Gizle" else "Şifreyi Göster",
+                    contentDescription = if (visible) Txt.auth.hidePasswordTitle else Txt.auth.showPasswordTitle,
                 )
             }
         },
@@ -182,7 +201,7 @@ fun GoogleSignInButton(label: String, enabled: Boolean, onResult: (idToken: Stri
     ) {
         Icon(
             painter = painterResource(id = R.drawable.ic_google),
-            contentDescription = "Google Logosu",
+            contentDescription = Txt.auth.googleLogoA11y,
             modifier = Modifier.size(24.dp),
             tint = Color.Unspecified,
         )

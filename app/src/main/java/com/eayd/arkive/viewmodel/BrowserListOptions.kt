@@ -2,29 +2,54 @@ package com.eayd.arkive.viewmodel
 
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.FileKind
 import com.eayd.arkive.utils.TurkishLocale
 import com.eayd.arkive.utils.fileKind
 import java.text.Collator
 
 /** "Sırala" seçenekleri. Sıralama yalnızca ekrandaki liste üzerinde, istemcide yapılır. */
-enum class SortOption(val label: String) {
-    NameAsc("Ad (A-Z)"),
-    NameDesc("Ad (Z-A)"),
-    Newest("En yeni"),
-    Oldest("En eski"),
-    Largest("Boyut (büyükten küçüğe)"),
-    Smallest("Boyut (küçükten büyüğe)"),
+enum class SortOption {
+    NameAsc,
+    NameDesc,
+    Newest,
+    Oldest,
+    Largest,
+    Smallest,
+    ;
+
+    /** Seçili dilde adı. */
+    val label: String
+        get() = when (this) {
+            NameAsc -> Txt.browser.sortNameAsc
+            NameDesc -> Txt.browser.sortNameDesc
+            Newest -> Txt.browser.sortNewest
+            Oldest -> Txt.browser.sortOldest
+            Largest -> Txt.browser.sortLargest
+            Smallest -> Txt.browser.sortSmallest
+        }
 }
 
 /** "Kategori" seçenekleri: dosyaları türüne göre süzer. */
-enum class CategoryOption(val label: String) {
-    All("Tümü"),
-    Images("Resimler"),
-    Videos("Videolar"),
-    Audio("Ses"),
-    Documents("Belgeler"),
-    Other("Diğer");
+enum class CategoryOption {
+    All,
+    Images,
+    Videos,
+    Audio,
+    Documents,
+    Other,
+    ;
+
+    /** Seçili dilde adı. */
+    val label: String
+        get() = when (this) {
+            All -> Txt.browser.categoryAll
+            Images -> Txt.browser.categoryImages
+            Videos -> Txt.browser.categoryVideos
+            Audio -> Txt.browser.categoryAudio
+            Documents -> Txt.browser.categoryDocuments
+            Other -> Txt.browser.categoryOther
+        }
 
     fun matches(mimeType: String?): Boolean {
         val kind = fileKind(mimeType)

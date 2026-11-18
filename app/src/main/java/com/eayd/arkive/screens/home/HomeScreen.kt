@@ -37,6 +37,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eayd.arkive.data.PlanStatus
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.screens.folders.BrowserContent
 import com.eayd.arkive.screens.profile.ProfileScreen
 import com.eayd.arkive.screens.trash.TrashScreen
@@ -114,7 +115,7 @@ fun HomeScreen(
                         title = { Text(section.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                         navigationIcon = {
                             IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Filled.Menu, contentDescription = "Menüyü aç")
+                                Icon(Icons.Filled.Menu, contentDescription = Txt.home.openMenu)
                             }
                         },
                         actions = {

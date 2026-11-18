@@ -33,6 +33,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.selected
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.i18n.Txt
 
 // Ekranların ortak pencereleri. Pencerenin açık/kapalı olması, "kaydediliyor" ve sunucu hatası ViewModel'de
 // (DialogHost) tutulur; buradaki bileşenler yalnızca verilen değerleri çizer ve olayları iletir.
@@ -46,7 +47,7 @@ fun ConfirmDialog(
     error: String?,
     onConfirm: () -> Unit,
     onDismiss: () -> Unit,
-    confirmLabel: String = "Sil",
+    confirmLabel: String = Txt.common.delete,
 ) {
     AlertDialog(
         onDismissRequest = { if (!saving) onDismiss() },
@@ -65,7 +66,7 @@ fun ConfirmDialog(
                 Text(confirmLabel, color = MaterialTheme.colorScheme.error)
             }
         },
-        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("İptal") } },
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text(Txt.common.cancel) } },
     )
 }
 
@@ -99,8 +100,8 @@ fun NameDialog(
     // Sunucudaki kuralların aynısı istemcide de denetlenir; kullanıcı daha gönderirken uyarılır.
     val trimmed = name.trim()
     val localError = when {
-        trimmed.length > 255 -> "En fazla 255 karakter olabilir"
-        '/' in trimmed || '\\' in trimmed -> "Ad '/' veya '\\' içeremez"
+        trimmed.length > 255 -> Txt.files.nameTooLong
+        '/' in trimmed || '\\' in trimmed -> Txt.files.nameInvalidChars
         else -> null
     }
     val shownError = localError ?: serverError
@@ -123,13 +124,13 @@ fun NameDialog(
                 )
                 if (showColor) {
                     Spacer(Modifier.height(12.dp))
-                    Text("Renk", style = MaterialTheme.typography.labelLarge)
+                    Text(Txt.files.color, style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(8.dp))
                     ColorSwatches(current = color, enabled = !saving, onSelect = { color = it })
                 }
                 if (showEmoji) {
                     Spacer(Modifier.height(12.dp))
-                    Text("Emoji", style = MaterialTheme.typography.labelLarge)
+                    Text(Txt.files.emoji, style = MaterialTheme.typography.labelLarge)
                     Spacer(Modifier.height(8.dp))
                     EmojiChoices(current = emoji, enabled = !saving, onSelect = { emoji = it })
                 }
@@ -141,7 +142,7 @@ fun NameDialog(
                 onClick = { onConfirm(trimmed, color, emoji) },
             ) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("İptal") } },
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text(Txt.common.cancel) } },
     )
 }
 
@@ -166,7 +167,7 @@ private fun ColorSwatches(current: String?, enabled: Boolean, onSelect: (String?
                     )
                     .clickable(enabled = enabled, role = Role.RadioButton) { onSelect(hex) }
                     .semantics {
-                        contentDescription = if (hex == null) "Renksiz" else "Renk $hex"
+                        contentDescription = if (hex == null) Txt.files.noColor else Txt.files.colorHex(hex)
                         selected = isSelected
                     },
                 contentAlignment = Alignment.Center,

@@ -52,6 +52,8 @@ import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.data.PlusOffer
 import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.ThemeMode
+import com.eayd.arkive.i18n.AppLanguage
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.ui.components.NoticeHost
 import com.eayd.arkive.ui.components.rememberNoticeHostState
@@ -78,6 +80,8 @@ fun ProfileScreen(
     val wifiOnly by viewModel.wifiOnly.collectAsState()
     val aiMode by viewModel.aiMode.collectAsState()
     val summaryTemplate by viewModel.summaryTemplate.collectAsState()
+    val appLanguage by viewModel.appLanguage.collectAsState()
+    val summaryLanguage by viewModel.summaryLanguage.collectAsState()
     val context = LocalContext.current
     val notices = rememberNoticeHostState()
     NoticeEffect(state.notice, notices, viewModel::clearNotice)
@@ -94,10 +98,10 @@ fun ProfileScreen(
     // Kendi arka planı var: sayfa ana ekranın üstüne kayarak gelirken alttaki ekran görünmesin.
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
         TopAppBar(
-            title = { Text("Profil") },
+            title = { Text(Txt.profile.title) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Txt.common.back)
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
@@ -124,15 +128,18 @@ fun ProfileScreen(
                     wifiOnly = wifiOnly,
                     aiMode = aiMode,
                     summaryTemplate = summaryTemplate,
+                    appLanguage = appLanguage,
+                    summaryLanguage = summaryLanguage,
                     // Değer sunucudan gelene kadar satır pasif kalır.
                     trashRetentionDays = if (state.storage != null) state.trashRetentionDays else null,
                     onNotifications = {
-                        if (!context.openNotificationSettings()) viewModel.showNotice("Bildirim ayarları açılamadı.")
+                        if (!context.openNotificationSettings()) viewModel.showNotice(Txt.profile.notificationSettingsFailed)
                     },
                     onTheme = { viewModel.openDialog(ProfileDialog.Theme) },
                     onWifiOnlyChange = viewModel::setWifiOnly,
                     onAiMode = { viewModel.openDialog(ProfileDialog.AiProcessing) },
                     onSummaryTemplate = { viewModel.openDialog(ProfileDialog.SummaryTemplateChoice) },
+                    onLanguage = { viewModel.openDialog(ProfileDialog.Language) },
                     onTrashRetention = { viewModel.openDialog(ProfileDialog.TrashRetention) },
                 )
 
@@ -145,7 +152,7 @@ fun ProfileScreen(
                 // DENEME İÇİN: ödeme sistemi yokken Plus'ı denedikten sonra ücretsiz plana dönülebilsin.
                 if (state.storage?.isFree == false) {
                     OutlinedButton(onClick = viewModel::switchToFree, modifier = Modifier.fillMaxWidth()) {
-                        Text("Ücretsiz plana dön (deneme)")
+                        Text(Txt.plan.backToFreeTrial)
                     }
                 }
 
@@ -159,7 +166,7 @@ fun ProfileScreen(
                 ) {
                     Icon(Icons.AutoMirrored.Filled.Logout, contentDescription = null)
                     Spacer(Modifier.width(8.dp))
-                    Text("Çıkış Yap")
+                    Text(Txt.profile.signOut)
                 }
             }
 
@@ -177,6 +184,8 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
     val themeMode by viewModel.themeMode.collectAsState()
     val aiMode by viewModel.aiMode.collectAsState()
     val summaryTemplate by viewModel.summaryTemplate.collectAsState()
+    val appLanguage by viewModel.appLanguage.collectAsState()
+    val summaryLanguage by viewModel.summaryLanguage.collectAsState()
     val close = viewModel.dialogs::close
 
     when (host.current) {
@@ -190,7 +199,7 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
         )
 
         ProfileDialog.Theme -> ChoiceDialog(
-            title = "Tema",
+            title = Txt.profile.theme,
             description = null,
             options = ThemeMode.entries,
             current = themeMode,
@@ -202,8 +211,8 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
         )
 
         ProfileDialog.AiProcessing -> ChoiceDialog(
-            title = "Yapay zeka işlem yeri",
-            description = AiMode.entries.joinToString("\n\n") { "${it.label}: ${it.description}" },
+            title = Txt.profile.aiLocation,
+            description = AiMode.entries.joinToString("\n\n") { Txt.profile.optionWithDescription(it.label, it.description) },
             options = AiMode.entries,
             current = aiMode,
             optionLabel = { it.label },
@@ -214,9 +223,9 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
         )
 
         ProfileDialog.SummaryTemplateChoice -> ChoiceDialog(
-            title = "Özet şablonu",
-            description = SummaryTemplate.entries.joinToString("\n\n") { "${it.label}: ${it.description}" } +
-                "\n\nŞablon yalnızca bundan sonra üretilen özetler için geçerlidir.",
+            title = Txt.profile.summaryTemplate,
+            description = SummaryTemplate.entries.joinToString("\n\n") { Txt.profile.optionWithDescription(it.label, it.description) } +
+                Txt.profile.templateFutureOnly,
             options = SummaryTemplate.entries,
             current = summaryTemplate,
             optionLabel = { it.label },
@@ -226,19 +235,97 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
             onDismiss = close,
         )
 
+        ProfileDialog.Language -> LanguageDialog(
+            appLanguage = appLanguage,
+            summaryLanguage = summaryLanguage,
+            onSave = viewModel::saveLanguages,
+            onDismiss = close,
+        )
+
         ProfileDialog.TrashRetention -> ChoiceDialog(
-            title = "Çöp kutusu saklama süresi",
-            description = "Silinen öğeler çöp kutusunda bu kadar gün kalır, sonra kalıcı olarak silinir. " +
-                "Süreyi kısaltırsanız, yeni süreyi aşan öğeler de silinir.",
+            title = Txt.profile.trashRetention,
+            description = Txt.profile.trashRetentionDetail,
             // Sunucudaki değer listede yoksa (başka yoldan ayarlanmışsa) o da seçenek olarak gösterilir.
             options = (RetentionChoices + state.trashRetentionDays).distinct().sorted(),
             current = state.trashRetentionDays,
-            optionLabel = { "$it gün" },
+            optionLabel = { Txt.profile.days(it) },
             saving = host.saving,
             error = host.error,
             onSave = viewModel::saveTrashRetention,
             onDismiss = close,
         )
+    }
+}
+
+/**
+ * "Dil" penceresi: uygulamanın dili ve özetin dili iki ayrı seçim olarak aynı yerde durur. Pencere açıldığında iki dil
+ * aynıysa, kullanıcı özet dilini ayrıca değiştirmedikçe özet dili uygulama diliyle birlikte değişir.
+ */
+@Composable
+private fun LanguageDialog(
+    appLanguage: AppLanguage,
+    summaryLanguage: AppLanguage,
+    onSave: (app: AppLanguage, summary: AppLanguage) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var app by remember { mutableStateOf(appLanguage) }
+    var summary by remember { mutableStateOf(summaryLanguage) }
+    var summaryTouched by remember { mutableStateOf(appLanguage != summaryLanguage) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(Txt.language.title) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                LanguageChoices(
+                    title = Txt.language.app,
+                    description = Txt.language.appDetail,
+                    selected = app,
+                    onSelect = {
+                        app = it
+                        if (!summaryTouched) summary = it
+                    },
+                )
+                Spacer(Modifier.height(16.dp))
+                LanguageChoices(
+                    title = Txt.language.summary,
+                    description = Txt.language.summaryDetail,
+                    selected = summary,
+                    onSelect = {
+                        summary = it
+                        summaryTouched = true
+                    },
+                )
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(app, summary) }) { Text(Txt.common.save) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Txt.common.cancel) } },
+    )
+}
+
+/** Başlık, açıklama ve dillerin radyo düğmeleri. */
+@Composable
+private fun LanguageChoices(
+    title: String,
+    description: String,
+    selected: AppLanguage,
+    onSelect: (AppLanguage) -> Unit,
+) {
+    Text(title, style = MaterialTheme.typography.titleSmall)
+    Spacer(Modifier.height(4.dp))
+    Text(description, style = MaterialTheme.typography.bodySmall)
+    AppLanguage.entries.forEach { language ->
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .selectable(selected = selected == language, role = Role.RadioButton, onClick = { onSelect(language) })
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            RadioButton(selected = selected == language, onClick = null)
+            Spacer(Modifier.width(12.dp))
+            Text(language.nativeName)
+        }
     }
 }
 
@@ -293,7 +380,7 @@ private fun <T> ChoiceDialog(
                 }
             }
         },
-        confirmButton = { TextButton(enabled = !saving, onClick = { onSave(selected) }) { Text("Kaydet") } },
-        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text("İptal") } },
+        confirmButton = { TextButton(enabled = !saving, onClick = { onSave(selected) }) { Text(Txt.common.save) } },
+        dismissButton = { TextButton(enabled = !saving, onClick = onDismiss) { Text(Txt.common.cancel) } },
     )
 }

@@ -14,13 +14,14 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.i18n.Txt
 
 @Composable
 internal fun TextViewer(text: String, truncated: Boolean) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp)) {
         if (truncated) {
             Text(
-                "Dosya büyük olduğu için yalnızca ilk 512 KB gösteriliyor.",
+                Txt.preview.textTruncated,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.outline,
             )

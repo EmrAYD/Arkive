@@ -47,6 +47,7 @@ import androidx.compose.ui.input.pointer.positionChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.data.PdfDoc
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.SkeletonBox
 import kotlin.math.roundToInt
 
@@ -215,7 +216,7 @@ private fun PdfPage(doc: PdfDoc, index: Int, widthPx: Int) {
         if (current != null) {
             Image(
                 bitmap = current.asImageBitmap(),
-                contentDescription = "Sayfa ${index + 1}",
+                contentDescription = Txt.preview.page(index + 1),
                 modifier = Modifier.fillMaxSize(),
             )
         } else {

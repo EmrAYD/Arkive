@@ -10,14 +10,15 @@ data class TextRun(val text: String, val bold: Boolean)
 
 /**
  * Özet metnini PDF için bloklara ayırır. Sunucudaki `parse_blocks` ile aynı kuralları uygular (backend/app/summary_pdf.py).
- * Telefonun ürettiği biçimi ("Özet: ...", "Önemli noktalar:", "- madde") ve Markdown benzeri metni (# başlık, **kalın
- * başlık**, 1. madde) tanır. Android sınıfı kullanmaz; test edilebilir.
+ * Telefonun ürettiği biçimi ("Özet: ...", "Önemli noktalar:", "- madde"; İngilizce özette "Summary: ...", "Key points:")
+ * ve Markdown benzeri metni (# başlık, **kalın başlık**, 1. madde) tanır. Android sınıfı kullanmaz; test edilebilir.
  */
 object SummaryBlocks {
 
     private val headingHash = Regex("""^#{1,6}\s*(.+?)\s*#*$""")
     private val headingBold = Regex("""^\*\*(.+?)\*\*:?$""")
-    private val summaryLabel = Regex("""^(özet)\s*:\s*(.+)$""", RegexOption.IGNORE_CASE)
+    // "Özet: ..." ya da İngilizce özette "Summary: ..." (bkz. ExtractiveSummarizer ve özet dili ayarı).
+    private val summaryLabel = Regex("""^(özet|summary)\s*:\s*(.+)$""", RegexOption.IGNORE_CASE)
     private val bullet = Regex("""^[-*•]\s+(.+)$""")
     private val numbered = Regex("""^(\d{1,3})[.)]\s+(.+)$""")
     private val boldRuns = Regex("""\*\*(.+?)\*\*|__(.+?)__""")
@@ -55,7 +56,9 @@ object SummaryBlocks {
                 }
                 label != null -> {
                     flush()
-                    blocks += SummaryBlock(BlockKind.Heading, "Özet")
+                    // Başlık metnin kendi dilinde kalır: "Summary: ..." satırından "Summary" başlığı çıkar.
+                    val english = label.groupValues[1].startsWith("s", ignoreCase = true)
+                    blocks += SummaryBlock(BlockKind.Heading, if (english) "Summary" else "Özet")
                     paragraph += label.groupValues[2]
                 }
                 dot != null -> {

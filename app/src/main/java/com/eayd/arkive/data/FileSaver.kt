@@ -7,6 +7,7 @@ import android.os.Build
 import android.os.Environment
 import android.provider.MediaStore
 import androidx.annotation.RequiresApi
+import com.eayd.arkive.i18n.Txt
 import java.io.File
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -33,7 +34,7 @@ object FileSaver {
             } else {
                 saveToPublicFolder(AppSettings.appContext, url, fileName, mime)
             }
-            "İndirilenler/$SUBFOLDER klasörüne kaydedildi"
+            Txt.files.savedToDownloads(SUBFOLDER)
         }
 
     @RequiresApi(Build.VERSION_CODES.Q)
@@ -47,10 +48,10 @@ object FileSaver {
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
         val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
-            ?: throw StorageException("Dosya İndirilenler klasörüne kaydedilemedi.")
+            ?: throw StorageException(Txt.errors.saveToDownloadsFailed)
         try {
             val output = resolver.openOutputStream(uri)
-                ?: throw StorageException("Dosya İndirilenler klasörüne yazılamadı.")
+                ?: throw StorageException(Txt.errors.writeToDownloadsFailed)
             output.use { FileDownloader.copyTo(url, it) }
             resolver.update(uri, ContentValues().apply { put(MediaStore.Downloads.IS_PENDING, 0) }, null, null)
         } catch (e: Throwable) {
@@ -64,7 +65,7 @@ object FileSaver {
     private suspend fun saveToPublicFolder(context: Context, url: String, fileName: String, mime: String) {
         val dir = File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), SUBFOLDER)
         if (!dir.isDirectory && !dir.mkdirs()) {
-            throw StorageException("İndirilenler klasörüne yazılamadı. Depolama izni verildi mi?")
+            throw StorageException(Txt.errors.writeToDownloadsPermission)
         }
         val target = uniqueFile(dir, fileName)
         try {

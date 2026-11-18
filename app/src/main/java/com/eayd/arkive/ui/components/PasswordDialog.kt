@@ -24,6 +24,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.i18n.Txt
 
 /** Göster/gizle düğmeli şifre alanı. */
 @Composable
@@ -51,7 +52,7 @@ fun PasswordInput(
             IconButton(onClick = { visible = !visible }) {
                 Icon(
                     imageVector = if (visible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                    contentDescription = if (visible) "Şifreyi gizle" else "Şifreyi göster",
+                    contentDescription = if (visible) Txt.auth.hidePassword else Txt.auth.showPassword,
                 )
             }
         },
@@ -81,7 +82,7 @@ fun PasswordDialog(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 Text(message)
                 PasswordInput(
-                    label = "Parola",
+                    label = Txt.docs.password,
                     value = password,
                     onValueChange = { password = it },
                     enabled = !busy,
@@ -95,6 +96,6 @@ fun PasswordDialog(
         confirmButton = {
             TextButton(enabled = !busy && password.isNotEmpty(), onClick = { onConfirm(password) }) { Text(confirmLabel) }
         },
-        dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text("İptal") } },
+        dismissButton = { TextButton(enabled = !busy, onClick = onDismiss) { Text(Txt.common.cancel) } },
     )
 }

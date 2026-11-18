@@ -19,6 +19,7 @@ import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.ListCache
 import com.eayd.arkive.data.NetworkPolicy
 import com.eayd.arkive.data.PdfDoc
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.PreviewKind
 import com.eayd.arkive.utils.decodeScaledBitmap
 import com.eayd.arkive.utils.formatBytes
@@ -122,7 +123,7 @@ class PreviewViewModel(
                 val offline = withContext(Dispatchers.IO) {
                     (ListCache.findFile(fileId) ?: SummaryStore.findResultFile(fileId))
                         ?.let { f -> InputCache.get(f.id, f.size)?.let { f to it } }
-                } ?: throw IOException("Sunucuya ulaşılamadı ve bu dosya telefonda kayıtlı değil.", e)
+                } ?: throw IOException(Txt.preview.offlineNotSaved, e)
                 _title.value = offline.first.name
                 show(offline.first, buildContent(offline.first, offline.second))
                 return@launchCatching
@@ -142,7 +143,7 @@ class PreviewViewModel(
     private suspend fun buildContent(file: FileDto, local: File? = null): PreviewContent {
         val kind = previewKind(file.mimeType, file.name)
         if (kind == PreviewKind.None) {
-            return PreviewContent.NoPreview("Bu dosya türü için ön izleme desteklenmiyor.")
+            return PreviewContent.NoPreview(Txt.preview.unsupportedType)
         }
 
         // Boyut sınırları: ön izleme için büyük dosyaları telefona indirmek yavaş ve belleği zorlar.
@@ -153,7 +154,7 @@ class PreviewViewModel(
             else -> Long.MAX_VALUE
         }
         if (file.size > limit) {
-            return PreviewContent.NoPreview("Dosya ön izleme için çok büyük (${formatBytes(file.size)}).")
+            return PreviewContent.NoPreview(Txt.preview.tooBig(formatBytes(file.size)))
         }
 
         if (local != null) return buildLocalContent(kind, local)
@@ -189,7 +190,7 @@ class PreviewViewModel(
                 openWord(tempFile, password = null)
             }
 
-            PreviewKind.None -> PreviewContent.NoPreview("Bu dosya türü için ön izleme desteklenmiyor.")
+            PreviewKind.None -> PreviewContent.NoPreview(Txt.preview.unsupportedType)
         }
     }
 
@@ -207,7 +208,7 @@ class PreviewViewModel(
 
         PreviewKind.Word -> openWord(local, password = null)
 
-        else -> PreviewContent.NoPreview("Sunucuya ulaşılamadığında bu dosya türü ön izlenemiyor.")
+        else -> PreviewContent.NoPreview(Txt.preview.offlineTypeUnsupported)
     }
 
     private suspend fun decodeImage(file: File): PreviewContent {
@@ -219,19 +220,19 @@ class PreviewViewModel(
             }
         }
         return if (bitmap != null) PreviewContent.Image(bitmap)
-        else PreviewContent.NoPreview("Bu görüntü biçimi telefonda açılamıyor.")
+        else PreviewContent.NoPreview(Txt.preview.imageFormatUnsupported)
     }
 
     private suspend fun openPdf(file: File): PreviewContent = try {
         val doc = PdfDoc.open(file)
         pdf = doc
-        if (doc.pageCount == 0) PreviewContent.NoPreview("PDF'te sayfa yok.") else PreviewContent.Pdf(doc)
+        if (doc.pageCount == 0) PreviewContent.NoPreview(Txt.preview.pdfNoPages) else PreviewContent.Pdf(doc)
     } catch (e: SecurityException) {
         // Android'in PDF çizicisi parolalı dosyayı açamaz: parola istenir, çözülmüş kopya çizilir ([unlock]).
         locked = PreviewKind.Pdf to file
         PreviewContent.PasswordProtected
     } catch (e: IOException) {
-        PreviewContent.NoPreview("PDF açılamadı; dosya bozuk olabilir.")
+        PreviewContent.NoPreview(Txt.preview.pdfOpenFailed)
     }
 
     /**
@@ -240,15 +241,15 @@ class PreviewViewModel(
      */
     private suspend fun openWord(file: File, password: String?): PreviewContent = try {
         val doc = withContext(Dispatchers.IO) { WordLoader.load(file.readBytes(), password) }
-        if (doc.isBlank()) PreviewContent.NoPreview("Belgede gösterilecek metin yok.") else PreviewContent.Word(doc)
+        if (doc.isBlank()) PreviewContent.NoPreview(Txt.preview.noTextToShow) else PreviewContent.Word(doc)
     } catch (e: PasswordException) {
         if (e.wrong) throw e
         locked = PreviewKind.Word to file
         PreviewContent.PasswordProtected
     } catch (e: UnreadableDocumentException) {
-        PreviewContent.NoPreview("Belge açılamadı: ${e.message}")
+        PreviewContent.NoPreview(Txt.preview.documentOpenFailed(e.message))
     } catch (e: IOException) {
-        PreviewContent.NoPreview("Belge okunamadı.")
+        PreviewContent.NoPreview(Txt.preview.documentUnreadable)
     }
 
     /**
@@ -316,7 +317,7 @@ class PreviewViewModel(
     fun moveFile(targetFolderId: String?, targetName: String) = dialogs.submit {
         val name = (_state.value as? PreviewState.Ready)?.file?.name
         replaceFile(ApiClient.api.updateFile(fileId, mapOf("folder_id" to targetFolderId)))
-        if (name != null) showNotice("“$name” “$targetName” klasörüne taşındı")
+        if (name != null) showNotice(Txt.preview.movedTo(name, targetName))
     }
 
     fun deleteFile() = dialogs.submit {

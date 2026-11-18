@@ -30,6 +30,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.data.FileDto
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.SkeletonBox
 
 /** Ses: [MediaPlayer] ile akıştan çalar; oynat/durdur düğmesi ve ilerleme çubuğu bu ekranda çizilir. */
@@ -70,7 +71,7 @@ internal fun AudioPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
     TrackPosition(playing, dragging, current = { player.currentPosition }) { position = it }
 
     if (failed) {
-        NoPreviewMessage(file, "Ses oynatılamadı. Bu biçim telefonda desteklenmiyor olabilir.", onOpenExternally)
+        NoPreviewMessage(file, Txt.preview.audioFailed, onOpenExternally)
         return
     }
 
@@ -107,7 +108,7 @@ internal fun AudioPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
             ) {
                 Icon(
                     if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                    contentDescription = if (playing) "Durdur" else "Oynat",
+                    contentDescription = if (playing) Txt.preview.pause else Txt.preview.play,
                     modifier = Modifier.size(48.dp),
                 )
             }

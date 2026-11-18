@@ -40,6 +40,7 @@ import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.i18n.Txt
 
 /**
  * Klasör, dosya ve çöp kutusu satırlarının ortak kartı: [icon], başlık, isteğe bağlı alt yazı ve sağda [trailing].
@@ -136,13 +137,13 @@ fun RowScope.RowActions(
         IconButton(onClick = onToggleAi, modifier = Modifier.size(width = 36.dp, height = 48.dp)) {
             if (aiWorking) {
                 CircularProgressIndicator(
-                    modifier = Modifier.size(20.dp).semantics { contentDescription = "Özetleniyor" },
+                    modifier = Modifier.size(20.dp).semantics { contentDescription = Txt.ai.summarizing },
                     strokeWidth = 2.5.dp,
                 )
             } else {
                 Icon(
                     imageVector = if (ai) AiIcons.Filled else AiIcons.Outlined,
-                    contentDescription = if (ai) "Yapay zeka özetini göster" else "Yapay zeka ile özetle",
+                    contentDescription = if (ai) Txt.ai.showSummaryA11y else Txt.ai.summarizeA11y,
                     tint = MaterialTheme.colorScheme.primary,
                 )
             }
@@ -151,13 +152,13 @@ fun RowScope.RowActions(
     IconButton(onClick = onToggleFavorite) {
         Icon(
             imageVector = if (favorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-            contentDescription = if (favorite) "Favorilerden çıkar" else "Favorilere ekle",
+            contentDescription = if (favorite) Txt.common.removeFromFavorites else Txt.common.addToFavorites,
             tint = MaterialTheme.colorScheme.primary,
         )
     }
     Box {
         IconButton(onClick = { menuOpen = true }, enabled = menuEnabled) {
-            Icon(Icons.Filled.MoreVert, contentDescription = "Daha fazla")
+            Icon(Icons.Filled.MoreVert, contentDescription = Txt.common.more)
         }
         menu(menuOpen) { menuOpen = false }
     }
@@ -175,7 +176,7 @@ fun SelectCircle(checked: Boolean) {
                 if (checked) Modifier.background(primary)
                 else Modifier.border(2.dp, MaterialTheme.colorScheme.outline, CircleShape)
             )
-            .semantics { contentDescription = if (checked) "Seçili" else "Seçili değil" },
+            .semantics { contentDescription = if (checked) Txt.common.selected else Txt.common.notSelected },
         contentAlignment = Alignment.Center,
     ) {
         if (checked) {

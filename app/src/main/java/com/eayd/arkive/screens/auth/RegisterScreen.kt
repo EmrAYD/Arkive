@@ -19,6 +19,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.viewmodel.AuthUiState
 import com.eayd.arkive.viewmodel.AuthViewModel
 import com.eayd.arkive.viewmodel.EmailCheck
@@ -46,7 +47,7 @@ fun RegisterScreen(
 
     NavigateOnSuccess(uiState, onRegisterSuccess, viewModel::resetState)
 
-    AuthScreenLayout(title = "Kayıt Ol") {
+    AuthScreenLayout(title = Txt.auth.signUp) {
         EmailField(viewModel.email, emailCheck, viewModel::onEmailChange)
         Spacer(Modifier.height(4.dp))
         PasswordField(
@@ -57,10 +58,10 @@ fun RegisterScreen(
 
         if (passwordFocused) {
             Column(Modifier.fillMaxWidth().padding(top = 8.dp, start = 8.dp)) {
-                PasswordRuleItem("En az 8 karakter", rules.longEnough)
-                PasswordRuleItem("Özel karakter (örn: @, #, !)", rules.hasSpecialChar)
-                PasswordRuleItem("Büyük harf", rules.hasUpperCase)
-                PasswordRuleItem("Küçük harf", rules.hasLowerCase)
+                PasswordRuleItem(Txt.auth.ruleMinLength, rules.longEnough)
+                PasswordRuleItem(Txt.auth.ruleSpecialChar, rules.hasSpecialChar)
+                PasswordRuleItem(Txt.auth.ruleUppercase, rules.hasUpperCase)
+                PasswordRuleItem(Txt.auth.ruleLowercase, rules.hasLowerCase)
             }
         }
 
@@ -75,7 +76,7 @@ fun RegisterScreen(
 
         // Kayıt düğmesi sadece kurallar sağlandığında aktif olur.
         AuthSubmitButton(
-            label = "Kayıt Ol",
+            label = Txt.auth.signUp,
             loading = loading,
             enabled = emailCheck == EmailCheck.Valid && rules.allMet && eulaAccepted,
             onClick = viewModel::register,
@@ -84,12 +85,12 @@ fun RegisterScreen(
         // Google ile kayıt için kutuyu işaretlemek gerekmez: yeni hesap açılırsa sözleşme o anda gösterilir.
         // Kutu zaten işaretliyse sözleşme tekrar sorulmaz.
         GoogleSignInButton(
-            label = "Google ile Kayıt Ol",
+            label = Txt.auth.signUpWithGoogle,
             enabled = !loading && !eulaPending,
             onResult = { viewModel.loginWithGoogle(it, eulaAlreadyAccepted = eulaAccepted) },
         )
         Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onNavigateToLogin) { Text("Zaten hesabın var mı? Giriş yap") }
+        TextButton(onClick = onNavigateToLogin) { Text(Txt.auth.haveAccount) }
     }
 
     if (showEula) {

@@ -54,6 +54,7 @@ import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.data.PlanSwitcher
 import com.eayd.arkive.data.PlusOffer
 import com.eayd.arkive.data.PlusPlan
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.toApiErrorMessage
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
@@ -147,7 +148,7 @@ private fun PlusOfferDialog(reason: String?, alreadyPlus: Boolean, onDismiss: ()
                         }
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "Daha fazla alan, sınırsız ve daha akıllı yapay zeka özetleri.",
+                            text = Txt.plan.offerTagline,
                             style = MaterialTheme.typography.bodyLarge,
                             color = colors.onSurfaceVariant,
                             textAlign = TextAlign.Center,
@@ -173,25 +174,23 @@ private fun PlusOfferDialog(reason: String?, alreadyPlus: Boolean, onDismiss: ()
                         Column(verticalArrangement = Arrangement.spacedBy(18.dp), modifier = Modifier.fillMaxWidth()) {
                             Feature(
                                 icon = Icons.Outlined.Cloud,
-                                title = "${PlusPlan.STORAGE_TEXT} toplam depolama",
-                                detail = "Ücretsiz planda ${PlusPlan.FREE_STORAGE_TEXT}.",
+                                title = Txt.plan.offerStorage(PlusPlan.STORAGE_TEXT),
+                                detail = Txt.plan.offerStorageFree(PlusPlan.FREE_STORAGE_TEXT),
                             )
                             Feature(
                                 icon = Icons.Filled.UploadFile,
-                                title = "Tek seferde ${PlusPlan.MAX_FILE_TEXT}'a kadar dosya yükleme",
-                                detail = "Ücretsiz planda dosya başına ${PlusPlan.FREE_MAX_FILE_TEXT}.",
+                                title = Txt.plan.offerMaxFile(PlusPlan.MAX_FILE_TEXT),
+                                detail = Txt.plan.offerMaxFileFree(PlusPlan.FREE_MAX_FILE_TEXT),
                             )
                             Feature(
                                 icon = AiIcons.Filled,
-                                title = "Sınırsız yapay zeka özeti",
-                                detail = "Ücretsiz planda toplam ${PlusPlan.FREE_SUMMARY_LIMIT} dosya özetlenebilir.",
+                                title = Txt.plan.offerUnlimited,
+                                detail = Txt.plan.offerUnlimitedFree(PlusPlan.FREE_SUMMARY_LIMIT),
                             )
                             Feature(
                                 icon = Icons.Filled.CloudDone,
-                                title = "Bulutta yapay zeka özeti",
-                                detail = "Büyük, uzun ve görselli belgeler sunucudaki yapay zekayla, konuları anlatan " +
-                                    "yeniden yazılmış bir özetle özetlenir. Ücretsiz planda yalnızca telefonda, küçük " +
-                                    "dosyalar özetlenir.",
+                                title = Txt.plan.offerCloud,
+                                detail = Txt.plan.offerCloudDetail,
                             )
                         }
                         Spacer(Modifier.height(24.dp))
@@ -211,7 +210,7 @@ private fun PlusOfferDialog(reason: String?, alreadyPlus: Boolean, onDismiss: ()
                             Spacer(Modifier.height(8.dp))
                         }
                         Button(
-                            onClick = { switchTo(PlusPlan.NAME, "Plus planına geçildi. Artık bulutta ve sınırsız özetleyebilirsiniz.") },
+                            onClick = { switchTo(PlusPlan.NAME, Txt.plan.switchedToPlus) },
                             enabled = !alreadyPlus && !busy,
                             shape = CircleShape,
                             modifier = Modifier.fillMaxWidth().height(56.dp),
@@ -220,19 +219,19 @@ private fun PlusOfferDialog(reason: String?, alreadyPlus: Boolean, onDismiss: ()
                                 CircularProgressIndicator(Modifier.size(22.dp), strokeWidth = 2.dp)
                             } else {
                                 Text(
-                                    text = if (alreadyPlus) "Plus planındasınız" else "Plus'a geç · ${PlusPlan.PRICE_TEXT}",
+                                    text = if (alreadyPlus) Txt.plan.onPlus else Txt.plan.goPlusWithPrice(PlusPlan.PRICE_TEXT),
                                     style = MaterialTheme.typography.titleMedium,
                                 )
                             }
                         }
                         Spacer(Modifier.height(4.dp))
                         if (alreadyPlus) {
-                            TextButton(onClick = { switchTo("Free", "Ücretsiz plana dönüldü.") }, enabled = !busy) {
-                                Text("Ücretsiz plana dön (deneme)")
+                            TextButton(onClick = { switchTo("Free", Txt.plan.switchedToFree) }, enabled = !busy) {
+                                Text(Txt.plan.backToFreeTrial)
                             }
                         } else {
                             Text(
-                                text = "Deneme sürümü: ödeme alınmaz, Plus 30 gün geçerlidir.",
+                                text = Txt.plan.trialNote,
                                 style = MaterialTheme.typography.bodySmall,
                                 color = colors.onSurfaceVariant,
                                 textAlign = TextAlign.Center,
@@ -242,7 +241,7 @@ private fun PlusOfferDialog(reason: String?, alreadyPlus: Boolean, onDismiss: ()
                 }
 
                 IconButton(onClick = onDismiss, modifier = Modifier.align(Alignment.TopEnd).padding(8.dp)) {
-                    Icon(Icons.Filled.Close, contentDescription = "Kapat")
+                    Icon(Icons.Filled.Close, contentDescription = Txt.common.close)
                 }
             }
         }

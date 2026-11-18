@@ -1,6 +1,7 @@
 package com.eayd.arkive.data
 
 import com.eayd.arkive.ai.AiMode
+import com.eayd.arkive.i18n.Txt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -11,7 +12,8 @@ import kotlinx.coroutines.flow.asStateFlow
  */
 object PlusPlan {
     const val NAME = "Plus"
-    const val PRICE_TEXT = "₺49,99 / ay"
+    /** Fiyat, seçili dilin biçimiyle ("₺49,99 / ay", "₺49.99 / month"). */
+    val PRICE_TEXT: String get() = Txt.plan.price
     const val STORAGE_TEXT = "20 GB"
     const val MAX_FILE_TEXT = "2 GB"
     const val FREE_STORAGE_TEXT = "100 MB"
@@ -37,14 +39,14 @@ object PlanPolicy {
     fun effectiveMode(mode: AiMode, cloudAllowed: Boolean): AiMode = if (cloudAllowed) mode else AiMode.Local
 
     fun limitMessage(limit: Int): String =
-        "Ücretsiz planda en çok $limit dosya özetlenebilir. Sınırsız özet için Plus'a geçin."
+        Txt.plan.freeLimitReached(limit)
 
     /** Dosya telefonda özetlenemiyor (büyük, görselli…) ve bulut özeti Plus'a özel. */
     fun needsCloudMessage(fileName: String, reason: String): String =
-        "“$fileName” telefonda özetlenemiyor: $reason Büyük, uzun ve görselli dosyalar Plus planında bulutta özetlenir."
+        Txt.plan.cantSummarizeOnPhone(fileName, reason)
 
-    const val CLOUD_MODE_MESSAGE =
-        "Bulut ve Yerel + Bulut seçenekleri Plus planına özeldir. Ücretsiz planda dosyalar yalnızca telefonda özetlenir."
+    val CLOUD_MODE_MESSAGE: String
+        get() = Txt.plan.cloudModesPlusOnly
 }
 
 /**

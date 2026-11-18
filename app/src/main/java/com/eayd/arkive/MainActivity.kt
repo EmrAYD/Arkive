@@ -23,8 +23,10 @@ import com.eayd.arkive.ai.AppVisibility
 import com.eayd.arkive.ai.SummaryOpenRequest
 import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.data.ThemeMode
+import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.navigation.ArkiveNavHost
 import com.eayd.arkive.ui.theme.ArkiveTheme
+import java.util.Locale
 
 // enableEdgeToEdge varsayılanlarıyla aynı gezinme çubuğu perdeleri.
 private val NAV_BAR_LIGHT_SCRIM = Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
@@ -35,21 +37,28 @@ class MainActivity : ComponentActivity() {
     /** Bu Activity oluşturulurken uygulanan tema. Ayar bundan farklı bir değere geçerse Activity yeniden kurulur. */
     private var appliedThemeMode = ThemeMode.System
 
+    /** Bu Activity oluşturulurken uygulanan dil. Ayar değişirse Activity yeniden kurulur. */
+    private var appliedLanguage = AppLanguage.Turkish
+
     /**
-     * Seçilen temayı kaynak (resource) yapılandırmasına işler. Böylece logolar gibi `drawable-night` ile hazırlanmış
-     * görseller telefonun değil UYGULAMANIN seçtiği temaya göre yüklenir. "Sistem varsayılanı" seçiliyse hiçbir şey
-     * değiştirilmez ve telefonun ayarı izlenir.
+     * Seçilen dili ve temayı kaynak (resource) yapılandırmasına işler. Dil: Android'in kendi metinleri (erişilebilirlik
+     * açıklamaları, tarih seçiciler) ve tarih/sayı biçimleri uygulamanın diline uyar. Tema: logolar gibi `drawable-night`
+     * ile hazırlanmış görseller telefonun değil UYGULAMANIN seçtiği temaya göre yüklenir; "Sistem varsayılanı" seçiliyse
+     * gece modu alanına dokunulmaz ve telefonun ayarı izlenir.
      */
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(newBase)
         appliedThemeMode = AppSettings.storedThemeMode(newBase)
-        val nightMode = when (appliedThemeMode) {
-            ThemeMode.System -> return
-            ThemeMode.Light -> Configuration.UI_MODE_NIGHT_NO
-            ThemeMode.Dark -> Configuration.UI_MODE_NIGHT_YES
+        appliedLanguage = AppSettings.storedAppLanguage(newBase)
+        Locale.setDefault(appliedLanguage.locale)
+        // Yalnızca dil ve (gerekirse) gece modu alanı dolu bir yapılandırma: gerisi (yön, ekran boyutu…) telefondan gelir.
+        val override = Configuration().apply { setLocale(appliedLanguage.locale) }
+        when (appliedThemeMode) {
+            ThemeMode.System -> Unit
+            ThemeMode.Light -> override.uiMode = Configuration.UI_MODE_NIGHT_NO
+            ThemeMode.Dark -> override.uiMode = Configuration.UI_MODE_NIGHT_YES
         }
-        // Yalnızca "gece modu" alanı dolu bir yapılandırma: gerisi (yön, dil, ekran boyutu…) telefondan gelmeye devam eder.
-        applyOverrideConfiguration(Configuration().apply { uiMode = nightMode })
+        applyOverrideConfiguration(override)
     }
 
     /** Uygulama zaten açıkken özetleme bildirimine dokunuldu. */
@@ -90,8 +99,11 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             val themeMode by AppSettings.themeMode.collectAsState()
+            val appLanguage by AppSettings.appLanguage.collectAsState()
             // Tema değişince Activity yeniden kurulur ki kaynaklar (logolar) yeni temaya göre yüklensin.
             LaunchedEffect(themeMode) { if (themeMode != appliedThemeMode) recreate() }
+            // Dil değişince de: bütün ekranlar metinlerini yeni dilde yeniden okur.
+            LaunchedEffect(appLanguage) { if (appLanguage != appliedLanguage) recreate() }
             val darkTheme = when (themeMode) {
                 ThemeMode.System -> isSystemInDarkTheme()
                 ThemeMode.Light -> false

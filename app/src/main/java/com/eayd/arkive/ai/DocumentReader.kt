@@ -1,6 +1,7 @@
 package com.eayd.arkive.ai
 
 import android.content.Context
+import com.eayd.arkive.i18n.Txt
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
 import com.tom_roush.pdfbox.pdmodel.encryption.InvalidPasswordException
@@ -30,7 +31,7 @@ class UnreadableDocumentException(message: String, cause: Throwable? = null) : E
  * Dosya parolalı. [wrong] false ise parola henüz verilmemiştir; true ise verilen parola yanlıştır. Kullanıcıdan
  * parola istenir ([AiSummarizer], ön izleme).
  */
-class PasswordException(val wrong: Boolean) : Exception(if (wrong) "Parola yanlış." else "Dosya parolalı.")
+class PasswordException(val wrong: Boolean) : Exception(if (wrong) Txt.docs.wrongPassword else Txt.docs.passwordProtected)
 
 /**
  * Telefona inmiş küçük bir dosyadan (en çok [AiPolicy.LOCAL_MAX_BYTES]) metni ve ölçüleri çıkarır: kelime sayısı,
@@ -54,7 +55,7 @@ object DocumentReader {
                     SummarizableKind.Docx -> readDocx(file, password)
                 }
             } catch (e: IOException) {
-                throw UnreadableDocumentException("Dosya okunamadı (bozuk olabilir).", e)
+                throw UnreadableDocumentException(Txt.docs.unreadableMaybeCorrupt, e)
             }
         }
 
@@ -63,7 +64,7 @@ object DocumentReader {
         try {
             readDocx(file, password)
         } catch (e: IOException) {
-            throw UnreadableDocumentException("Dosya okunamadı (bozuk olabilir).", e)
+            throw UnreadableDocumentException(Txt.docs.unreadableMaybeCorrupt, e)
         }
     }
 
@@ -80,10 +81,10 @@ object DocumentReader {
             }
         } catch (e: IOException) {
             out.delete()
-            throw UnreadableDocumentException("PDF açılamadı (bozuk olabilir).", e)
+            throw UnreadableDocumentException(Txt.docs.pdfOpenFailed, e)
         } catch (e: OutOfMemoryError) {
             out.delete()
-            throw UnreadableDocumentException("PDF parolayla açılamayacak kadar büyük.", e)
+            throw UnreadableDocumentException(Txt.docs.pdfTooBigForPassword, e)
         }
     }
 
@@ -118,7 +119,7 @@ object DocumentReader {
         val document = try {
             loadPdf(file, password)
         } catch (e: IOException) {
-            throw UnreadableDocumentException("PDF açılamadı (bozuk olabilir).", e)
+            throw UnreadableDocumentException(Txt.docs.pdfOpenFailed, e)
         }
         document.use { doc ->
             val pages = doc.numberOfPages
@@ -163,7 +164,7 @@ object DocumentReader {
             } catch (e: WrongPasswordException) {
                 throw PasswordException(wrong = true)
             } catch (e: OfficeCryptoException) {
-                throw UnreadableDocumentException(e.message ?: "Şifreli Word belgesi okunamadı.", e)
+                throw UnreadableDocumentException(e.message ?: Txt.docs.encryptedWordUnreadable, e)
             }
         }
         var xml: String? = null
@@ -178,7 +179,7 @@ object DocumentReader {
                         while (true) {
                             val n = zip.read(buffer)
                             if (n < 0) break
-                            if (out.size() + n > MAX_XML_BYTES) throw UnreadableDocumentException("Word belgesi çok büyük.")
+                            if (out.size() + n > MAX_XML_BYTES) throw UnreadableDocumentException(Txt.docs.wordTooBig)
                             out.write(buffer, 0, n)
                         }
                         xml = out.toString(Charsets.UTF_8.name())
@@ -187,7 +188,7 @@ object DocumentReader {
                 }
             }
         }
-        val raw = xml ?: throw UnreadableDocumentException("Word belgesi okunamadı (.docx değil ya da bozuk).")
+        val raw = xml ?: throw UnreadableDocumentException(Txt.docs.wordNotDocxOrCorrupt)
         val text = docxXmlToText(raw)
         return ReadDocument(text, DocumentStats(words = countWords(text), pages = null, images = images))
     }

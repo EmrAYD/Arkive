@@ -1,10 +1,13 @@
 package com.eayd.arkive.screens.auth
 
+import com.eayd.arkive.i18n.AppLanguage
+import com.eayd.arkive.i18n.Lang
+
 /**
  * Son Kullanıcı Lisans Sözleşmesi (EULA) metni.
  *
  * Metin, kayıt ekranındaki onay penceresinde ([EulaDialog]) bölüm bölüm gösterilir. Paragraflarda `**kalın**`
- * işareti desteklenir. Metni değiştirirsen [LAST_UPDATED] değerini de güncelle.
+ * işareti desteklenir. Metin Türkçe ve İngilizce olarak tutulur; birini değiştirirsen ötekini ve tarihleri de güncelle.
  */
 sealed interface EulaBlock {
     /** Bölüm başlığı (ör. "1. LİSANS VERİLMESİ VE KULLANIM KAPSAMI"). */
@@ -15,14 +18,31 @@ sealed interface EulaBlock {
 }
 
 object EulaContent {
-    const val TITLE = "Son Kullanıcı Lisans Sözleşmesi (EULA)"
-    const val LAST_UPDATED = "22 Ekim 2026"
+    /** Seçili dildeki başlık. */
+    val TITLE: String get() = forLanguage(Lang.app).title
+
+    /** Seçili dildeki metin. Türkçe metin asıldır; İngilizce metin onun çevirisidir. */
+    val blocks: List<EulaBlock> get() = forLanguage(Lang.app).blocks
+
+    /** Bir dildeki sözleşme metni. */
+    class Text(val title: String, val lastUpdated: String, val blocks: List<EulaBlock>)
+
+    fun forLanguage(language: AppLanguage): Text = when (language) {
+        AppLanguage.Turkish -> Turkish
+        AppLanguage.English -> English
+    }
 
     private fun h(text: String) = EulaBlock.Heading(text)
     private fun p(text: String) = EulaBlock.Paragraph(text)
 
-    val blocks: List<EulaBlock> = listOf(
-        p("**Son Güncelleme Tarihi:** $LAST_UPDATED"),
+    private val Turkish = Text(
+        title = "Son Kullanıcı Lisans Sözleşmesi (EULA)",
+        lastUpdated = "22 Ekim 2026",
+        blocks = turkishBlocks("22 Ekim 2026"),
+    )
+
+    private fun turkishBlocks(lastUpdated: String): List<EulaBlock> = listOf(
+        p("**Son Güncelleme Tarihi:** $lastUpdated"),
         p("Lütfen **Arkive** mobil uygulamasını kullanmadan önce bu Son Kullanıcı Lisans Sözleşmesi'ni dikkatlice okuyunuz."),
         p("Bu Sözleşme, siz (\"Kullanıcı\") ile Arkive geliştirici ekibi (\"Geliştirici\" veya \"Hizmet Sağlayıcı\") arasında yapılan yasal bir anlaşmadır. Uygulamayı indirerek, kurarak veya kullanarak bu Sözleşme’nin tüm hükümlerini kabul etmiş sayılırsınız."),
 
@@ -56,5 +76,48 @@ object EulaContent {
 
         h("7. İLETİŞİM"),
         p("Bu EULA metni veya veri gizliliği politikalarımızla ilgili her türlü soru için Arkive geliştirici ekibi ile iletişime geçebilirsiniz."),
+    )
+
+    private val English = Text(
+        title = "End User License Agreement (EULA)",
+        lastUpdated = "October 22, 2026",
+        blocks = englishBlocks("October 22, 2026"),
+    )
+
+    private fun englishBlocks(lastUpdated: String): List<EulaBlock> = listOf(
+        p("**Last Updated:** $lastUpdated"),
+        p("Please read this End User License Agreement carefully before using the **Arkive** mobile application."),
+        p("This Agreement is a legal agreement between you (the \"User\") and the Arkive development team (the \"Developer\" or \"Service Provider\"). By downloading, installing or using the Application, you are deemed to have accepted all terms of this Agreement."),
+
+        h("1. GRANT OF LICENSE AND SCOPE OF USE"),
+        p("1.1. Provided that the User complies with the terms of this Agreement, the Developer grants the User a non-transferable, non-exclusive, limited license to use the Application for personal and non-commercial purposes."),
+        p("1.2. All ownership rights, copyrights, source code and intellectual property rights in the Application belong exclusively to the Developer."),
+        p("1.3. The User agrees not to copy, decompile, reproduce or share the Application with unauthorized third parties."),
+
+        h("2. PRIVACY, USER AUTHENTICATION AND CONTENT LOCALITY GUARANTEE"),
+        p("2.1. **Authentication Service:** **Firebase Authentication** is used to create user accounts securely, to sign in and for authentication. In this context, only the basic account information needed for authentication (email address, user ID/UID, access tokens) is processed on the infrastructure of that cloud service."),
+        p("2.2. **Locality of Files and Content:** **No file, document, text, audio recording or image uploaded to Arkive by the User, nor any personal data in such content, is transferred to cloud servers abroad or stored in services abroad**."),
+        p("2.3. **No External AI Services:** For file processing, transcription, analysis and summarization, **no data is sent to any third-party AI service or API abroad**."),
+        p("2.4. **Local and Dedicated Infrastructure:** All content storage, database management and AI processing take place entirely on the **local/dedicated server infrastructure** under the Developer's control or **on the User's own device**."),
+
+        h("3. AI AND HYBRID FILE PROCESSING ARCHITECTURE"),
+        p("3.1. **On-Device (Local) Processing:** Small and short documents may be processed directly with the processing power of the User's mobile device, without being uploaded to the server."),
+        p("3.2. **Asynchronous Server-Side Processing:** Large documents, audio recordings and image files are processed through asynchronous job queues running on local servers, to optimize server load and device performance."),
+        p("3.3. **Nature of AI Output:** Summaries, text transcriptions and analysis results produced by local AI models are provided for information and convenience only. The output is not guaranteed to be 100% accurate or complete."),
+
+        h("4. STORAGE, SUBSCRIPTIONS AND USER CONTENT"),
+        p("4.1. **Responsibility for Files:** The User bears legal responsibility for all content uploaded to their storage. Uploading content that infringes copyright, or that is illegal or harmful, is prohibited."),
+        p("4.2. **Subscription Plans:** The Application offers different storage and usage quotas under the Free and Plus plans. The User must stay within the storage limits of the plan they choose."),
+        p("4.3. **Trash and Permanent Deletion:** Files deleted by the User are completely and irreversibly deleted from the local storage units at the end of the retention period set in the system (30 days by default)."),
+
+        h("5. SERVICE QUALITY AND LIMITATION OF LIABILITY"),
+        p("5.1. The Application is provided \"AS IS\". The Developer does not guarantee uninterrupted service."),
+        p("5.2. The Developer cannot be held directly liable for any data loss that may occur due to technical failures, hardware limitations or force majeure. The User is responsible for backing up their critical data."),
+
+        h("6. TERMINATION"),
+        p("If the User violates the terms of this Agreement, the Developer has the right to unilaterally suspend or terminate the User's license and access to the account without prior notice."),
+
+        h("7. CONTACT"),
+        p("For any questions about this EULA or our data privacy policies, you can contact the Arkive development team."),
     )
 }

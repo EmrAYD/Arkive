@@ -24,6 +24,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.data.FileDto
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.formatBytes
 
 /** Ön izleme yapılamayan dosyanın ortada gösterilen kartı: simge, ad, boyut, [reason] ve düğmeler ([actions]). */
@@ -48,17 +49,17 @@ private fun FileMessage(file: FileDto, icon: ImageVector, reason: String, action
 @Composable
 internal fun NoPreviewMessage(file: FileDto, reason: String, onOpenExternally: () -> Unit) {
     FileMessage(file, Icons.Filled.Description, reason) {
-        Button(onClick = onOpenExternally) { Text("İndir") }
+        Button(onClick = onOpenExternally) { Text(Txt.common.download) }
     }
 }
 
 /** Parolalı dosya: parola penceresi kapatıldıysa buradan yeniden açılır. */
 @Composable
 internal fun PasswordProtectedMessage(file: FileDto, onEnterPassword: () -> Unit, onDownload: () -> Unit) {
-    FileMessage(file, Icons.Filled.Lock, "Bu dosya parola ile korunuyor.") {
+    FileMessage(file, Icons.Filled.Lock, Txt.preview.passwordProtected) {
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            Button(onClick = onEnterPassword) { Text("Parola gir") }
-            OutlinedButton(onClick = onDownload) { Text("İndir") }
+            Button(onClick = onEnterPassword) { Text(Txt.preview.enterPassword) }
+            OutlinedButton(onClick = onDownload) { Text(Txt.common.download) }
         }
     }
 }

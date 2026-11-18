@@ -12,7 +12,8 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.data.FileDto
-import com.eayd.arkive.utils.TurkishLocale
+import com.eayd.arkive.i18n.Lang
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.fileTypeLabel
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.utils.formatServerDateTime
@@ -36,8 +37,8 @@ fun FileInfoDialog(
         if (storageLimit != null && storageLimit > 0) {
             val percent = file.size * 100.0 / storageLimit
             append(
-                if (percent < 0.1) "\nKotanızın %0,1'inden azı"
-                else "\nKotanızın %" + String.format(TurkishLocale, "%.1f", percent) + " kadarı"
+                if (percent < 0.1) "\n" + Txt.files.quotaLessThanTenth
+                else "\n" + Txt.files.quotaPercent(String.format(Lang.locale, "%.1f", percent))
             )
         }
     }
@@ -54,16 +55,16 @@ fun FileInfoDialog(
         },
         text = {
             Column {
-                InfoLine("Tür", fileTypeLabel(file.mimeType, file.name))
+                InfoLine(Txt.files.type, fileTypeLabel(file.mimeType, file.name))
                 Spacer(Modifier.height(12.dp))
-                InfoLine("Boyut", formatBytes(file.size))
+                InfoLine(Txt.files.size, formatBytes(file.size))
                 Spacer(Modifier.height(12.dp))
-                InfoLine("Kullandığı alan", usedSpace)
+                InfoLine(Txt.files.spaceUsed, usedSpace)
                 Spacer(Modifier.height(12.dp))
-                InfoLine("Oluşturulma", formatServerDateTime(file.createdAt))
+                InfoLine(Txt.files.created, formatServerDateTime(file.createdAt))
             }
         },
-        confirmButton = { TextButton(onClick = onDismiss) { Text("Kapat") } },
+        confirmButton = { TextButton(onClick = onDismiss) { Text(Txt.common.close) } },
     )
 }
 

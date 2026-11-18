@@ -37,6 +37,7 @@ import com.eayd.arkive.ai.SummaryDone
 import com.eayd.arkive.ai.SummaryStore
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.CenteredHint
 import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.LeaveEffect
@@ -140,7 +141,7 @@ fun BrowserContent(
 
         if (state.offline) {
             Text(
-                text = "Sunucuya ulaşılamadı. Liste telefondaki son kayıttan gösteriliyor; telefonda kopyası olan küçük dosyalar yine de özetlenebilir.",
+                text = Txt.browser.offlineBanner,
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSecondaryContainer,
                 modifier = Modifier
@@ -180,7 +181,7 @@ fun BrowserContent(
                     CenteredHint(text = emptyText(state, viewModel.favoritesOnly, viewModel.isAiResultsRoot))
                 }
 
-                nothingVisible -> PullableCenter { CenteredHint(text = "Seçili kategoriye uyan bir şey yok.") }
+                nothingVisible -> PullableCenter { CenteredHint(text = Txt.browser.noCategoryMatch) }
 
                 else -> BrowserList(
                     state = state,
@@ -229,10 +230,10 @@ private fun PullableCenter(content: @Composable () -> Unit) {
 }
 
 private fun emptyText(state: BrowserUiState, favoritesOnly: Boolean, aiResultsRoot: Boolean): String = when {
-    aiResultsRoot -> "Henüz yapay zeka sonucu yok.\nBir dosyanın yanındaki yapay zeka düğmesiyle özet oluşturabilirsiniz."
-    favoritesOnly -> "Henüz favori eklemediniz.\nKlasör ya da dosyaların yanındaki yıldıza dokunun."
-    state.canUpload -> "Burada henüz klasör ya da dosya yok.\nSağ üstteki + düğmesiyle ekleyebilirsiniz."
-    else -> "Burada henüz klasör yok.\nSağ üstteki + düğmesiyle oluşturabilirsiniz."
+    aiResultsRoot -> Txt.browser.emptyAiResults
+    favoritesOnly -> Txt.browser.emptyFavorites
+    state.canUpload -> Txt.browser.emptyHome
+    else -> Txt.browser.emptyFolders
 }
 
 @Composable

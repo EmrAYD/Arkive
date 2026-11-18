@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.eayd.arkive.data.AppSettings
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.clearGoogleCredentialState
 import com.eayd.arkive.utils.toAuthErrorMessage
 import com.google.firebase.auth.AuthResult
@@ -137,27 +138,27 @@ class AuthViewModel : ViewModel() {
 
     fun register() {
         if (email.isBlank() || password.isBlank()) {
-            _uiState.value = AuthUiState.Error("Lütfen tüm alanları doldurun")
+            _uiState.value = AuthUiState.Error(Txt.auth.fillAllFields)
             return
         }
         if (!passwordRules.longEnough) {
-            _uiState.value = AuthUiState.Error("Şifre en az ${PasswordRules.MIN_LENGTH} karakter olmalı")
+            _uiState.value = AuthUiState.Error(Txt.auth.passwordMinLength(PasswordRules.MIN_LENGTH))
             return
         }
         authenticate(
-            failure = "Kayıt başarısız. Lütfen tekrar deneyin.",
-            noUser = "Kullanıcı oluşturulamadı",
+            failure = Txt.auth.registerFailed,
+            noUser = Txt.auth.userNotCreated,
         ) { auth.createUserWithEmailAndPassword(email, password).await() }
     }
 
     fun login() {
         if (email.isBlank() || password.isBlank()) {
-            _uiState.value = AuthUiState.Error("Lütfen e-posta ve şifrenizi girin")
+            _uiState.value = AuthUiState.Error(Txt.auth.enterEmailAndPassword)
             return
         }
         authenticate(
-            failure = "Giriş başarısız. Lütfen tekrar deneyin.",
-            noUser = "Kullanıcı bulunamadı",
+            failure = Txt.auth.loginFailed,
+            noUser = Txt.auth.userNotFound,
         ) { auth.signInWithEmailAndPassword(email, password).await() }
     }
 
@@ -170,12 +171,12 @@ class AuthViewModel : ViewModel() {
      */
     fun loginWithGoogle(idToken: String?, eulaAlreadyAccepted: Boolean = false) {
         if (idToken == null) {
-            _uiState.value = AuthUiState.Error("Google ile giriş işlemi iptal edildi veya başarısız oldu.")
+            _uiState.value = AuthUiState.Error(Txt.auth.googleCancelledOrFailed)
             return
         }
         authenticate(
-            failure = "Google girişi başarısız. Lütfen tekrar deneyin.",
-            noUser = "Google girişi başarısız oldu",
+            failure = Txt.auth.googleFailedRetry,
+            noUser = Txt.auth.googleFailed,
             eulaRequiredForNewUser = !eulaAlreadyAccepted,
         ) { auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await() }
     }
@@ -226,7 +227,7 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             discardUnacceptedAccount()
             clearGoogleCredentialState(appContext)
-            _uiState.value = AuthUiState.Error("Sözleşmeyi kabul etmediğiniz için hesap oluşturulmadı.")
+            _uiState.value = AuthUiState.Error(Txt.auth.eulaDeclined)
         }
     }
 
@@ -268,7 +269,7 @@ class AuthViewModel : ViewModel() {
 
     fun sendPasswordReset() {
         if (email.isBlank()) {
-            _passwordResetState.value = PasswordResetUiState.Error("Önce e-posta adresinizi girin")
+            _passwordResetState.value = PasswordResetUiState.Error(Txt.auth.enterEmailFirst)
             return
         }
 
@@ -276,7 +277,7 @@ class AuthViewModel : ViewModel() {
         viewModelScope.launch {
             // E-posta kayıtlı olmasa bile aynı mesajı gösteriyoruz; böylece bir
             // e-postanın sistemde olup olmadığı dışarıdan öğrenilemez.
-            val successMessage = "E-posta kayıtlıysa şifre sıfırlama bağlantısı gönderildi"
+            val successMessage = Txt.auth.resetLinkSent
             try {
                 auth.sendPasswordResetEmail(email).await()
                 _passwordResetState.value = PasswordResetUiState.Success(successMessage)
@@ -287,7 +288,7 @@ class AuthViewModel : ViewModel() {
                     if (e is FirebaseAuthException && e.errorCode == "ERROR_USER_NOT_FOUND") {
                         PasswordResetUiState.Success(successMessage)
                     } else {
-                        PasswordResetUiState.Error(e.toAuthErrorMessage("Bağlantı gönderilemedi"))
+                        PasswordResetUiState.Error(e.toAuthErrorMessage(Txt.auth.resetLinkFailed))
                     }
             }
         }

@@ -21,6 +21,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eayd.arkive.R
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.theme.arkiveGradientBackground
 import com.eayd.arkive.viewmodel.AuthUiState
 import com.eayd.arkive.viewmodel.AuthViewModel
@@ -81,7 +82,7 @@ fun SplashScreen(
         // Alt katman: arkaplan (bulutlar) — önce eklendiği için altta kalır
         Image(
             painter = painterResource(id = R.drawable.loading_background),
-            contentDescription = "Yüklenme arkaplanı",
+            contentDescription = Txt.auth.splashBackgroundA11y,
             modifier = Modifier.fillMaxSize(),
             alignment = Alignment.BottomCenter
         )
@@ -89,7 +90,7 @@ fun SplashScreen(
         // Üst katman: sandık — sonra eklendiği için üstte görünür, yüzen animasyonlu
         Image(
             painter = painterResource(id = R.drawable.loading_chest),
-            contentDescription = "Sandık",
+            contentDescription = Txt.auth.chestA11y,
             modifier = Modifier.offset(y = (-40).dp) // boyutu beğeninize göre ayarlayın
                 .graphicsLayer {
                     this.translationY = translationY

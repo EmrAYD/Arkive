@@ -44,6 +44,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.viewmodel.CategoryOption
 import com.eayd.arkive.viewmodel.SortOption
 
@@ -91,17 +92,17 @@ fun FolderActionRow(
                 ) {
                     Icon(
                         Icons.Filled.Add,
-                        contentDescription = if (canUpload) "Ekle" else "Yeni klasör",
+                        contentDescription = if (canUpload) Txt.browser.add else Txt.browser.newFolder,
                     )
                 }
                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                     DropdownMenuItem(
-                        text = { Text("Yeni klasör") },
+                        text = { Text(Txt.browser.newFolder) },
                         leadingIcon = { Icon(Icons.Filled.CreateNewFolder, contentDescription = null) },
                         onClick = { menuOpen = false; onNewFolder() },
                     )
                     DropdownMenuItem(
-                        text = { Text("Dosya yükle") },
+                        text = { Text(Txt.browser.uploadFile) },
                         leadingIcon = { Icon(Icons.Filled.UploadFile, contentDescription = null) },
                         onClick = { menuOpen = false; onUploadFiles() },
                     )
@@ -160,7 +161,7 @@ fun BrowserFilters(
     onCategory: (CategoryOption) -> Unit,
 ) {
     OptionPill(
-        label = "Sırala",
+        label = Txt.browser.sort,
         leadingIcon = Icons.Filled.SwapVert,
         options = SortOption.entries,
         selected = sort,
@@ -169,7 +170,7 @@ fun BrowserFilters(
     )
     OptionPill(
         // Bir kategori seçiliyse düğme onun adını gösterir ve çerçevesi renklenir.
-        label = if (category == CategoryOption.All) "Kategori" else category.label,
+        label = if (category == CategoryOption.All) Txt.browser.category else category.label,
         trailingIcon = Icons.Filled.KeyboardArrowDown,
         active = category != CategoryOption.All,
         options = CategoryOption.entries,
@@ -205,7 +206,7 @@ private fun <T> OptionPill(
                 DropdownMenuItem(
                     text = { Text(optionLabel(option)) },
                     trailingIcon = {
-                        if (option == selected) Icon(Icons.Filled.Check, contentDescription = "Seçili")
+                        if (option == selected) Icon(Icons.Filled.Check, contentDescription = Txt.common.selected)
                     },
                     onClick = { onSelect(option); menuOpen = false },
                 )
@@ -231,26 +232,26 @@ fun SelectionBar(
         modifier = Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = "Seçimi kapat") }
+        IconButton(onClick = onClose) { Icon(Icons.Filled.Close, contentDescription = Txt.browser.closeSelection) }
         Text(
-            text = "$count seçildi",
+            text = Txt.browser.selectedCount(count),
             style = MaterialTheme.typography.titleMedium,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f),
         )
-        IconButton(onClick = onSelectAll) { Icon(Icons.Filled.SelectAll, contentDescription = "Tümünü seç") }
+        IconButton(onClick = onSelectAll) { Icon(Icons.Filled.SelectAll, contentDescription = Txt.browser.selectAll) }
         IconButton(onClick = onFavorite) {
             Icon(
                 imageVector = if (allFavorite) Icons.Filled.Star else Icons.Outlined.StarBorder,
-                contentDescription = if (allFavorite) "Favorilerden çıkar" else "Favorilere ekle",
+                contentDescription = if (allFavorite) Txt.common.removeFromFavorites else Txt.common.addToFavorites,
             )
         }
         IconButton(onClick = onMove, enabled = canMove) {
-            Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = "Taşı")
+            Icon(Icons.AutoMirrored.Filled.DriveFileMove, contentDescription = Txt.common.move)
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Filled.Delete, contentDescription = "Sil", tint = MaterialTheme.colorScheme.error)
+            Icon(Icons.Filled.Delete, contentDescription = Txt.common.delete, tint = MaterialTheme.colorScheme.error)
         }
     }
 }

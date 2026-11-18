@@ -2,6 +2,7 @@ package com.eayd.arkive.viewmodel
 
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
+import com.eayd.arkive.i18n.Txt
 
 /** Seçim ve sürükleme için satır anahtarları. Dosya ve klasör kimlikleri karışmasın diye ön ek taşır. */
 private const val FILE_PREFIX = "file:"
@@ -44,5 +45,5 @@ class SelectedItems(val files: List<FileDto>, val folders: List<FolderDto>) {
 
     /** Tek öğeyse adı, değilse "N öğe". */
     val label: String
-        get() = if (count == 1) (files.firstOrNull()?.name ?: folders.first().name) else "$count öğe"
+        get() = if (count == 1) (files.firstOrNull()?.name ?: folders.first().name) else Txt.browser.itemCount(count)
 }

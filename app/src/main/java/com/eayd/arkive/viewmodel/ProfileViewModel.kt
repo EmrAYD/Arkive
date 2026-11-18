@@ -11,6 +11,8 @@ import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.data.PlanSwitcher
 import com.eayd.arkive.data.PlusOffer
 import com.eayd.arkive.data.ThemeMode
+import com.eayd.arkive.i18n.AppLanguage
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.toAuthErrorMessage
 import com.google.firebase.auth.EmailAuthProvider
 import com.google.firebase.auth.FirebaseAuth
@@ -40,6 +42,9 @@ sealed interface ProfileDialog {
 
     /** Özet PDF'inin şablon seçimi. */
     data object SummaryTemplateChoice : ProfileDialog
+
+    /** Dil: uygulamanın dili ve özetin dili (bulut özetinin ve özet başlıklarının dili) aynı pencerede seçilir. */
+    data object Language : ProfileDialog
 }
 
 data class ProfileUiState(
@@ -58,12 +63,12 @@ data class ProfileUiState(
 
 /** Şifre değiştirirken Firebase hatalarını kullanıcıya gösterilecek Türkçe mesaja çevirir. */
 private fun Throwable.toPasswordChangeMessage(): String = when {
-    this is FirebaseAuthInvalidCredentialsException -> "Mevcut şifre hatalı."
+    this is FirebaseAuthInvalidCredentialsException -> Txt.profile.currentPasswordWrong
     this is FirebaseAuthException && (errorCode == "ERROR_WRONG_PASSWORD" || errorCode == "ERROR_INVALID_CREDENTIAL") ->
-        "Mevcut şifre hatalı."
+        Txt.profile.currentPasswordWrong
     this is FirebaseAuthRecentLoginRequiredException ->
-        "Güvenlik nedeniyle çıkış yapıp yeniden giriş yapmanız gerekiyor."
-    else -> toAuthErrorMessage("Şifre değiştirilemedi. Lütfen tekrar deneyin.")
+        Txt.profile.reloginRequired
+    else -> toAuthErrorMessage(Txt.profile.passwordChangeFailed)
 }
 
 /**
@@ -91,6 +96,18 @@ class ProfileViewModel : ViewModel() {
     val wifiOnly: StateFlow<Boolean> = AppSettings.wifiOnly
     val aiMode: StateFlow<AiMode> = AppSettings.aiMode
     val summaryTemplate: StateFlow<SummaryTemplate> = AppSettings.summaryTemplate
+    val appLanguage: StateFlow<AppLanguage> = AppSettings.appLanguage
+    val summaryLanguage: StateFlow<AppLanguage> = AppSettings.summaryLanguage
+
+    /**
+     * Dil penceresinde seçilenleri kaydeder. Özet dili önce yazılır: uygulamanın dili değişince Activity yeniden kurulur
+     * ve bütün ekranlar yeni dilde açılır.
+     */
+    fun saveLanguages(app: AppLanguage, summary: AppLanguage) {
+        dialogs.close()
+        AppSettings.setSummaryLanguage(summary)
+        AppSettings.setAppLanguage(app)
+    }
 
     fun setSummaryTemplate(template: SummaryTemplate) {
         AppSettings.setSummaryTemplate(template)
@@ -146,7 +163,7 @@ class ProfileViewModel : ViewModel() {
     fun switchToFree() {
         launchCatching(onError = { message -> _state.update { it.copy(notice = message) } }) {
             val me = PlanSwitcher.switchTo("Free")
-            _state.update { it.copy(storage = me.toStorageInfo(), notice = "Ücretsiz plana dönüldü") }
+            _state.update { it.copy(storage = me.toStorageInfo(), notice = Txt.profile.switchedToFree) }
         }
     }
 
@@ -165,7 +182,7 @@ class ProfileViewModel : ViewModel() {
         val email = user?.email
         if (user == null || email.isNullOrBlank()) {
             dialogs.close()
-            _state.update { it.copy(notice = "Bu hesapta şifre değiştirilemez.") }
+            _state.update { it.copy(notice = Txt.profile.passwordChangeUnavailable) }
             return
         }
         dialogs.submit {
@@ -177,7 +194,7 @@ class ProfileViewModel : ViewModel() {
             } catch (e: Exception) {
                 throw Exception(e.toPasswordChangeMessage())
             }
-            _state.update { it.copy(notice = "Şifreniz değiştirildi") }
+            _state.update { it.copy(notice = Txt.profile.passwordChanged) }
         }
     }
 
@@ -192,7 +209,7 @@ class ProfileViewModel : ViewModel() {
             _state.update {
                 it.copy(
                     trashRetentionDays = me.trashRetentionDays,
-                    notice = "Çöp kutusu saklama süresi ${me.trashRetentionDays} gün olarak kaydedildi",
+                    notice = Txt.profile.retentionSaved(me.trashRetentionDays),
                 )
             }
         }

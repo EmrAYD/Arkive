@@ -13,6 +13,7 @@ import com.eayd.arkive.data.WifiRequiredException
 import com.eayd.arkive.data.SaveSummaryRequest
 import com.eayd.arkive.data.SummarizeRequest
 import com.eayd.arkive.data.SummaryResponse
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.toApiErrorMessage
 import java.io.IOException
 import android.content.Context
@@ -42,10 +43,17 @@ import org.json.JSONObject
 import retrofit2.HttpException
 
 /** Özetin nerede üretildiği ([SummaryResponse.source]). */
-enum class SummarySource(val key: String, val label: String) {
-    Local("local", "Telefonda özetlendi"),
-    Cloud("cloud", "Sunucuda özetlendi"),
+enum class SummarySource(val key: String) {
+    Local("local"),
+    Cloud("cloud"),
     ;
+
+    /** Seçili dilde açıklaması ("Telefonda özetlendi"). */
+    val label: String
+        get() = when (this) {
+            Local -> Txt.ai.sourceLocal
+            Cloud -> Txt.ai.sourceCloud
+        }
 
     companion object {
         fun fromKey(key: String) = entries.firstOrNull { it.key == key } ?: Cloud
@@ -226,7 +234,7 @@ object AiSummarizer {
         _ui.value = null
         if (file.id in _running.value) return
         _running.update { it + file.id }
-        setStatus(file.id, "Hazırlanıyor…")
+        setStatus(file.id, Txt.ai.preparing)
         // Uygulama arka plana alınsa da iş sürsün: ön plan servisi süreci canlı tutar.
         runCatching { SummaryService.start(AppSettings.appContext) }
         jobs[file.id] = scope.launch {
@@ -282,7 +290,7 @@ object AiSummarizer {
                 // İnternet yoksa sunucu özetlemeyi bitirir; özet AI Sonuçlarım'da görünür.
             }
         }
-        _notices.tryEmit("“${file.name}” için özetleme durduruldu.")
+        _notices.tryEmit(Txt.ai.stopped(file.name))
     }
 
     /** Pencereyi kapatır (özetleme çalışıyorsa sürer). */
@@ -300,14 +308,14 @@ object AiSummarizer {
             // Telefonda üretildi ama henüz sunucuya yüklenmedi: özet telefondaki kopyadan gösterilir, yükleme yeniden denenir.
             _ui.value = SummaryUi.Viewing(
                 fileName, local.summary, SummarySource.fromKey(local.source),
-                note = "Henüz sunucuya yüklenmedi; internet gelince otomatik yüklenecek.",
+                note = Txt.ai.notUploadedYet,
             )
             scope.launch { flushPending() }
             return
         }
         opening += fileId
         _running.update { it + fileId }
-        setStatus(fileId, "Özet açılıyor…")
+        setStatus(fileId, Txt.ai.openingSummary)
         scope.launch {
             try {
                 val saved = ApiClient.api.getSummary(fileId)
@@ -347,14 +355,14 @@ object AiSummarizer {
         when {
             copy != null -> {
                 _openFile.tryEmit(copy)
-                _notices.tryEmit("Sunucuya bağlanılamıyor; özet telefondaki kopyadan açıldı.")
+                _notices.tryEmit(Txt.ai.openedFromPhoneCopy)
             }
             cached != null && cached.summary.isNotBlank() -> _ui.value = SummaryUi.Viewing(
                 fileName, cached.summary, SummarySource.fromKey(cached.source),
-                note = "Sunucuya ulaşılamadı; özet telefondaki kopyadan gösteriliyor.",
+                note = Txt.ai.shownFromPhoneCopy,
             )
             error is IOException || error is HttpException ->
-                _notices.tryEmit("Sunucuya ulaşılamadı ve bu özetin telefonda kopyası yok. İnternet gelince yeniden deneyin.")
+                _notices.tryEmit(Txt.ai.noPhoneCopy)
             else -> _notices.tryEmit(error.toApiErrorMessage())
         }
     }
@@ -443,15 +451,15 @@ object AiSummarizer {
                 } catch (e: UnreadableDocumentException) {
                     // Dosya telefonda açılamadı (bozuk olabilir): bulut izinliyse orada denenir.
                     if (mode.allowsCloud) return summarizeInCloud(file, password)
-                    throw AiFailure("“${file.name}” özetlenemedi: ${e.message}")
+                    throw AiFailure(Txt.ai.summarizeFailed(file.name, e.message))
                 } catch (e: Exception) {
                     // Dosyanın telefonda kopyası yok ve internet de yok: bulut da işe yaramaz, nedeni söylenir.
                     if (e is IOException && e !is WifiRequiredException) {
-                        throw AiFailure("“${file.name}” telefonda kayıtlı değil ve sunucuya ulaşılamadı. Bağlantı gelince tekrar deneyin.")
+                        throw AiFailure(Txt.ai.notOnPhoneAndOffline(file.name))
                     }
                     // Dosya telefonda açılamadı: bulut izinliyse orada denenir, değilse nedeni söylenir.
                     if (mode.allowsCloud) return summarizeInCloud(file, password)
-                    throw AiFailure(e.message ?: "Dosya açılamadı.")
+                    throw AiFailure(e.message ?: Txt.ai.fileOpenFailed)
                 }
                 // Parola (varsa) burada telefonda doğrulanmış demektir; bulut gerekirse yalnızca doğru parola gider.
                 when (val route = AiPolicy.afterInspection(mode, doc.stats)) {
@@ -470,9 +478,9 @@ object AiSummarizer {
         }
         val hint = when (reason) {
             LocalRejection.NoText -> ""
-            else -> " Büyük ya da uzun dosyalar için Profil > Ayarlar bölümünden yapay zeka işlem yerini \"Yerel + Bulut\" yapın."
+            else -> Txt.ai.hintUseHybrid
         }
-        return AiFailure("“${file.name}” özetlenemedi: ${reason.message}$hint")
+        return AiFailure(Txt.ai.summarizeFailedHint(file.name, reason.message, hint))
     }
 
     /**
@@ -481,7 +489,7 @@ object AiSummarizer {
      */
     private suspend fun inspect(file: FileDto, kind: SummarizableKind, password: String?): ReadDocument {
         val context = AppSettings.appContext
-        setStatus(file.id, "Dosya okunuyor…")
+        setStatus(file.id, Txt.ai.readingFile)
         InputCache.get(file.id, file.size)?.let { return DocumentReader.read(context, it, kind, password) }
         NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa dosya indirilmez
         val temp = InputCache.tempFile(file.id)
@@ -567,17 +575,19 @@ object AiSummarizer {
     }
 
     private suspend fun summarizeOnDevice(file: FileDto, text: String, mode: AiMode, password: String?) {
-        setStatus(file.id, "Telefonda özetleniyor…")
-        val summary = withContext(Dispatchers.Default) { ExtractiveSummarizer.summarize(text) }
+        setStatus(file.id, Txt.ai.summarizingOnPhone)
+        // Özetin başlıkları ("Özet:", "Önemli noktalar:") ve PDF'in üst bilgileri özet dilinde yazılır; cümleler belgenindir.
+        val language = AppSettings.summaryLanguage.value
+        val summary = withContext(Dispatchers.Default) { ExtractiveSummarizer.summarize(text, language) }
         if (summary.isBlank()) {
             // Özet çıkarılacak cümle yok (ör. yalnızca sayı/tablo): bulut izinliyse orada denenir.
             if (mode.allowsCloud) return summarizeInCloud(file, password)
-            throw AiFailure("“${file.name}” özetlenemedi: ${LocalRejection.NoText.message}")
+            throw AiFailure(Txt.ai.summarizeFailed(file.name, LocalRejection.NoText.message))
         }
         // Özetin PDF'i telefonda üretilir (seçili şablonla). Üretilemezse özet yine de kaydedilir; sunucu PDF'i kendisi yazar.
         val template = AppSettings.summaryTemplate.value
         val pdf = withContext(Dispatchers.Default) {
-            runCatching { SummaryPdfWriter.render(AppSettings.appContext, file.name, summary, template) }.getOrNull()
+            runCatching { SummaryPdfWriter.render(AppSettings.appContext, file.name, summary, template, language) }.getOrNull()
         }
         // Önce telefona yazılır: yükleme sırasında internet kesilse ya da uygulama kapansa özet (ve PDF'i) kaybolmaz.
         SummaryStore.put(
@@ -589,7 +599,7 @@ object AiSummarizer {
             Upload.Done -> Unit
             // Özet telefonda saklandı, bağlantı gelince yüklenecek; "özetlendi" mesajını [confirm] bunu belirterek verir.
             Upload.Later -> Unit
-            Upload.Rejected -> throw AiFailure("“${file.name}” özeti sunucuya kaydedilemedi.")
+            Upload.Rejected -> throw AiFailure(Txt.ai.saveToServerFailed(file.name))
             is Upload.PlanLimit -> throw PlusRequired(result.message)
         }
     }
@@ -619,6 +629,7 @@ object AiSummarizer {
                     model = model,
                     template = AppSettings.summaryTemplate.value.id,
                     pdfBase64 = pdf,
+                    language = AppSettings.summaryLanguage.value.tag,
                 ),
             )
             SummaryStore.markUploaded(fileId)
@@ -668,14 +679,14 @@ object AiSummarizer {
             when (val result = upload(entry.fileId, entry.summary, entry.model)) {
                 Upload.Done -> {
                     _completed.tryEmit(entry.fileId)
-                    _notices.tryEmit("“${entry.fileName}” özeti sunucuya yüklendi.")
+                    _notices.tryEmit(Txt.ai.uploadedToServer(entry.fileName))
                 }
                 Upload.Later -> break // internet yok: kalanları da denemenin anlamı yok
                 Upload.Rejected -> Unit
                 // İnternetsizken üretilen özet, bağlanınca planın sınırına takıldı: kaydedilemedi.
                 is Upload.PlanLimit -> {
                     _completed.tryEmit(entry.fileId) // satırdaki "yüklenmeyi bekliyor" görünümü kalksın
-                    _notices.tryEmit("“${entry.fileName}” özeti kaydedilemedi. ${result.message}")
+                    _notices.tryEmit(Txt.ai.saveFailed(entry.fileName, result.message))
                 }
             }
         }
@@ -712,7 +723,7 @@ object AiSummarizer {
     }
 
     private suspend fun summarizeInCloud(file: FileDto, password: String?) {
-        setStatus(file.id, "Sunucuda özetleniyor…")
+        setStatus(file.id, Txt.ai.summarizingOnServer)
         // Uygulama özetleme sürerken kapanırsa sunucu işi yine bitirir; uygulama açılınca bu kayıtla sonuca yeniden katılır.
         CloudJobs.add(file.id, file.name)
         var stillRunningOnServer = false
@@ -720,6 +731,7 @@ object AiSummarizer {
             val request = SummarizeRequest(
                 password = password?.takeIf { it.isNotEmpty() },
                 template = AppSettings.summaryTemplate.value.id,
+                language = AppSettings.summaryLanguage.value.tag,
             )
             val saved = requestCloud(file.id, request)
             // Özet telefonda da tutulur (metin + PDF'in kopyası): internet yokken de açılır.
@@ -727,15 +739,14 @@ object AiSummarizer {
         } catch (e: ServerUnreachable) {
             stillRunningOnServer = true
             throw AiFailure(
-                "“${file.name}” için sunucuya ulaşılamadı. Özetleme sunucuda sürüyorsa bitince AI Sonuçlarım'da " +
-                    "görünür; uygulama yeniden açılınca sonuç kendiliğinden sorulur.",
+                Txt.ai.serverUnreachableStillRunning(file.name),
             )
         } catch (e: HttpException) {
             // 423: dosya parolalı (parola gerekiyor ya da yanlış). Parola penceresi açılır.
             if (e.code() == 423) throw PasswordException(wrong = e.passwordInvalid(sent = !password.isNullOrEmpty()))
             // 402: bulut özeti Plus'a özel (plan bilgisi eskiyse buraya gelinebilir). Plus tanıtımı açılır.
             if (e.code() == 402) throw PlusRequired(e.planMessage())
-            throw AiFailure("“${file.name}” özetlenemedi: ${e.cloudMessage()}")
+            throw AiFailure(Txt.ai.summarizeFailed(file.name, e.cloudMessage()))
         } finally {
             if (!stillRunningOnServer) CloudJobs.remove(file.id)
         }
@@ -758,9 +769,9 @@ object AiSummarizer {
                 throw e
             } catch (e: IOException) {
                 val wait = CloudJobPolicy.retryDelayMs(attempt++) ?: throw ServerUnreachable()
-                setStatus(fileId, "Bağlantı koptu; özetleme sunucuda sürüyor…")
+                setStatus(fileId, Txt.ai.connectionLostStillRunning)
                 delay(wait)
-                setStatus(fileId, "Sunucuda özetleniyor…")
+                setStatus(fileId, Txt.ai.summarizingOnServer)
             }
         }
     }
@@ -779,7 +790,7 @@ object AiSummarizer {
             }
             if (job.fileId in _running.value) continue
             _running.update { it + job.fileId }
-            setStatus(job.fileId, "Sunucuda özetleniyor…")
+            setStatus(job.fileId, Txt.ai.summarizingOnServer)
             runCatching { SummaryService.start(AppSettings.appContext) }
             jobs[job.fileId] = scope.launch {
                 try {
@@ -803,7 +814,7 @@ object AiSummarizer {
                     CloudJobs.remove(job.fileId)
                     _completed.tryEmit(job.fileId)
                     if (e.code() == 404) {
-                        _notices.tryEmit("“${job.fileName}” özetlemesi sunucuda tamamlanamadı; yeniden deneyebilirsiniz.")
+                        _notices.tryEmit(Txt.ai.serverJobFailed(job.fileName))
                     }
                 } catch (e: Exception) {
                     CloudJobs.remove(job.fileId)
@@ -852,6 +863,6 @@ object AiSummarizer {
         }
     }
 
-    private const val UNSUPPORTED_MESSAGE =
-        "Bu dosya türü özetlenemiyor. Metin, PDF ve Word (DOCX, DOC) dosyaları özetlenebilir."
+    private val UNSUPPORTED_MESSAGE: String
+        get() = Txt.ai.unsupportedType
 }

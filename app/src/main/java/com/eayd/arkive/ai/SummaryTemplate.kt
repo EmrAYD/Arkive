@@ -1,5 +1,7 @@
 package com.eayd.arkive.ai
 
+import com.eayd.arkive.i18n.Txt
+
 /** Özet PDF'inde yazı ailesi: Serif (Times benzeri) ya da Sans (Arial benzeri). Yazı tipleri assets/fonts içindeki Liberation ailesidir. */
 enum class PdfFamily { Serif, Sans }
 
@@ -14,8 +16,6 @@ enum class PdfAlign { Left, Center, Justify }
  */
 enum class SummaryTemplate(
     val id: String,
-    val label: String,
-    val description: String,
     val family: PdfFamily,
     val bodySize: Float,
     val headingSize: Float,
@@ -32,22 +32,40 @@ enum class SummaryTemplate(
     val titleRule: Boolean,
 ) {
     Classic(
-        "klasik", "Klasik", "Serif yazı tipi; başlıklar kalın 14 punto, metin 12 punto, sola yaslı.",
+        "klasik",
         PdfFamily.Serif, 12f, 14f, 14f, 1.25f, PdfAlign.Left, PdfAlign.Left, listOf(2.5f, 2.5f, 2.5f, 2.5f), null, true,
     ),
     Academic(
-        "akademik", "Akademik", "Serif yazı tipi; 1,5 satır aralığı, iki yana yaslı metin, ortalı başlık.",
+        "akademik",
         PdfFamily.Serif, 12f, 14f, 14f, 1.5f, PdfAlign.Justify, PdfAlign.Center, listOf(3.0f, 2.5f, 2.5f, 2.5f), null, false,
     ),
     Modern(
-        "modern", "Modern", "Sans-serif yazı tipi; büyük mavi başlık ve ince çizgi.",
+        "modern",
         PdfFamily.Sans, 11f, 14f, 20f, 1.35f, PdfAlign.Left, PdfAlign.Left, listOf(2.2f, 2.2f, 2.2f, 2.2f), 0xFF1E40AF.toInt(), true,
     ),
     Compact(
-        "kompakt", "Kompakt", "Dar kenar boşlukları ve küçük punto; uzun özetler daha az sayfa tutar.",
+        "kompakt",
         PdfFamily.Serif, 10.5f, 13f, 13f, 1.15f, PdfAlign.Left, PdfAlign.Left, listOf(1.8f, 1.8f, 1.8f, 1.8f), null, false,
     ),
     ;
+
+    /** Seçili dilde adı. */
+    val label: String
+        get() = when (this) {
+            Classic -> Txt.ai.templateClassic
+            Academic -> Txt.ai.templateAcademic
+            Modern -> Txt.ai.templateModern
+            Compact -> Txt.ai.templateCompact
+        }
+
+    /** Seçili dilde kısa açıklaması (ayarlar penceresinde gösterilir). */
+    val description: String
+        get() = when (this) {
+            Classic -> Txt.ai.templateClassicDescription
+            Academic -> Txt.ai.templateAcademicDescription
+            Modern -> Txt.ai.templateModernDescription
+            Compact -> Txt.ai.templateCompactDescription
+        }
 
     companion object {
         val Default = Classic

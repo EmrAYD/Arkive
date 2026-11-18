@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eayd.arkive.data.FolderLocations
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.viewmodel.MoveFolderViewModel
 
 /**
@@ -67,7 +68,7 @@ fun MoveFolderDialog(
 
     AlertDialog(
         onDismissRequest = { if (!moving) onDismiss() },
-        title = { Text("Taşı") },
+        title = { Text(Txt.common.move) },
         text = {
             Column {
                 Text(
@@ -97,7 +98,7 @@ fun MoveFolderDialog(
                                 modifier = Modifier.size(24.dp),
                             )
                         },
-                        label = "Üst klasör",
+                        label = Txt.browser.parentFolder,
                     )
                 }
 
@@ -110,7 +111,7 @@ fun MoveFolderDialog(
                         list == null -> ListSkeleton(Modifier.fillMaxWidth(), rows = 3, contentPadding = PaddingValues(0.dp))
 
                         list.isEmpty() -> Text(
-                            "Bu klasörde alt klasör yok.",
+                            Txt.browser.noSubfolders,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline,
                             modifier = Modifier.align(Alignment.Center),
@@ -133,7 +134,7 @@ fun MoveFolderDialog(
                 if (alreadyHere) {
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "Seçilenler zaten bu klasörde.",
+                        Txt.browser.alreadyHere,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.outline,
                     )
@@ -148,9 +149,9 @@ fun MoveFolderDialog(
             TextButton(
                 enabled = !moving && !alreadyHere,
                 onClick = { onMove(state.currentId, state.currentName) },
-            ) { Text("Buraya taşı") }
+            ) { Text(Txt.browser.moveHere) }
         },
-        dismissButton = { TextButton(enabled = !moving, onClick = onDismiss) { Text("İptal") } },
+        dismissButton = { TextButton(enabled = !moving, onClick = onDismiss) { Text(Txt.common.cancel) } },
     )
 }
 

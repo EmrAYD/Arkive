@@ -3,6 +3,7 @@ package com.eayd.arkive.screens.folders
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.ConfirmDialog
 import com.eayd.arkive.ui.components.FileInfoDialog
 import com.eayd.arkive.data.FolderLocations
@@ -26,9 +27,9 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         null -> Unit
 
         BrowserDialog.NewFolder -> NameDialog(
-            title = "Yeni klasör",
-            confirmLabel = "Oluştur",
-            label = "Klasör adı",
+            title = Txt.browser.newFolder,
+            confirmLabel = Txt.common.create,
+            label = Txt.browser.folderName,
             initialName = "",
             saving = host.saving,
             serverError = host.error,
@@ -37,9 +38,9 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         )
 
         is BrowserDialog.EditFolder -> NameDialog(
-            title = "Klasörü düzenle",
-            confirmLabel = "Kaydet",
-            label = "Klasör adı",
+            title = Txt.browser.editFolder,
+            confirmLabel = Txt.common.save,
+            label = Txt.browser.folderName,
             initialName = dialog.folder.name,
             initialColor = dialog.folder.color,
             initialEmoji = dialog.folder.emoji,
@@ -50,9 +51,9 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         )
 
         is BrowserDialog.RenameFile -> NameDialog(
-            title = "Yeniden adlandır",
-            confirmLabel = "Kaydet",
-            label = "Dosya adı",
+            title = Txt.common.rename,
+            confirmLabel = Txt.common.save,
+            label = Txt.browser.fileName,
             initialName = dialog.file.name,
             showColor = false,
             saving = host.saving,
@@ -62,10 +63,9 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         )
 
         is BrowserDialog.DeleteFolder -> ConfirmDialog(
-            title = "Klasör çöp kutusuna taşınsın mı?",
-            message = "“${dialog.folder.name}” klasörü, içindeki alt klasörler ve dosyalarla birlikte çöp kutusuna " +
-                "taşınacak. Çöp kutusundan geri yükleyebilirsiniz.",
-            confirmLabel = "Çöp kutusuna taşı",
+            title = Txt.browser.folderToTrashTitle,
+            message = Txt.browser.folderToTrashBody(dialog.folder.name),
+            confirmLabel = Txt.browser.moveToTrash,
             saving = host.saving,
             error = host.error,
             onConfirm = { viewModel.deleteFolder(dialog.folder) },
@@ -73,9 +73,9 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         )
 
         is BrowserDialog.DeleteFile -> ConfirmDialog(
-            title = "Dosya çöp kutusuna taşınsın mı?",
-            message = "“${dialog.file.name}” çöp kutusuna taşınacak. Çöp kutusundan geri yükleyebilirsiniz.",
-            confirmLabel = "Çöp kutusuna taşı",
+            title = Txt.browser.fileToTrashTitle,
+            message = Txt.browser.fileToTrashBody(dialog.file.name),
+            confirmLabel = Txt.browser.moveToTrash,
             saving = host.saving,
             error = host.error,
             onConfirm = { viewModel.deleteFile(dialog.file) },
@@ -83,11 +83,11 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         )
 
         BrowserDialog.DeleteSelection -> ConfirmDialog(
-            title = "${state.selection.count} öğe çöp kutusuna taşınsın mı?",
-            message = "Seçilen öğeler çöp kutusuna taşınacak." +
-                (if (state.selectedFolders.isNotEmpty()) " Klasörlerin içindekiler de klasörle birlikte taşınır." else "") +
-                " Çöp kutusundan geri yükleyebilirsiniz.",
-            confirmLabel = "Çöp kutusuna taşı",
+            title = Txt.browser.itemsToTrashTitle(state.selection.count),
+            message = Txt.browser.itemsToTrashBody +
+                (if (state.selectedFolders.isNotEmpty()) Txt.browser.itemsToTrashFolders else "") +
+                Txt.browser.itemsToTrashRestore,
+            confirmLabel = Txt.browser.moveToTrash,
             saving = host.saving,
             error = host.error,
             onConfirm = viewModel::confirmDeleteSelection,
@@ -95,7 +95,7 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         )
 
         is BrowserDialog.MoveFile -> MoveFolderDialog(
-            summary = "“${dialog.file.name}”",
+            summary = Txt.browser.quoted(dialog.file.name),
             currentParentIds = listOf(dialog.file.folderId),
             excludedFolderIds = emptySet(),
             moving = host.saving,
@@ -106,7 +106,7 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         )
 
         is BrowserDialog.MoveFolder -> MoveFolderDialog(
-            summary = "“${dialog.folder.name}”",
+            summary = Txt.browser.quoted(dialog.folder.name),
             currentParentIds = listOf(dialog.folder.parentId),
             // Klasör kendi içine taşınamaz: listede gösterilmez (alt klasörlerine de ancak içinden girilir).
             excludedFolderIds = setOf(dialog.folder.id),
@@ -117,7 +117,7 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         )
 
         BrowserDialog.MoveSelection -> MoveFolderDialog(
-            summary = "${state.selection.count} öğe",
+            summary = Txt.browser.itemCount(state.selection.count),
             currentParentIds = state.selectedFiles.map { it.folderId } + state.selectedFolders.map { it.parentId },
             // Taşınan klasörler listede gösterilmez: bir klasör kendi içine taşınamaz.
             excludedFolderIds = state.selectedFolders.map { it.id }.toSet(),

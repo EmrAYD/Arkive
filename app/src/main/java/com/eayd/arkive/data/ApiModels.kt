@@ -163,6 +163,8 @@ data class SummarizeRequest(
     val password: String? = null,
     val template: String? = null,
     @SerializedName("join_only") val joinOnly: Boolean = false,
+    /** Özetin yazılacağı dil ("tr" / "en"); bkz. [com.eayd.arkive.data.AppSettings.summaryLanguage]. */
+    val language: String? = null,
 )
 
 /** Telefonda üretilen özetin sunucuya kaydı (PUT /files/{id}/summary). */
@@ -173,4 +175,6 @@ data class SaveSummaryRequest(
     val template: String? = null,
     /** Telefonun ürettiği özet PDF'i (base64). Yoksa sunucu PDF'i kendisi üretir. */
     @SerializedName("pdf_base64") val pdfBase64: String? = null,
+    /** Özetin dili ("tr" / "en"): sunucu PDF'i kendisi üretirse başlıkları ve sonuç dosyasının adı bu dilde olur. */
+    val language: String? = null,
 )

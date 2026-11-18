@@ -1,5 +1,7 @@
 package com.eayd.arkive.ai
 
+import com.eayd.arkive.i18n.Txt
+
 /**
  * Yapay zeka özetlemesinin NEREDE yapılacağına karar veren kurallar. Hiçbir Android sınıfı kullanmaz; bu yüzden
  * tek başına test edilebilir (bkz. AiPolicyTest). Eşikleri değiştirmek için yalnızca bu dosyadaki sabitlere bakmak yeter.
@@ -13,11 +15,27 @@ package com.eayd.arkive.ai
  */
 
 /** Ayarlardaki "yapay zeka işlem yeri". */
-enum class AiMode(val label: String, val description: String) {
-    Local("Yerel", "Özetleme yalnızca bu telefonda yapılır (telefonda kayıtlı dosyalarda internet gerekmez); özet belgenin en önemli cümlelerinden oluşur. Yalnızca küçük (en çok 1 MB ve 10 sayfa), metin ağırlıklı dosyalar özetlenebilir."),
-    Cloud("Bulut", "Özetleme her zaman sunucudaki yapay zeka ile yapılır; özet yeniden yazılır. Büyük ve görsel ağırlıklı dosyalar dahil hepsi özetlenebilir."),
-    Hybrid("Yerel + Bulut", "Uygun dosyalar telefonda, uygun olmayanlar (büyük, 10 sayfadan uzun, çok görselli) sunucuda özetlenir."),
+enum class AiMode {
+    Local,
+    Cloud,
+    Hybrid,
     ;
+
+    /** Seçili dilde adı ("Yerel + Bulut"). */
+    val label: String
+        get() = when (this) {
+            Local -> Txt.ai.modeLocal
+            Cloud -> Txt.ai.modeCloud
+            Hybrid -> Txt.ai.modeHybrid
+        }
+
+    /** Seçili dilde açıklaması (ayarlar penceresinde gösterilir). */
+    val description: String
+        get() = when (this) {
+            Local -> Txt.ai.modeLocalDescription
+            Cloud -> Txt.ai.modeCloudDescription
+            Hybrid -> Txt.ai.modeHybridDescription
+        }
 
     val allowsLocal: Boolean get() = this != Cloud
     val allowsCloud: Boolean get() = this != Local
@@ -30,11 +48,21 @@ enum class SummarizableKind { Text, Pdf, Docx }
 data class DocumentStats(val words: Int, val pages: Int?, val images: Int)
 
 /** Dosyanın yerelde özetlenememe nedeni. [message] kullanıcıya gösterilir. */
-enum class LocalRejection(val message: String) {
-    TooBig("Dosya yerelde özetlenemeyecek kadar büyük."),
-    TooManyPages("Dosya yerelde özetlenemeyecek kadar uzun (en çok 10 sayfa)."),
-    ImageHeavy("Dosya çok fazla görsel içeriyor."),
-    NoText("Dosyadan okunabilir metin çıkarılamadı."),
+enum class LocalRejection {
+    TooBig,
+    TooManyPages,
+    ImageHeavy,
+    NoText,
+    ;
+
+    /** Seçili dilde açıklaması. */
+    val message: String
+        get() = when (this) {
+            TooBig -> Txt.ai.rejectTooBig
+            TooManyPages -> Txt.ai.rejectTooManyPages
+            ImageHeavy -> Txt.ai.rejectImageHeavy
+            NoText -> Txt.ai.rejectNoText
+        }
 }
 
 sealed interface Precheck {

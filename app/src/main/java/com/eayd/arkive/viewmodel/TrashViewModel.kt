@@ -8,6 +8,7 @@ import com.eayd.arkive.data.ApiClient
 import com.eayd.arkive.data.TrashFileDto
 import com.eayd.arkive.data.TrashFolderDto
 import com.eayd.arkive.data.TrashIdsRequest
+import com.eayd.arkive.i18n.Txt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -152,7 +153,7 @@ class TrashViewModel(private val folderId: String? = null) : ViewModel() {
             onError = { message -> _state.update { it.copy(busy = false, notice = message) } },
         ) {
             ApiClient.api.emptyTrash()
-            _state.update { it.copy(busy = false, selection = Selection(), notice = "Çöp kutusu boşaltıldı") }
+            _state.update { it.copy(busy = false, selection = Selection(), notice = Txt.trash.emptied) }
             fetch(showSpinner = false)
         }
     }
@@ -161,13 +162,13 @@ class TrashViewModel(private val folderId: String? = null) : ViewModel() {
     fun restoreSelected() = perform(
         call = { ApiClient.api.restoreTrash(it) },
         // Klasörün içinden geri yüklenen öğeler, klasör hâlâ çöpte olduğu için Ana Sayfa'nın en üstüne gelir.
-        success = { n -> if (isFolderView) "$n öğe Ana Sayfa'ya geri yüklendi" else "$n öğe geri yüklendi" },
+        success = { n -> if (isFolderView) Txt.trash.restoredToHome(n) else Txt.trash.restored(n) },
     )
 
     /** Seçilenleri KALICI siler. */
     fun deleteSelectedForever() = perform(
         call = { ApiClient.api.deleteTrash(it) },
-        success = { n -> "$n öğe kalıcı olarak silindi" },
+        success = { n -> Txt.trash.deletedPermanently(n) },
     )
 
     private fun perform(call: suspend (TrashIdsRequest) -> Unit, success: (Int) -> String) {

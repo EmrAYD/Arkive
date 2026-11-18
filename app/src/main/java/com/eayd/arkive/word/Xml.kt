@@ -1,5 +1,6 @@
 package com.eayd.arkive.word
 
+import com.eayd.arkive.i18n.Txt
 import java.io.ByteArrayInputStream
 import javax.xml.parsers.SAXParserFactory
 import org.xml.sax.Attributes
@@ -63,11 +64,11 @@ internal object Xml {
         if (bytes.size >= 2) {
             val b0 = bytes[0].toInt() and 0xFF
             val b1 = bytes[1].toInt() and 0xFF
-            if ((b0 == 0xFF && b1 == 0xFE) || (b0 == 0xFE && b1 == 0xFF)) throw WordFormatException("Desteklenmeyen XML kodlaması.")
+            if ((b0 == 0xFF && b1 == 0xFE) || (b0 == 0xFE && b1 == 0xFF)) throw WordFormatException(Txt.docs.xmlUnsupportedEncoding)
         }
         val head = String(bytes, 0, minOf(bytes.size, 4096), Charsets.ISO_8859_1)
         if (head.contains("<!DOCTYPE", ignoreCase = true) || head.contains("<!ENTITY", ignoreCase = true)) {
-            throw WordFormatException("Güvenli olmayan XML.")
+            throw WordFormatException(Txt.docs.xmlUnsafe)
         }
 
         val factory = SAXParserFactory.newInstance()
@@ -91,11 +92,11 @@ internal object Xml {
             reader.entityResolver = org.xml.sax.EntityResolver { _, _ -> InputSource(java.io.StringReader("")) }
             reader.parse(InputSource(ByteArrayInputStream(bytes)))
         } catch (e: SAXException) {
-            throw WordFormatException("XML okunamadı: ${e.message}")
+            throw WordFormatException(Txt.docs.xmlUnreadableWith(e.message))
         } catch (e: java.io.IOException) {
-            throw WordFormatException("XML okunamadı.")
+            throw WordFormatException(Txt.docs.xmlUnreadable)
         }
-        return handler.root ?: throw WordFormatException("XML boş.")
+        return handler.root ?: throw WordFormatException(Txt.docs.xmlEmpty)
     }
 
     private class TreeHandler : DefaultHandler() {
@@ -103,7 +104,7 @@ internal object Xml {
         private val stack = ArrayList<XNode>()
 
         override fun startElement(uri: String?, localName: String?, qName: String?, attributes: Attributes?) {
-            if (stack.size >= MAX_DEPTH) throw SAXException("XML çok derin.")
+            if (stack.size >= MAX_DEPTH) throw SAXException(Txt.docs.xmlTooDeep)
             val local = localName?.takeIf { it.isNotEmpty() } ?: qName?.substringAfter(':').orEmpty()
             val prefix = prefixOf(uri.orEmpty())
             val name = if (prefix.isEmpty()) local else "$prefix:$local"

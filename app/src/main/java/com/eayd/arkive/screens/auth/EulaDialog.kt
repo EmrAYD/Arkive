@@ -45,6 +45,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.eayd.arkive.i18n.Txt
 
 /**
  * Kullanıcı Sözleşmesi'nin tamamını gösteren tam ekran pencere.
@@ -88,7 +89,7 @@ fun EulaDialog(
                         modifier = Modifier.weight(1f),
                     )
                     IconButton(onClick = onDismiss) {
-                        Icon(Icons.Filled.Close, contentDescription = "Kapat")
+                        Icon(Icons.Filled.Close, contentDescription = Txt.common.close)
                     }
                 }
                 HorizontalDivider()
@@ -106,7 +107,7 @@ fun EulaDialog(
                 Column(modifier = Modifier.fillMaxWidth().padding(16.dp)) {
                     if (!reachedEnd) {
                         Text(
-                            text = "Onaylamak için sözleşmeyi sonuna kadar kaydırın.",
+                            text = Txt.eula.scrollToAccept,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -117,7 +118,7 @@ fun EulaDialog(
                         enabled = reachedEnd,
                         modifier = Modifier.fillMaxWidth(),
                     ) {
-                        Text("Okudum, onaylıyorum")
+                        Text(Txt.eula.accept)
                     }
                 }
             }
@@ -173,11 +174,14 @@ fun EulaConsentRow(accepted: Boolean, onOpen: () -> Unit, onWithdraw: () -> Unit
         Checkbox(checked = accepted, onCheckedChange = null)
         Spacer(modifier = Modifier.width(8.dp))
         Text(
+            // Türkçede bağlantı başta ("Kullanıcı Sözleşmesi'ni okudum…"), İngilizcede ortadadır ("I have read and accept the
+            // User Agreement."); bu yüzden bağlantının önü ve arkası ayrı metinlerdir.
             text = buildAnnotatedString {
+                append(Txt.eula.consentPrefix)
                 withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {
-                    append("Kullanıcı Sözleşmesi")
+                    append(Txt.eula.linkText)
                 }
-                append("'ni okudum ve kabul ediyorum.")
+                append(Txt.eula.consentSuffix)
             },
             style = MaterialTheme.typography.bodyMedium,
         )

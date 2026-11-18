@@ -2,11 +2,12 @@ package com.eayd.arkive.data
 
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
+import com.eayd.arkive.i18n.Txt
 import java.io.IOException
 
 /** "Yalnızca Wi-Fi" açıkken kablosuz ağda olunmadığını anlatır. Mesajı doğrudan kullanıcıya gösterilir. */
 class WifiRequiredException :
-    IOException("Yalnızca Wi-Fi ile aktarım açık. Dosya yüklemek/indirmek için kablosuz ağa bağlanın.")
+    IOException(Txt.errors.wifiOnly)
 
 /**
  * Dosya aktarımı (yükleme, indirme, ön izleme) başlamadan önce çağrılır. Ayar açıksa ve cihaz Wi-Fi (ya da

@@ -1,6 +1,8 @@
 package com.eayd.arkive.data
 
 import com.eayd.arkive.BuildConfig
+import com.eayd.arkive.i18n.Lang
+import com.eayd.arkive.i18n.Txt
 import com.google.android.gms.tasks.Tasks
 import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.GsonBuilder
@@ -26,24 +28,28 @@ object ApiConfig {
 /** Firebase kimlik token'ını (ID token) alır. Ağ iş parçacığında çağrılır, bu yüzden bloklayıcıdır. */
 private fun currentIdToken(forceRefresh: Boolean): String {
     val user = FirebaseAuth.getInstance().currentUser
-        ?: throw IOException("Oturum açık değil")
+        ?: throw IOException(Txt.errors.notSignedIn)
     return try {
         Tasks.await(user.getIdToken(forceRefresh)).token
-            ?: throw IOException("Kimlik bilgisi alınamadı")
+            ?: throw IOException(Txt.errors.credentialsUnavailable)
     } catch (e: ExecutionException) {
-        throw IOException("Kimlik bilgisi alınamadı", e)
+        throw IOException(Txt.errors.credentialsUnavailable, e)
     } catch (e: InterruptedException) {
         Thread.currentThread().interrupt()
-        throw IOException("Kimlik bilgisi alınamadı", e)
+        throw IOException(Txt.errors.credentialsUnavailable, e)
     }
 }
 
-/** Her isteğe `Authorization: Bearer <Firebase token>` başlığını ekler. */
+/**
+ * Her isteğe `Authorization: Bearer <Firebase token>` başlığını ve uygulamanın dilini (`Accept-Language: tr` / `en`)
+ * ekler. Sunucu hata ve bilgi mesajlarını bu dilde döndürür.
+ */
 private class AuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val token = currentIdToken(forceRefresh = false)
         val request = chain.request().newBuilder()
             .header("Authorization", "Bearer $token")
+            .header("Accept-Language", Lang.app.tag)
             .build()
         return chain.proceed(request)
     }

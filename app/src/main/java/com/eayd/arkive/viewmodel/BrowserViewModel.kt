@@ -14,6 +14,7 @@ import com.eayd.arkive.data.FileUploader
 import com.eayd.arkive.data.FolderDto
 import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.data.ListCache
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.toApiErrorMessage
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
@@ -482,7 +483,7 @@ class BrowserViewModel(
         items.folders.forEach { f -> attempt { onFolder(f) } }
         refreshQuietly()
         if (failed > 0) {
-            throw BatchFailure(if (items.count == 1) firstError.orEmpty() else "$failed öğe işlenemedi: $firstError")
+            throw BatchFailure(if (items.count == 1) firstError.orEmpty() else Txt.browser.batchFailed(failed, firstError))
         }
     }
 
@@ -493,8 +494,8 @@ class BrowserViewModel(
             onFile = { ApiClient.api.updateFile(it.id, mapOf("folder_id" to targetFolderId)) },
             onFolder = { ApiClient.api.updateFolder(it.id, mapOf("parent_id" to targetFolderId)) },
         )
-        val what = if (items.count == 1) "“${items.label}”" else items.label
-        edit { it.copy(selection = Selection(), notice = "$what “$targetName” klasörüne taşındı") }
+        val what = if (items.count == 1) Txt.browser.quoted(items.label) else items.label
+        edit { it.copy(selection = Selection(), notice = Txt.browser.movedTo(what, targetName)) }
     }
 
     /** "Taşı" penceresinde hedef seçildi: tek dosya, tek klasör ya da seçimin tamamı taşınır. */
@@ -510,7 +511,7 @@ class BrowserViewModel(
 
     /** Sürükle-bırak: seçilen öğeleri [folderId] klasörüne taşır. */
     fun dropItems(items: SelectedItems, folderId: String) {
-        val name = _state.value.folders.firstOrNull { it.id == folderId }?.name ?: "klasör"
+        val name = _state.value.folders.firstOrNull { it.id == folderId }?.name ?: Txt.browser.folderFallback
         launchCatching(::showNotice) { moveItems(items, folderId, name) }
     }
 

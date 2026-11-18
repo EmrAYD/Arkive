@@ -14,6 +14,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.viewmodel.AuthUiState
 import com.eayd.arkive.viewmodel.AuthViewModel
 import com.eayd.arkive.viewmodel.EmailCheck
@@ -34,7 +35,7 @@ fun LoginScreen(
 
     NavigateOnSuccess(uiState, onLoginSuccess, viewModel::resetState)
 
-    AuthScreenLayout(title = "Giriş Yap") {
+    AuthScreenLayout(title = Txt.auth.signIn) {
         EmailField(viewModel.email, emailCheck, viewModel::onEmailChange)
         Spacer(Modifier.height(4.dp))
         PasswordField(viewModel.password, viewModel::onPasswordChange)
@@ -45,7 +46,7 @@ fun LoginScreen(
             enabled = passwordResetState !is PasswordResetUiState.Loading,
             modifier = Modifier.align(Alignment.End),
         ) {
-            Text("Şifrenizi mi unuttunuz?", style = MaterialTheme.typography.bodySmall)
+            Text(Txt.auth.forgotPassword, style = MaterialTheme.typography.bodySmall)
         }
 
         when (val reset = passwordResetState) {
@@ -67,19 +68,19 @@ fun LoginScreen(
         AuthErrorText(uiState)
 
         AuthSubmitButton(
-            label = "Giriş Yap",
+            label = Txt.auth.signIn,
             loading = loading,
             enabled = emailCheck == EmailCheck.Valid && viewModel.password.isNotBlank(),
             onClick = viewModel::login,
         )
         Spacer(Modifier.height(12.dp))
         GoogleSignInButton(
-            label = "Google ile Giriş Yap",
+            label = Txt.auth.signInWithGoogle,
             enabled = !loading && !eulaPending,
             onResult = { viewModel.loginWithGoogle(it) },
         )
         Spacer(Modifier.height(12.dp))
-        TextButton(onClick = onNavigateToRegister) { Text("Hesabın yok mu? Kayıt ol") }
+        TextButton(onClick = onNavigateToRegister) { Text(Txt.auth.noAccount) }
     }
 
     // Google ile ilk kez giren (yeni hesap açılan) kullanıcıya sözleşme gösterilir. Kapatmak = kabul etmemek:

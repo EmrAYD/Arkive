@@ -5,6 +5,7 @@ import androidx.lifecycle.viewModelScope
 import com.eayd.arkive.data.ApiClient
 import com.eayd.arkive.data.FileSaver
 import com.eayd.arkive.data.NetworkPolicy
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.toApiErrorMessage
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -46,10 +47,10 @@ fun saveFileToDevice(fileId: String, fileName: String, mimeType: String?, notify
     downloadScope.launch {
         try {
             NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa indirme başlatılmaz
-            notify("“$fileName” indiriliyor…")
+            notify(Txt.files.downloading(fileName))
             val url = ApiClient.api.getDownloadUrl(fileId).url
             val where = FileSaver.saveToDownloads(url, fileName, mimeType)
-            notify("“$fileName” $where")
+            notify(Txt.files.downloadResult(fileName, where))
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {

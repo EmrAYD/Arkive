@@ -1,5 +1,6 @@
 package com.eayd.arkive.word
 
+import com.eayd.arkive.i18n.Txt
 import java.nio.charset.Charset
 import java.util.Locale
 
@@ -19,19 +20,19 @@ internal object DocReader {
      * [com.eayd.arkive.ai.PasswordException] atılır.
      */
     fun read(ole: OleFile, password: String? = null): WordDoc {
-        var wd = ole.stream("WordDocument") ?: throw WordFormatException("Word belgesi okunamadı.")
-        if (wd.size < 0x100 || u16(wd, 0) != 0xA5EC) throw WordFormatException("Word belgesi okunamadı (bozuk).")
+        var wd = ole.stream("WordDocument") ?: throw WordFormatException(Txt.docs.wordUnreadable)
+        if (wd.size < 0x100 || u16(wd, 0) != 0xA5EC) throw WordFormatException(Txt.docs.wordUnreadableCorrupt)
         val nFib = u16(wd, 2)
         val flags = u16(wd, 0x0A)
         val encrypted = flags and 0x0100 != 0
         if (encrypted && (nFib < 0xC1 || flags and 0x8000 != 0)) {
             // Word 6/95 ve XOR ile gizlenmiş belgeler: yöntem belgelenmiş ama bu uygulamada desteklenmiyor.
-            throw WordFormatException("Bu parolalı .doc şifreleme yöntemi desteklenmiyor.")
+            throw WordFormatException(Txt.docs.docEncryptionUnsupported)
         }
         if (!encrypted && nFib < 0xC1) return readWord6(wd)
 
         var table = ole.stream(if (flags and 0x0200 != 0) "1Table" else "0Table")
-            ?: throw WordFormatException("Word belgesi okunamadı (tablo akışı yok).")
+            ?: throw WordFormatException(Txt.docs.wordNoTableStream)
         var data: ByteArray? = runCatching { ole.stream("Data") }.getOrNull()
         if (encrypted) {
             val clear = WordCrypto.decrypt(wd, table, data, password)
@@ -42,7 +43,7 @@ internal object DocReader {
         val fib = Fib.parse(wd)
         val pieces = readPieces(wd, table, fib)
         val text = buildText(wd, pieces, fib.ccpText)
-        if (text.isEmpty()) throw WordFormatException("Belgede metin yok.")
+        if (text.isEmpty()) throw WordFormatException(Txt.docs.noText)
         return try {
             Builder(data, wd, table, fib, pieces, text).build()
         } catch (e: WordFormatException) {
@@ -92,7 +93,7 @@ internal object DocReader {
                 val ccpText = i32(wd, rgLw + 12)
                 p = rgLw + cslw * 4
                 val cb = u16(wd, p)
-                if (ccpText <= 0) throw WordFormatException("Belgede metin yok.")
+                if (ccpText <= 0) throw WordFormatException(Txt.docs.noText)
                 return Fib(ccpText, p + 2, cb, wd)
             }
         }
@@ -105,7 +106,7 @@ internal object DocReader {
     }
 
     private fun readPieces(wd: ByteArray, table: ByteArray, fib: Fib): List<Piece> {
-        val (fc, lcb) = fib.pair(Fib.CLX) ?: throw WordFormatException("Parça tablosu yok.")
+        val (fc, lcb) = fib.pair(Fib.CLX) ?: throw WordFormatException(Txt.docs.noPieceTable)
         var pos = fc
         val end = minOf(fc + lcb, table.size)
         while (pos < end) {
@@ -114,7 +115,7 @@ internal object DocReader {
                 2 -> {
                     val size = i32(table, pos + 1)
                     val plc = pos + 5
-                    if (size < 4 || plc + size > table.size) throw WordFormatException("Parça tablosu bozuk.")
+                    if (size < 4 || plc + size > table.size) throw WordFormatException(Txt.docs.pieceTableCorrupt)
                     val n = (size - 4) / 12
                     val out = ArrayList<Piece>(n)
                     for (i in 0 until n) {
@@ -129,10 +130,10 @@ internal object DocReader {
                     }
                     return out
                 }
-                else -> throw WordFormatException("Parça tablosu bozuk.")
+                else -> throw WordFormatException(Txt.docs.pieceTableCorrupt)
             }
         }
-        throw WordFormatException("Parça tablosu bulunamadı.")
+        throw WordFormatException(Txt.docs.pieceTableNotFound)
     }
 
     private fun buildText(wd: ByteArray, pieces: List<Piece>, ccpText: Int): String {
@@ -154,7 +155,7 @@ internal object DocReader {
     private fun readWord6(wd: ByteArray): WordDoc {
         val fcMin = i32(wd, 0x18)
         val fcMac = i32(wd, 0x1C)
-        if (fcMin < 0 || fcMac <= fcMin || fcMac > wd.size) throw WordFormatException("Word belgesi okunamadı (eski sürüm).")
+        if (fcMin < 0 || fcMac <= fcMin || fcMac > wd.size) throw WordFormatException(Txt.docs.wordOldVersion)
         return plainDoc(String(wd, fcMin, fcMac - fcMin, CP1252))
     }
 

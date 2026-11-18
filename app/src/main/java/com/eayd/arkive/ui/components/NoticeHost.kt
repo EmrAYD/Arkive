@@ -52,6 +52,7 @@ import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.theme.arkiveColors
 
 /**
@@ -166,7 +167,7 @@ private fun NoticeCard(notice: Notice, onDismiss: () -> Unit) {
                     modifier = Modifier.weight(1f).padding(vertical = 4.dp),
                 )
                 IconButton(onClick = onDismiss, modifier = Modifier.size(40.dp)) {
-                    Icon(Icons.Filled.Close, contentDescription = "Kapat", tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
+                    Icon(Icons.Filled.Close, contentDescription = Txt.common.close, tint = colors.onSurfaceVariant, modifier = Modifier.size(20.dp))
                 }
             }
             LinearProgressIndicator(

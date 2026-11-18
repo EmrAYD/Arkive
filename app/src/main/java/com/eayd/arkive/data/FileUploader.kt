@@ -4,6 +4,7 @@ import android.content.ContentResolver
 import android.net.Uri
 import android.provider.OpenableColumns
 import android.webkit.MimeTypeMap
+import com.eayd.arkive.i18n.Txt
 import java.io.IOException
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -55,7 +56,7 @@ object FileUploader {
         if (fromProvider != null && fromProvider >= 0) return fromProvider
 
         // Bazı kaynaklar boyutu bildirmez: akışı sayarak buluruz (yalnızca bu nadir durumda tüm dosya okunur).
-        val input = resolver.openInputStream(uri) ?: throw IOException("Dosya açılamadı")
+        val input = resolver.openInputStream(uri) ?: throw IOException(Txt.errors.fileOpenFailed)
         return input.use { stream ->
             val buffer = ByteArray(64 * 1024)
             var total = 0L
@@ -95,7 +96,7 @@ object FileUploader {
     ): FileDto {
         NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa sunucuda kayıt açılmadan reddedilir
         val meta = withContext(Dispatchers.IO) { readMeta(resolver, uri) }
-        if (meta.size == 0L) throw IOException("Boş dosya yüklenemez")
+        if (meta.size == 0L) throw IOException(Txt.errors.emptyFileUpload)
 
         // 1. adım: hata olursa (boyut sınırı, kota…) henüz sunucuda kayıt açılmadığı için temizlik gerekmez.
         val init = ApiClient.api.initUpload(
@@ -147,10 +148,10 @@ object FileUploader {
 
         executeOnStorage(
             request = request,
-            failureMessage = "Dosya depolamaya gönderilemedi",
+            failureMessage = Txt.errors.sendToStorageFailed,
             rejected = { code ->
-                if (code == 403) "Depolama yükleme imzasını reddetti (HTTP 403). Backend ve RustFS ayarlarını kontrol edin."
-                else "Depolama yüklemeyi reddetti (HTTP $code)."
+                if (code == 403) Txt.errors.storageRejectedSignature
+                else Txt.errors.storageRejectedUpload(code)
             },
         ) { }
     }
@@ -179,7 +180,7 @@ private class UriRequestBody(
     override fun contentLength() = size
 
     override fun writeTo(sink: BufferedSink) {
-        val input = resolver.openInputStream(uri) ?: throw IOException("Dosya açılamadı")
+        val input = resolver.openInputStream(uri) ?: throw IOException(Txt.errors.fileOpenFailed)
         input.source().use { source ->
             var sent = 0L
             var lastPercent = -1
@@ -195,7 +196,7 @@ private class UriRequestBody(
                 }
             }
             // Dosya seçildikten sonra küçüldüyse Content-Length tutmaz; OkHttp zaten hata verir, ama anlaşılır olsun.
-            if (sent != size) throw IOException("Dosya yükleme sırasında değişti")
+            if (sent != size) throw IOException(Txt.errors.fileChangedDuringUpload)
         }
     }
 }

@@ -33,6 +33,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eayd.arkive.data.FileDto
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.ConfirmDialog
 import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.FileActionsMenu
@@ -86,17 +87,17 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
 
     Column(Modifier.fillMaxSize().safeDrawingPadding()) {
         TopAppBar(
-            title = { Text(title ?: "Ön izleme", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+            title = { Text(title ?: Txt.preview.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
             navigationIcon = {
                 IconButton(onClick = onBack) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Txt.common.back)
                 }
             },
             actions = {
                 if (state is PreviewState.Ready) {
                     Box {
                         IconButton(onClick = { menuOpen = true }) {
-                            Icon(Icons.Filled.MoreVert, contentDescription = "Daha fazla")
+                            Icon(Icons.Filled.MoreVert, contentDescription = Txt.common.more)
                         }
                         if (readOnly) {
                             // Çöpteki dosya değiştirilemez: taşı / yeniden adlandır / sil menüde yok.
@@ -171,9 +172,9 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
         null -> Unit
 
         PreviewDialog.Rename -> NameDialog(
-            title = "Yeniden adlandır",
-            confirmLabel = "Kaydet",
-            label = "Dosya adı",
+            title = Txt.common.rename,
+            confirmLabel = Txt.common.save,
+            label = Txt.browser.fileName,
             initialName = file.name,
             showColor = false,
             saving = host.saving,
@@ -183,7 +184,7 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
         )
 
         PreviewDialog.Move -> MoveFolderDialog(
-            summary = "“${file.name}”",
+            summary = Txt.browser.quoted(file.name),
             currentParentIds = listOf(file.folderId),
             excludedFolderIds = emptySet(),
             moving = host.saving,
@@ -196,10 +197,10 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
         PreviewDialog.Info -> FileInfoDialog(file = file, storageLimit = storageLimit, onDismiss = close)
 
         PreviewDialog.Password -> PasswordDialog(
-            title = "Dosya parolalı",
-            message = "“${file.name}” parola ile korunuyor. Ön izlemek için parolayı girin.",
-            note = "Parola yalnızca bu telefonda dosyayı açmak için kullanılır; sunucuya gönderilmez ve kaydedilmez.",
-            confirmLabel = "Aç",
+            title = Txt.ai.passwordTitle,
+            message = Txt.preview.passwordBody(file.name),
+            note = Txt.preview.passwordNote,
+            confirmLabel = Txt.common.open,
             busy = host.saving,
             error = host.error,
             onConfirm = viewModel::unlock,
@@ -207,9 +208,9 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
         )
 
         PreviewDialog.Delete -> ConfirmDialog(
-            title = "Dosya çöp kutusuna taşınsın mı?",
-            message = "“${file.name}” çöp kutusuna taşınacak. Çöp kutusundan geri yükleyebilirsiniz.",
-            confirmLabel = "Çöp kutusuna taşı",
+            title = Txt.browser.fileToTrashTitle,
+            message = Txt.browser.fileToTrashBody(file.name),
+            confirmLabel = Txt.browser.moveToTrash,
             saving = host.saving,
             error = host.error,
             onConfirm = viewModel::deleteFile,
@@ -223,6 +224,6 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
 private fun PreviewSkeleton(progress: Float?) {
     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {
         SkeletonBox(Modifier.fillMaxSize(), RoundedCornerShape(12.dp))
-        if (progress != null) Text("%${(progress * 100).toInt()}", style = MaterialTheme.typography.titleMedium)
+        if (progress != null) Text(Txt.preview.percent((progress * 100).toInt()), style = MaterialTheme.typography.titleMedium)
     }
 }

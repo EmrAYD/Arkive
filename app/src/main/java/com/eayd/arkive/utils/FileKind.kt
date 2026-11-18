@@ -1,5 +1,7 @@
 package com.eayd.arkive.utils
 
+import com.eayd.arkive.i18n.Txt
+
 
 /**
  * Dosyanın mime türüne göre kaba sınıfı. Simge ([com.eayd.arkive.ui.components.fileTypeIcon]), tür adı
@@ -30,18 +32,18 @@ fun fileKind(mimeType: String?): FileKind {
 /** Dosya türünün okunur adı: "Resim (JPG)", "PDF", "Word belgesi (DOCX)"… */
 fun fileTypeLabel(mimeType: String?, fileName: String): String {
     val kind = when (fileKind(mimeType)) {
-        FileKind.Image -> "Resim"
-        FileKind.Video -> "Video"
-        FileKind.Audio -> "Ses"
+        FileKind.Image -> Txt.files.kindImage
+        FileKind.Video -> Txt.files.kindVideo
+        FileKind.Audio -> Txt.files.kindAudio
         // PDF'in tek bir adı var: uzantı eklemeye gerek yok.
         FileKind.Pdf -> return "PDF"
-        FileKind.Text -> "Metin dosyası"
-        FileKind.Word -> "Word belgesi"
-        FileKind.Excel -> "Excel tablosu"
-        FileKind.Presentation -> "Sunum"
-        FileKind.Document -> "Belge"
-        FileKind.Archive -> "Arşiv"
-        FileKind.Other -> "Dosya"
+        FileKind.Text -> Txt.files.kindText
+        FileKind.Word -> Txt.files.kindWord
+        FileKind.Excel -> Txt.files.kindExcel
+        FileKind.Presentation -> Txt.files.kindPresentation
+        FileKind.Document -> Txt.files.kindDocument
+        FileKind.Archive -> Txt.files.kindArchive
+        FileKind.Other -> Txt.files.kindFile
     }
     // Uzantı çok uzunsa (ör. noktalı bir ad) gösterme.
     val extension = fileName.substringAfterLast('.', "").uppercase()

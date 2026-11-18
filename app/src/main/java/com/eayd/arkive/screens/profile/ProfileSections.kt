@@ -18,6 +18,7 @@ import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
@@ -45,6 +46,8 @@ import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.PlusPlan
 import com.eayd.arkive.data.ThemeMode
+import com.eayd.arkive.i18n.AppLanguage
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.screens.home.ProfileAvatar
 import com.eayd.arkive.ui.components.AiIcons
 import com.eayd.arkive.ui.components.StorageSkeleton
@@ -149,13 +152,13 @@ private fun Chevron() {
 /** "Hesap": e-posta ve şifre değiştirme. Google ile girenlerin şifresi Google'da olduğu için o satır pasiftir. */
 @Composable
 internal fun AccountSection(email: String?, hasPassword: Boolean, onChangePassword: () -> Unit) {
-    SectionCard("Hesap") {
-        ProfileRow(Icons.Filled.Email, title = "E-posta", subtitle = email ?: "—")
+    SectionCard(Txt.profile.account) {
+        ProfileRow(Icons.Filled.Email, title = Txt.auth.email, subtitle = email ?: "—")
         RowDivider()
         ProfileRow(
             icon = Icons.Filled.Lock,
-            title = "Şifreyi değiştir",
-            subtitle = if (hasPassword) null else "Google hesabıyla giriş yaptınız; şifreniz Google'da yönetilir",
+            title = Txt.profile.changePassword,
+            subtitle = if (hasPassword) null else Txt.profile.googleManagedPassword,
             onClick = onChangePassword,
             enabled = hasPassword,
             trailing = { if (hasPassword) Chevron() },
@@ -164,7 +167,7 @@ internal fun AccountSection(email: String?, hasPassword: Boolean, onChangePasswo
 }
 
 /**
- * "Ayarlar": bildirimler (sistem ayarlarını açar), tema, yalnızca Wi-Fi, yapay zeka işlem yeri,
+ * "Ayarlar": bildirimler (sistem ayarlarını açar), dil (uygulamanın ve özetin dili), tema, yalnızca Wi-Fi, yapay zeka işlem yeri, özet şablonu,
  * çöp kutusu saklama süresi. Tema, Wi-Fi ve yapay zeka ayarları bu cihazda, saklama süresi sunucuda tutulur; süre henüz yüklenmediyse ([trashRetentionDays] null)
  * o satır pasiftir.
  */
@@ -174,26 +177,42 @@ internal fun SettingsSection(
     wifiOnly: Boolean,
     aiMode: AiMode,
     summaryTemplate: SummaryTemplate,
+    appLanguage: AppLanguage,
+    summaryLanguage: AppLanguage,
     trashRetentionDays: Int?,
     onNotifications: () -> Unit,
     onTheme: () -> Unit,
     onWifiOnlyChange: (Boolean) -> Unit,
     onAiMode: () -> Unit,
     onSummaryTemplate: () -> Unit,
+    onLanguage: () -> Unit,
     onTrashRetention: () -> Unit,
 ) {
-    SectionCard("Ayarlar") {
+    SectionCard(Txt.profile.settings) {
         ProfileRow(
             icon = Icons.Filled.Notifications,
-            title = "Bildirim ayarları",
+            title = Txt.profile.notificationSettings,
             subtitle = null,
             onClick = onNotifications,
             trailing = { Chevron() },
         )
         RowDivider()
         ProfileRow(
+            icon = Icons.Filled.Language,
+            title = Txt.language.title,
+            // İki dil aynıysa yalnızca dilin adı, farklıysa ikisi de yazılır.
+            subtitle = if (appLanguage == summaryLanguage) {
+                appLanguage.nativeName
+            } else {
+                Txt.language.mixed(appLanguage.nativeName, summaryLanguage.nativeName)
+            },
+            onClick = onLanguage,
+            trailing = { Chevron() },
+        )
+        RowDivider()
+        ProfileRow(
             icon = Icons.Filled.Palette,
-            title = "Tema",
+            title = Txt.profile.theme,
             subtitle = themeMode.label,
             onClick = onTheme,
             trailing = { Chevron() },
@@ -201,8 +220,8 @@ internal fun SettingsSection(
         RowDivider()
         ProfileRow(
             icon = Icons.Filled.Wifi,
-            title = "Yalnızca Wi-Fi ile dosya aktar",
-            subtitle = "Açıkken yükleme ve indirme yalnızca kablosuz ağda yapılır",
+            title = Txt.profile.wifiOnly,
+            subtitle = Txt.profile.wifiOnlyDetail,
             onClick = { onWifiOnlyChange(!wifiOnly) },
             // Satırın tamamı dokunulabilir olduğu için anahtarın kendi dokunuşu kapalıdır (çift işlem olmasın).
             trailing = { Switch(checked = wifiOnly, onCheckedChange = null) },
@@ -210,7 +229,7 @@ internal fun SettingsSection(
         RowDivider()
         ProfileRow(
             icon = AiIcons.Filled, // uygulamanın yapay zeka simgesi (elmas ve parıltı)
-            title = "Yapay zeka işlem yeri",
+            title = Txt.profile.aiLocation,
             subtitle = aiMode.label,
             onClick = onAiMode,
             trailing = { Chevron() },
@@ -218,7 +237,7 @@ internal fun SettingsSection(
         RowDivider()
         ProfileRow(
             icon = Icons.Filled.Description,
-            title = "Özet şablonu",
+            title = Txt.profile.summaryTemplate,
             subtitle = summaryTemplate.label,
             onClick = onSummaryTemplate,
             trailing = { Chevron() },
@@ -226,8 +245,8 @@ internal fun SettingsSection(
         RowDivider()
         ProfileRow(
             icon = Icons.Filled.Delete,
-            title = "Çöp kutusu saklama süresi",
-            subtitle = trashRetentionDays?.let { "$it gün" } ?: "Yükleniyor…",
+            title = Txt.profile.trashRetention,
+            subtitle = trashRetentionDays?.let { Txt.profile.days(it) } ?: Txt.common.loadingEllipsis,
             onClick = onTrashRetention,
             enabled = trashRetentionDays != null,
             trailing = { Chevron() },
@@ -238,7 +257,7 @@ internal fun SettingsSection(
 /** "Planım": plan adı, tek dosya ve toplam yükleme limiti, kullanım çubuğu. */
 @Composable
 internal fun PlanSection(storage: StorageInfo?, isLoading: Boolean, error: String?, onRetry: () -> Unit) {
-    SectionCard("Planım") {
+    SectionCard(Txt.profile.myPlan) {
         Column(Modifier.fillMaxWidth().padding(16.dp)) {
             when {
                 storage != null -> PlanDetails(storage)
@@ -247,11 +266,11 @@ internal fun PlanSection(storage: StorageInfo?, isLoading: Boolean, error: Strin
 
                 else -> {
                     Text(
-                        text = error ?: "Plan bilgisi alınamadı.",
+                        text = error ?: Txt.profile.planUnavailable,
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error,
                     )
-                    TextButton(onClick = onRetry) { Text("Tekrar dene") }
+                    TextButton(onClick = onRetry) { Text(Txt.common.retry) }
                 }
             }
         }
@@ -263,11 +282,11 @@ private fun PlanDetails(storage: StorageInfo) {
     Row(verticalAlignment = Alignment.CenterVertically) {
         Icon(Icons.Outlined.Cloud, contentDescription = null, tint = MaterialTheme.colorScheme.primary)
         Spacer(Modifier.width(12.dp))
-        Text("${storage.planName} planı", style = MaterialTheme.typography.titleMedium)
+        Text(Txt.profile.planName(storage.planName), style = MaterialTheme.typography.titleMedium)
     }
     Spacer(Modifier.height(12.dp))
-    LimitRow("Tek dosya yükleme limiti", formatBytes(storage.maxFileSize))
-    LimitRow("Toplam depolama alanı", formatBytes(storage.limit))
+    LimitRow(Txt.profile.maxFileLimit, formatBytes(storage.maxFileSize))
+    LimitRow(Txt.profile.totalStorage, formatBytes(storage.limit))
     Spacer(Modifier.height(12.dp))
     LinearProgressIndicator(
         progress = { storage.fraction },
@@ -276,11 +295,11 @@ private fun PlanDetails(storage: StorageInfo) {
     )
     Spacer(Modifier.height(8.dp))
     Text(
-        text = "${formatBytes(storage.used)} / ${formatBytes(storage.limit)} kullanıldı",
+        text = Txt.profile.usedOf(formatBytes(storage.used), formatBytes(storage.limit)),
         style = MaterialTheme.typography.bodyMedium,
     )
     Text(
-        text = "Kalan: ${formatBytes(storage.remaining)}",
+        text = Txt.profile.remaining(formatBytes(storage.remaining)),
         style = MaterialTheme.typography.bodySmall,
         color = MaterialTheme.colorScheme.outline,
     )
@@ -314,14 +333,14 @@ internal fun PlusPromo(storage: StorageInfo, onUpgrade: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(AiIcons.Filled, contentDescription = null) // uygulamanın yapay zeka simgesi (elmas ve parıltı)
                 Spacer(Modifier.width(12.dp))
-                Text("Plus ile daha fazlası", style = MaterialTheme.typography.titleMedium)
+                Text(Txt.profile.morePlus, style = MaterialTheme.typography.titleMedium)
             }
             Spacer(Modifier.height(12.dp))
-            PlusBenefit("Dosya başına 2 GB yükleme (şu an ${formatBytes(storage.maxFileSize)})")
-            PlusBenefit("20 GB toplam depolama alanı (şu an ${formatBytes(storage.limit)})")
-            PlusBenefit("Sınırsız yapay zeka özeti, bulutta da (şu an ${PlusPlan.FREE_SUMMARY_LIMIT} dosya, yalnızca telefonda)")
+            PlusBenefit(Txt.profile.plusPerFile(formatBytes(storage.maxFileSize)))
+            PlusBenefit(Txt.profile.plusStorage(formatBytes(storage.limit)))
+            PlusBenefit(Txt.profile.plusAi(PlusPlan.FREE_SUMMARY_LIMIT))
             Spacer(Modifier.height(16.dp))
-            Button(onClick = onUpgrade, modifier = Modifier.fillMaxWidth()) { Text("Plus'a geç") }
+            Button(onClick = onUpgrade, modifier = Modifier.fillMaxWidth()) { Text(Txt.plan.goPlus) }
         }
     }
 }

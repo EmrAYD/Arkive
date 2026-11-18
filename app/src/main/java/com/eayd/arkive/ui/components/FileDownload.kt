@@ -12,6 +12,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.content.ContextCompat
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.viewmodel.saveFileToDevice
 
 private class PendingDownload(val fileId: String, val name: String, val mimeType: String?)
@@ -31,7 +32,7 @@ fun rememberFileDownloader(notify: (String) -> Unit): (fileId: String, name: Str
         pending = null
         if (request != null) {
             if (granted) saveFileToDevice(request.fileId, request.name, request.mimeType, notify)
-            else notify("Dosyayı indirmek için depolama izni gerekli.")
+            else notify(Txt.errors.storagePermissionNeeded)
         }
     }
 

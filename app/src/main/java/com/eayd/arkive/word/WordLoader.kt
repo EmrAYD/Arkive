@@ -5,6 +5,7 @@ import com.eayd.arkive.ai.OfficeCryptoException
 import com.eayd.arkive.ai.PasswordException
 import com.eayd.arkive.ai.UnreadableDocumentException
 import com.eayd.arkive.ai.WrongPasswordException
+import com.eayd.arkive.i18n.Txt
 
 /**
  * Word belgesini açar (ön izleme ve özetleme): .docx, eski .doc ve her ikisinin parolalısı. Dosya türü uzantıya/mime
@@ -22,15 +23,15 @@ object WordLoader {
             return when {
                 isZip(bytes) -> DocxReader.read(bytes)
                 OleFile.isOle(bytes) -> loadOle(bytes, password)
-                else -> throw UnreadableDocumentException("Bu dosya bir Word belgesi değil (.docx ya da .doc bekleniyordu).")
+                else -> throw UnreadableDocumentException(Txt.docs.notWordExpected)
             }
         } catch (e: WordFormatException) {
-            throw UnreadableDocumentException(e.message ?: "Word belgesi okunamadı.", e)
+            throw UnreadableDocumentException(e.message ?: Txt.docs.wordUnreadable, e)
         } catch (e: OutOfMemoryError) {
-            throw UnreadableDocumentException("Belge ön izleme için çok büyük ya da karmaşık.")
+            throw UnreadableDocumentException(Txt.docs.tooBigForPreview)
         } catch (e: RuntimeException) {
             // Bozuk dosyada yapı okuyucularının fırlattığı her çalışma zamanı hatası (dizin taşması, geçersiz zip adı...)
-            throw UnreadableDocumentException("Word belgesi okunamadı (bozuk olabilir).", e)
+            throw UnreadableDocumentException(Txt.docs.wordUnreadableMaybeCorrupt, e)
         }
     }
 
@@ -46,11 +47,11 @@ object WordLoader {
             } catch (e: WrongPasswordException) {
                 throw PasswordException(wrong = true)
             } catch (e: OfficeCryptoException) {
-                throw UnreadableDocumentException(e.message ?: "Şifreli Word belgesi okunamadı.", e)
+                throw UnreadableDocumentException(e.message ?: Txt.docs.encryptedWordUnreadable, e)
             }
             return DocxReader.read(zip)
         }
         if (ole.hasStream("WordDocument")) return DocReader.read(ole, password)
-        throw UnreadableDocumentException("Bu dosya bir Word belgesi değil.")
+        throw UnreadableDocumentException(Txt.docs.notWord)
     }
 }

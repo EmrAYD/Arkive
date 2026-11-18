@@ -36,6 +36,7 @@ import com.eayd.arkive.ai.AiSummarizer
 import com.eayd.arkive.ai.SummaryUi
 import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.data.FileDto
+import com.eayd.arkive.i18n.Txt
 
 /**
  * AI düğmesine basılınca açılan pencereler: onay ("Bu dosyayı özetlemek istiyor musunuz?"), özetleme sürerken durdurma
@@ -68,37 +69,35 @@ fun AiSummaryDialogHost() {
             }
             AlertDialog(
                 onDismissRequest = AiSummarizer::dismiss,
-                title = { Text("Dosya özetlensin mi?") },
+                title = { Text(Txt.ai.confirmTitle) },
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                        Text("“${state.file.name}” dosyasını yapay zeka ile özetlemek istiyor musunuz?")
+                        Text(Txt.ai.confirmBody(state.file.name))
                         Text(
-                            "Küçük dosyalar telefonda, büyük dosyalar sunucuda özetlenir. Özet, AI Sonuçlarım " +
-                                "sayfasına PDF dosyası olarak kaydedilir. Özetleme sürerken uygulamayı kullanmaya devam edebilirsiniz.",
+                            Txt.ai.confirmDetail,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline,
                         )
                     }
                 },
-                confirmButton = { TextButton(onClick = start) { Text("Özetle") } },
-                dismissButton = { TextButton(onClick = AiSummarizer::dismiss) { Text("İptal") } },
+                confirmButton = { TextButton(onClick = start) { Text(Txt.ai.summarize) } },
+                dismissButton = { TextButton(onClick = AiSummarizer::dismiss) { Text(Txt.common.cancel) } },
             )
         }
 
         is SummaryUi.Password -> {
             val mode by AppSettings.aiMode.collectAsState()
             PasswordDialog(
-                title = "Dosya parolalı",
-                message = "“${state.file.name}” parola ile korunuyor. Özetlemek için parolayı girin.",
+                title = Txt.ai.passwordTitle,
+                message = Txt.ai.passwordBody(state.file.name),
                 note = when (mode) {
-                    AiMode.Local -> "Parola yalnızca bu telefonda, dosyayı açmak için kullanılır."
-                    AiMode.Cloud -> "Dosya sunucuda özetleneceğinden parola o isteğe eklenip sunucuya gönderilir; sunucu parolayı kaydetmez."
-                    AiMode.Hybrid -> "Parola önce telefonda doğrulanır. Dosya telefonda özetlenemiyorsa (büyük ya da görsel ağırlıklıysa) " +
-                        "sunucuya gönderilir; sunucu parolayı kaydetmez."
+                    AiMode.Local -> Txt.ai.passwordLocalNote
+                    AiMode.Cloud -> Txt.ai.passwordCloudNote
+                    AiMode.Hybrid -> Txt.ai.passwordHybridNote
                 },
-                confirmLabel = "Özetle",
+                confirmLabel = Txt.ai.summarize,
                 busy = false,
-                error = if (state.wrong) "Parola yanlış." else null,
+                error = if (state.wrong) Txt.docs.wrongPassword else null,
                 onConfirm = { password -> AiSummarizer.confirm(state.file, password) },
                 onDismiss = AiSummarizer::dismiss,
             )
@@ -106,25 +105,25 @@ fun AiSummaryDialogHost() {
 
         is SummaryUi.StopAsk -> AlertDialog(
             onDismissRequest = AiSummarizer::dismiss,
-            title = { Text("Özetleme sürüyor") },
+            title = { Text(Txt.ai.runningTitle) },
             text = {
                 Text(
-                    "“${state.file.name}” özetleniyor. Beklemek ya da durdurmak istiyor musunuz?",
+                    Txt.ai.runningBody(state.file.name),
                 )
             },
-            confirmButton = { TextButton(onClick = { AiSummarizer.cancel(state.file) }) { Text("Durdur") } },
-            dismissButton = { TextButton(onClick = AiSummarizer::dismiss) { Text("Beklemeye devam") } },
+            confirmButton = { TextButton(onClick = { AiSummarizer.cancel(state.file) }) { Text(Txt.common.stop) } },
+            dismissButton = { TextButton(onClick = AiSummarizer::dismiss) { Text(Txt.ai.keepWaiting) } },
         )
 
         is SummaryUi.Viewing -> {
             val context = LocalContext.current
             AlertDialog(
                 onDismissRequest = AiSummarizer::dismiss,
-                title = { Text("Özet") },
+                title = { Text(Txt.ai.summaryTitle) },
                 text = {
                     Column {
                         Text(
-                            "${state.fileName} · ${state.source.label}",
+                            Txt.ai.summaryMeta(state.fileName, state.source.label),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline,
                             maxLines = 2,
@@ -144,12 +143,12 @@ fun AiSummaryDialogHost() {
                         }
                         TextButton(onClick = {
                             val clipboard = context.getSystemService(ClipboardManager::class.java)
-                            clipboard?.setPrimaryClip(ClipData.newPlainText("Özet", state.text))
-                            Toast.makeText(context, "Özet kopyalandı", Toast.LENGTH_SHORT).show()
-                        }) { Text("Kopyala") }
+                            clipboard?.setPrimaryClip(ClipData.newPlainText(Txt.ai.summaryTitle, state.text))
+                            Toast.makeText(context, Txt.ai.summaryCopied, Toast.LENGTH_SHORT).show()
+                        }) { Text(Txt.common.copy) }
                     }
                 },
-                confirmButton = { TextButton(onClick = AiSummarizer::dismiss) { Text("Kapat") } },
+                confirmButton = { TextButton(onClick = AiSummarizer::dismiss) { Text(Txt.common.close) } },
             )
         }
     }

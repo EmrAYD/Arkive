@@ -13,6 +13,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
+import com.eayd.arkive.i18n.Txt
 
 /**
  * Bir dosyanın 3 nokta menüsü. Dosya listesinde ve ön izleme ekranında aynı menü kullanılır:
@@ -29,11 +30,11 @@ fun FileActionsMenu(
     onDelete: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        MenuItem("İndir", Icons.Filled.Download) { onDismiss(); onDownload() }
-        if (onMove != null) MenuItem("Taşı", Icons.AutoMirrored.Filled.DriveFileMove) { onDismiss(); onMove() }
-        MenuItem("Yeniden adlandır", Icons.Filled.Edit) { onDismiss(); onRename() }
-        MenuItem("Bilgi", Icons.Outlined.Info) { onDismiss(); onInfo() }
-        MenuItem("Sil", Icons.Filled.Delete, destructive = true) { onDismiss(); onDelete() }
+        MenuItem(Txt.common.download, Icons.Filled.Download) { onDismiss(); onDownload() }
+        if (onMove != null) MenuItem(Txt.common.move, Icons.AutoMirrored.Filled.DriveFileMove) { onDismiss(); onMove() }
+        MenuItem(Txt.common.rename, Icons.Filled.Edit) { onDismiss(); onRename() }
+        MenuItem(Txt.common.info, Icons.Outlined.Info) { onDismiss(); onInfo() }
+        MenuItem(Txt.common.delete, Icons.Filled.Delete, destructive = true) { onDismiss(); onDelete() }
     }
 }
 
@@ -46,8 +47,8 @@ fun TrashedFileActionsMenu(
     onInfo: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        MenuItem("İndir", Icons.Filled.Download) { onDismiss(); onDownload() }
-        MenuItem("Bilgi", Icons.Outlined.Info) { onDismiss(); onInfo() }
+        MenuItem(Txt.common.download, Icons.Filled.Download) { onDismiss(); onDownload() }
+        MenuItem(Txt.common.info, Icons.Outlined.Info) { onDismiss(); onInfo() }
     }
 }
 
@@ -62,9 +63,9 @@ fun FolderActionsMenu(
     onDelete: () -> Unit,
 ) {
     DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
-        MenuItem("Düzenle", Icons.Filled.Edit) { onDismiss(); onEdit() }
-        if (canMove) MenuItem("Taşı", Icons.AutoMirrored.Filled.DriveFileMove) { onDismiss(); onMove() }
-        MenuItem("Sil", Icons.Filled.Delete, destructive = true) { onDismiss(); onDelete() }
+        MenuItem(Txt.common.edit, Icons.Filled.Edit) { onDismiss(); onEdit() }
+        if (canMove) MenuItem(Txt.common.move, Icons.AutoMirrored.Filled.DriveFileMove) { onDismiss(); onMove() }
+        MenuItem(Txt.common.delete, Icons.Filled.Delete, destructive = true) { onDismiss(); onDelete() }
     }
 }
 

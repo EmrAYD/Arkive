@@ -12,6 +12,9 @@ import android.text.Spanned
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.style.MetricAffectingSpan
+import com.eayd.arkive.i18n.AppLanguage
+import com.eayd.arkive.i18n.Lang
+import com.eayd.arkive.i18n.SummaryStrings
 import java.io.ByteArrayOutputStream
 
 /**
@@ -55,11 +58,20 @@ object SummaryPdfWriter {
         }
     }
 
-    /** Özetin PDF baytları. Sorun çıkarsa istisna atar; çağıran, sunucunun kendisinin üretmesine güvenebilir. */
-    fun render(context: Context, sourceName: String, summary: String, template: SummaryTemplate): ByteArray {
+    /**
+     * Özetin PDF baytları. Sorun çıkarsa istisna atar; çağıran, sunucunun kendisinin üretmesine güvenebilir. Üst bilgi
+     * ("Arkive ile özetlenmiştir", "Kaynak dosya: …") ve sayfa numaraları [language] dilinde yazılır (özet dili ayarı).
+     */
+    fun render(
+        context: Context,
+        sourceName: String,
+        summary: String,
+        template: SummaryTemplate,
+        language: AppLanguage = AppLanguage.Turkish,
+    ): ByteArray {
         val doc = PdfDocument()
         try {
-            Writer(doc, fonts(context, template.family), template).write(sourceName, summary)
+            Writer(doc, fonts(context, template.family), template, Lang.stringsFor(language).summary).write(sourceName, summary)
             val out = ByteArrayOutputStream()
             doc.writeTo(out)
             return out.toByteArray()
@@ -68,7 +80,12 @@ object SummaryPdfWriter {
         }
     }
 
-    private class Writer(private val doc: PdfDocument, private val fonts: Fonts, private val t: SummaryTemplate) {
+    private class Writer(
+        private val doc: PdfDocument,
+        private val fonts: Fonts,
+        private val t: SummaryTemplate,
+        private val labels: SummaryStrings,
+    ) {
 
         private val left = t.marginsCm[0] * PT_PER_CM
         private val right = t.marginsCm[1] * PT_PER_CM
@@ -100,7 +117,7 @@ object SummaryPdfWriter {
         private fun finishPage() {
             val p = page ?: return
             val footer = paint(fonts.regular, 9f, FOOTER_GRAY).apply { textAlign = Paint.Align.CENTER }
-            p.canvas.drawText("Sayfa $number", PAGE_W / 2f, PAGE_H - bottom / 2f, footer)
+            p.canvas.drawText(labels.page(number), PAGE_W / 2f, PAGE_H - bottom / 2f, footer)
             doc.finishPage(p)
             page = null
         }
@@ -188,11 +205,11 @@ object SummaryPdfWriter {
 
             newPage()
             place(
-                layoutOf(styled("Arkive ile özetlenmiştir", fonts.bold), titlePaint, contentWidth, t.titleAlign, t.titleSize * 1.25f),
+                layoutOf(styled(labels.pdfTitle, fonts.bold), titlePaint, contentWidth, t.titleAlign, t.titleSize * 1.25f),
                 left, 0f, body * 0.3f,
             )
             place(
-                layoutOf("Kaynak dosya: $sourceName", subtitlePaint, contentWidth, t.titleAlign, body * t.leading),
+                layoutOf(labels.sourceFile(sourceName), subtitlePaint, contentWidth, t.titleAlign, body * t.leading),
                 left, 0f, body * 0.8f,
             )
             if (t.titleRule) {

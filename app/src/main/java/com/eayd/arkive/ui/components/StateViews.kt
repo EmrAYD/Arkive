@@ -13,6 +13,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.i18n.Txt
 
 // Liste, çöp kutusu ve ön izleme ekranlarının ortak "hata / boş durum / bildirim" parçaları.
 
@@ -30,7 +31,7 @@ fun ErrorRetry(message: String, onRetry: () -> Unit, modifier: Modifier = Modifi
             textAlign = TextAlign.Center,
         )
         Spacer(Modifier.height(12.dp))
-        Button(onClick = onRetry) { Text("Tekrar dene") }
+        Button(onClick = onRetry) { Text(Txt.common.retry) }
     }
 }
 

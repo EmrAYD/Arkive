@@ -2,23 +2,36 @@ package com.eayd.arkive.data
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.content.res.Resources
 import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.ai.AiSummarizer
 import com.eayd.arkive.ai.SummaryTemplate
+import com.eayd.arkive.i18n.AppLanguage
+import com.eayd.arkive.i18n.Lang
+import com.eayd.arkive.i18n.Txt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
 /** Uygulama teması. [System]: telefonun açık/koyu tema ayarını izler (varsayılan). */
-enum class ThemeMode(val label: String) {
-    System("Sistem varsayılanı"),
-    Light("Açık"),
-    Dark("Koyu"),
+enum class ThemeMode {
+    System,
+    Light,
+    Dark,
+    ;
+
+    /** Seçili dilde adı (dil değişince yeniden okunur). */
+    val label: String
+        get() = when (this) {
+            System -> Txt.profile.themeSystem
+            Light -> Txt.profile.themeLight
+            Dark -> Txt.profile.themeDark
+        }
 }
 
 /**
- * Bu cihaza özgü uygulama ayarları (tema, yalnızca Wi-Fi ile aktarım, yapay zeka işlem yeri). Sunucuya gitmez; SharedPreferences'ta
- * saklanır, değerler StateFlow olarak dinlenir. [init] uygulama açılırken (MainActivity) bir kez çağrılır.
+ * Bu cihaza özgü uygulama ayarları (tema, dil, yalnızca Wi-Fi ile aktarım, yapay zeka işlem yeri). Sunucuya gitmez;
+ * SharedPreferences'ta saklanır, değerler StateFlow olarak dinlenir. [init] uygulama açılırken (MainActivity) bir kez çağrılır.
  */
 object AppSettings {
 
@@ -28,6 +41,8 @@ object AppSettings {
     private const val KEY_PENDING_EULA_UID = "pending_eula_uid"
     private const val KEY_AI_MODE = "ai_mode"
     private const val KEY_SUMMARY_TEMPLATE = "summary_template"
+    private const val KEY_APP_LANGUAGE = "app_language"
+    private const val KEY_SUMMARY_LANGUAGE = "summary_language"
 
     private lateinit var prefs: SharedPreferences
 
@@ -53,10 +68,27 @@ object AppSettings {
     private val _summaryTemplate = MutableStateFlow(SummaryTemplate.Default)
     val summaryTemplate: StateFlow<SummaryTemplate> = _summaryTemplate.asStateFlow()
 
+    /**
+     * Uygulamanın dili. Kullanıcı seçmediyse telefonun dili (Türkçe telefonda Türkçe, diğerlerinde İngilizce). Dil
+     * değişince Activity yeniden kurulur (bkz. MainActivity).
+     */
+    private val _appLanguage = MutableStateFlow(AppLanguage.Turkish)
+    val appLanguage: StateFlow<AppLanguage> = _appLanguage.asStateFlow()
+
+    /**
+     * Özetin yazılacağı dil (bulut özeti bu dilde yazılır; telefonda üretilen özetin başlıkları ve PDF üst bilgileri bu
+     * dildedir). Kullanıcı ayrıca seçmediyse uygulamanın diliyle aynıdır.
+     */
+    private val _summaryLanguage = MutableStateFlow(AppLanguage.Turkish)
+    val summaryLanguage: StateFlow<AppLanguage> = _summaryLanguage.asStateFlow()
+
     fun init(context: Context) {
         if (::prefs.isInitialized) return
         appContext = context.applicationContext
         prefs = appContext.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
+        _appLanguage.value = storedAppLanguage(appContext)
+        Lang.app = _appLanguage.value
+        _summaryLanguage.value = AppLanguage.fromTag(prefs.getString(KEY_SUMMARY_LANGUAGE, null)) ?: _appLanguage.value
         _themeMode.value = storedThemeMode(appContext)
         _wifiOnly.value = prefs.getBoolean(KEY_WIFI_ONLY, false)
         _aiMode.value = AiMode.entries.firstOrNull { it.name == prefs.getString(KEY_AI_MODE, null) } ?: AiMode.Hybrid
@@ -71,6 +103,32 @@ object AppSettings {
     fun storedThemeMode(context: Context): ThemeMode {
         val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_THEME, null)
         return ThemeMode.entries.firstOrNull { it.name == saved } ?: ThemeMode.System
+    }
+
+    /**
+     * Kayıtlı uygulama dilini [init]'ten ÖNCE de okuyabilir (Activity, bağlamı kurulurken dili kaynak yapılandırmasına
+     * işler). Kayıt yoksa telefonun dili kullanılır; telefonun dili, uygulamanın kendi ayarından etkilenmeyen sistem
+     * yapılandırmasından okunur. Okunan dil [Lang.app]'e de yazılır.
+     */
+    fun storedAppLanguage(context: Context): AppLanguage {
+        val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_APP_LANGUAGE, null)
+        val language = AppLanguage.fromTag(saved) ?: AppLanguage.fromSystem(Resources.getSystem().configuration.locales[0])
+        Lang.app = language
+        return language
+    }
+
+    /** Uygulamanın dilini değiştirir. Özet dili ayrıca seçilmemişse o da bu dile geçer. */
+    fun setAppLanguage(language: AppLanguage) {
+        val summaryFollowsApp = prefs.getString(KEY_SUMMARY_LANGUAGE, null) == null
+        _appLanguage.value = language
+        Lang.app = language
+        prefs.edit().putString(KEY_APP_LANGUAGE, language.tag).apply()
+        if (summaryFollowsApp) _summaryLanguage.value = language
+    }
+
+    fun setSummaryLanguage(language: AppLanguage) {
+        _summaryLanguage.value = language
+        prefs.edit().putString(KEY_SUMMARY_LANGUAGE, language.tag).apply()
     }
 
     fun setThemeMode(mode: ThemeMode) {

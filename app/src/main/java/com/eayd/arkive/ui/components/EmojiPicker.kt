@@ -55,6 +55,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
+import com.eayd.arkive.i18n.Txt
 import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -119,21 +120,21 @@ fun EmojiChoices(current: String?, enabled: Boolean, onSelect: (String?) -> Unit
                         EmojiSlot.None -> EmojiBox(
                             selected = current == null,
                             enabled = enabled,
-                            description = "Emojisiz",
+                            description = Txt.emoji.noEmoji,
                             onClick = { onSelect(null) },
                         ) { Text("–", style = MaterialTheme.typography.labelMedium) }
 
                         is EmojiSlot.Emoji -> EmojiBox(
                             selected = slot.value == current,
                             enabled = enabled,
-                            description = "Emoji ${slot.value}",
+                            description = Txt.emoji.emojiValue(slot.value),
                             onClick = { onSelect(if (slot.value == current) null else slot.value) },
                         ) { Text(slot.value, fontSize = 20.sp) }
 
                         EmojiSlot.More -> EmojiBox(
                             selected = false,
                             enabled = enabled,
-                            description = "Tüm emojiler",
+                            description = Txt.emoji.allEmojis,
                             onClick = { showAll = true },
                         ) { Text("+", style = MaterialTheme.typography.titleMedium) }
                     }
@@ -205,14 +206,14 @@ private fun EmojiPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
                     verticalAlignment = Alignment.CenterVertically,
                 ) {
                     Column(Modifier.weight(1f)) {
-                        Text("Emoji seç", style = MaterialTheme.typography.titleLarge)
+                        Text(Txt.emoji.chooseEmoji, style = MaterialTheme.typography.titleLarge)
                         Text(
                             EmojiCategories[category].label,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline,
                         )
                     }
-                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = "Kapat") }
+                    IconButton(onClick = onDismiss) { Icon(Icons.Filled.Close, contentDescription = Txt.common.close) }
                 }
 
                 LazyRow(
@@ -256,7 +257,7 @@ private fun EmojiPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
                                 .height(46.dp)
                                 .clip(RoundedCornerShape(8.dp))
                                 .clickable(role = Role.Button) { onPick(value) }
-                                .semantics { contentDescription = "Emoji $value" },
+                                .semantics { contentDescription = Txt.emoji.emojiValue(value) },
                             contentAlignment = Alignment.Center,
                         ) { Text(value, fontSize = 26.sp) }
                     }

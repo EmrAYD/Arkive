@@ -1,5 +1,7 @@
 package com.eayd.arkive.ai
 
+import com.eayd.arkive.i18n.AppLanguage
+import com.eayd.arkive.i18n.Lang
 import java.util.Locale
 import kotlin.math.pow
 
@@ -107,13 +109,17 @@ object ExtractiveSummarizer {
         val titleStems: List<Set<String>> = titles.map { stemsOf(it) }
     }
 
-    /** Özeti döndürür; metinde özetlenecek cümle yoksa boş metin. */
-    fun summarize(text: String): String {
+    /**
+     * Özeti döndürür; metinde özetlenecek cümle yoksa boş metin. Cümleler belgenin kendisinden seçildiği için belgenin
+     * dilindedir; yalnızca başlıklar ("Özet:", "Önemli noktalar:") [language] dilinde yazılır (özet dili ayarı).
+     */
+    fun summarize(text: String, language: AppLanguage = AppLanguage.Turkish): String {
+        val labels = Lang.stringsFor(language).summary
         val parsed = parse(clean(text))
         val sentences = parsed.sentences
         if (sentences.isEmpty()) return ""
         // Çok kısa belge: seçmeye gerek yok, olduğu gibi gösterilir.
-        if (sentences.size <= 3) return "Özet: " + sentences.joinToString(" ") { clip(withLabel(it)) }
+        if (sentences.size <= 3) return labels.summaryLabel + sentences.joinToString(" ") { clip(withLabel(it)) }
 
         val n = sentences.size
         val weights = termWeights(sentences)
@@ -176,7 +182,7 @@ object ExtractiveSummarizer {
         // Seçilenler belgedeki sırasıyla okunur: ilki "Özet" (çoğunlukla giriş cümlesi), kalanları maddeler.
         val points = chosen.filter { it !== headline }.sortedBy { it.index }
         return buildString {
-            append("Özet: ").append(clip(headline.text))
+            append(labels.summaryLabel).append(clip(headline.text))
             if (points.isEmpty()) return@buildString
             if (sectioned) {
                 var current = -1
@@ -189,7 +195,7 @@ object ExtractiveSummarizer {
                     append("\n- ").append(clip(withLabel(point)))
                 }
             } else {
-                append("\n\nÖnemli noktalar:")
+                append(labels.keyPoints)
                 points.forEach { append("\n- ").append(clip(withLabel(it))) }
             }
         }

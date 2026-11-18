@@ -1,5 +1,7 @@
 package com.eayd.arkive.word
 
+import com.eayd.arkive.i18n.Txt
+
 /**
  * Eski Office dosyalarının (.doc) kapsayıcısı olan OLE "Compound File" biçimini (MS-CFB) okur: adıyla akış verir.
  * Dosya baytları bellektedir; bozuk/uydurma yapılar [WordFormatException] ile reddedilir (sonsuz döngü ve dev
@@ -21,11 +23,11 @@ internal class OleFile(private val data: ByteArray) {
     private val entries: List<Entry>
 
     init {
-        if (data.size < 512 || !isOle(data)) throw WordFormatException("OLE dosyası değil.")
+        if (data.size < 512 || !isOle(data)) throw WordFormatException(Txt.docs.notOle)
         val sectorShift = u16(0x1E)
         val miniShift = u16(0x20)
-        if (sectorShift != 9 && sectorShift != 12) throw WordFormatException("OLE bozuk.")
-        if (miniShift > 12 || miniShift < 3) throw WordFormatException("OLE bozuk.")
+        if (sectorShift != 9 && sectorShift != 12) throw WordFormatException(Txt.docs.oleCorrupt)
+        if (miniShift > 12 || miniShift < 3) throw WordFormatException(Txt.docs.oleCorrupt)
         sectorSize = 1 shl sectorShift
         miniSectorSize = 1 shl miniShift
         miniCutoff = u32(0x38)
@@ -46,7 +48,7 @@ internal class OleFile(private val data: ByteArray) {
             difat = u32(base + sectorSize - 4)
         }
         val perSector = sectorSize / 4
-        if (fatSectors.size.toLong() * perSector > MAX_FAT_ENTRIES) throw WordFormatException("OLE çok büyük.")
+        if (fatSectors.size.toLong() * perSector > MAX_FAT_ENTRIES) throw WordFormatException(Txt.docs.oleTooBig)
         fat = LongArray(fatSectors.size * perSector)
         fatSectors.forEachIndexed { n, s ->
             val base = offset(s)
@@ -64,7 +66,7 @@ internal class OleFile(private val data: ByteArray) {
                 size = u32(directory, o + 0x78),
             )
         }
-        val root = entries.firstOrNull { it.type == 5 } ?: throw WordFormatException("OLE bozuk.")
+        val root = entries.firstOrNull { it.type == 5 } ?: throw WordFormatException(Txt.docs.oleCorrupt)
         rootStart = root.start
         rootSize = root.size
 
@@ -77,7 +79,7 @@ internal class OleFile(private val data: ByteArray) {
     /** Adı [name] olan akışın baytları; yoksa null. */
     fun stream(name: String): ByteArray? {
         val entry = entries.firstOrNull { it.type == 2 && it.name == name } ?: return null
-        if (entry.size > MAX_STREAM_BYTES) throw WordFormatException("OLE akışı çok büyük.")
+        if (entry.size > MAX_STREAM_BYTES) throw WordFormatException(Txt.docs.oleStreamTooBig)
         return if (entry.size < miniCutoff) readMiniChain(entry.start, entry.size) else readChain(entry.start, entry.size)
     }
 
@@ -86,7 +88,7 @@ internal class OleFile(private val data: ByteArray) {
 
     private fun offset(sector: Long): Int {
         val o = (sector + 1) * sectorSize
-        if (o < 0 || o + sectorSize > data.size) throw WordFormatException("OLE bozuk.")
+        if (o < 0 || o + sectorSize > data.size) throw WordFormatException(Txt.docs.oleCorrupt)
         return o.toInt()
     }
 
@@ -95,7 +97,7 @@ internal class OleFile(private val data: ByteArray) {
         var s = start
         var guard = 0
         while (s < END_OF_CHAIN && out.size() < limit) {
-            if (guard++ > fat.size + 1 || s >= fat.size) throw WordFormatException("OLE bozuk.")
+            if (guard++ > fat.size + 1 || s >= fat.size) throw WordFormatException(Txt.docs.oleCorrupt)
             out.write(data, offset(s), sectorSize)
             s = fat[s.toInt()]
         }
@@ -109,9 +111,9 @@ internal class OleFile(private val data: ByteArray) {
         var s = start
         var guard = 0
         while (s < END_OF_CHAIN && out.size() < size) {
-            if (guard++ > miniFat.size + 1 || s >= miniFat.size) throw WordFormatException("OLE bozuk.")
+            if (guard++ > miniFat.size + 1 || s >= miniFat.size) throw WordFormatException(Txt.docs.oleCorrupt)
             val o = s.toInt() * miniSectorSize
-            if (o + miniSectorSize > mini.size) throw WordFormatException("OLE bozuk.")
+            if (o + miniSectorSize > mini.size) throw WordFormatException(Txt.docs.oleCorrupt)
             out.write(mini, o, miniSectorSize)
             s = miniFat[s.toInt()]
         }

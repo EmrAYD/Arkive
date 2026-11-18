@@ -1,6 +1,7 @@
 package com.eayd.arkive.word
 
 import com.eayd.arkive.ai.PasswordException
+import com.eayd.arkive.i18n.Txt
 import java.security.MessageDigest
 
 /**
@@ -39,7 +40,7 @@ internal object WordCrypto {
      */
     fun decrypt(wd: ByteArray, table: ByteArray, data: ByteArray?, password: String?): Decrypted {
         val headerSize = OleFile.u32(wd, 0x0E)
-        if (headerSize < 4 || headerSize > table.size) throw WordFormatException("Şifreli Word belgesi bozuk.")
+        if (headerSize < 4 || headerSize > table.size) throw WordFormatException(Txt.docs.encryptedWordCorrupt)
         val scheme = parseScheme(table, headerSize.toInt())
         if (password.isNullOrEmpty()) throw PasswordException(wrong = false)
         val pw = password.toByteArray(Charsets.UTF_16LE)
@@ -83,7 +84,7 @@ internal object WordCrypto {
         val minor = OleFile.u16(table, 2)
         return when {
             major == 1 && minor == 1 -> {
-                if (headerSize < 4 + 48) throw WordFormatException("Şifreli Word belgesi bozuk.")
+                if (headerSize < 4 + 48) throw WordFormatException(Txt.docs.encryptedWordCorrupt)
                 Rc4Scheme(
                     salt = table.copyOfRange(4, 20),
                     encryptedVerifier = table.copyOfRange(20, 36),
@@ -91,34 +92,34 @@ internal object WordCrypto {
                 )
             }
             major in 2..4 && minor == 2 -> parseCryptoApi(table, headerSize)
-            else -> throw WordFormatException("Bu parolalı .doc şifreleme yöntemi desteklenmiyor.")
+            else -> throw WordFormatException(Txt.docs.docEncryptionUnsupported)
         }
     }
 
     private fun parseCryptoApi(table: ByteArray, headerSize: Int): Scheme {
         val limit = minOf(headerSize, table.size)
-        if (limit < 12 + 32) throw WordFormatException("Şifreli Word belgesi bozuk.")
+        if (limit < 12 + 32) throw WordFormatException(Txt.docs.encryptedWordCorrupt)
         val flags = OleFile.u32(table, 4)
         val infoSize = OleFile.u32(table, 8)
-        if (infoSize < 32 || 12 + infoSize > limit) throw WordFormatException("Şifreli Word belgesi bozuk.")
+        if (infoSize < 32 || 12 + infoSize > limit) throw WordFormatException(Txt.docs.encryptedWordCorrupt)
         val info = 12
         val algId = OleFile.u32(table, info + 8)
         var keyBits = OleFile.u32(table, info + 16).toInt()
         if (keyBits == 0) keyBits = 40
         // Bayrak 0x04: CryptoAPI (şart), 0x20: AES. Yalnızca RC4 desteklenir (algId 0 ya da RC4 = 0x6801).
         if (flags and 0x04L == 0L || flags and 0x20L != 0L || (algId != 0L && algId != 0x6801L)) {
-            throw WordFormatException("Bu parolalı .doc şifreleme yöntemi desteklenmiyor.")
+            throw WordFormatException(Txt.docs.docEncryptionUnsupported)
         }
-        if (keyBits < 40 || keyBits > 128 || keyBits % 8 != 0) throw WordFormatException("Şifreli Word belgesi bozuk.")
+        if (keyBits < 40 || keyBits > 128 || keyBits % 8 != 0) throw WordFormatException(Txt.docs.encryptedWordCorrupt)
 
         val v = (info + infoSize).toInt() // doğrulayıcı
-        if (v + 4 + 16 + 16 + 4 + 20 > limit) throw WordFormatException("Şifreli Word belgesi bozuk.")
+        if (v + 4 + 16 + 16 + 4 + 20 > limit) throw WordFormatException(Txt.docs.encryptedWordCorrupt)
         val saltSize = OleFile.u32(table, v)
-        if (saltSize != 16L) throw WordFormatException("Şifreli Word belgesi bozuk.")
+        if (saltSize != 16L) throw WordFormatException(Txt.docs.encryptedWordCorrupt)
         val salt = table.copyOfRange(v + 4, v + 20)
         val encVerifier = table.copyOfRange(v + 20, v + 36)
         val hashSize = OleFile.u32(table, v + 36)
-        if (hashSize != 20L) throw WordFormatException("Şifreli Word belgesi bozuk.")
+        if (hashSize != 20L) throw WordFormatException(Txt.docs.encryptedWordCorrupt)
         val encHash = table.copyOfRange(v + 40, v + 60)
         return CryptoApiScheme(salt, keyBits, encVerifier, encHash)
     }

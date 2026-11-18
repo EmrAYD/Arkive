@@ -1,5 +1,7 @@
 package com.eayd.arkive.utils
 
+import com.eayd.arkive.i18n.Lang
+import com.eayd.arkive.i18n.Txt
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -31,5 +33,5 @@ fun formatServerDateTime(iso: String): String {
         millis -= sign * offsetMinutes * 60_000L
     }
 
-    return SimpleDateFormat("d MMMM yyyy, HH:mm", TurkishLocale).format(Date(millis))
+    return SimpleDateFormat(Txt.files.dateTimePattern, Lang.locale).format(Date(millis))
 }

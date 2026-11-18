@@ -1,5 +1,6 @@
 package com.eayd.arkive.data
 
+import com.eayd.arkive.i18n.Txt
 import java.io.ByteArrayOutputStream
 import java.io.File
 import java.io.OutputStream
@@ -19,10 +20,10 @@ object FileDownloader {
     private suspend fun <T> get(url: String, block: suspend (ResponseBody) -> T): T =
         executeOnStorage(
             request = Request.Builder().url(url).build(),
-            failureMessage = "Dosya depolamadan alınamadı",
-            rejected = { code -> "Depolama dosyayı vermedi (HTTP $code)." },
+            failureMessage = Txt.errors.downloadFromStorageFailed,
+            rejected = { code -> Txt.errors.storageRefusedFile(code) },
         ) { response ->
-            val body = response.body ?: throw StorageException("Depolamadan boş yanıt geldi.")
+            val body = response.body ?: throw StorageException(Txt.errors.storageEmptyResponse)
             block(body)
         }
 
@@ -46,7 +47,7 @@ object FileDownloader {
                             if (n < 0) break
                             output.write(buffer, 0, n)
                             done += n
-                            if (done > maxBytes) throw StorageException("Dosya ön izleme için çok büyük.")
+                            if (done > maxBytes) throw StorageException(Txt.errors.tooBigForPreview)
                             if (total > 0) {
                                 val percent = (done * 100 / total).toInt()
                                 if (percent != lastPercent) {

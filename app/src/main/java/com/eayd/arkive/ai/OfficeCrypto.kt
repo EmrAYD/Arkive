@@ -1,12 +1,13 @@
 package com.eayd.arkive.ai
 
+import com.eayd.arkive.i18n.Txt
 import java.security.MessageDigest
 import javax.crypto.Cipher
 import javax.crypto.spec.IvParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
 /** Parola yanlış. */
-class WrongPasswordException : Exception("Parola yanlış.")
+class WrongPasswordException : Exception(Txt.docs.wrongPassword)
 
 /** Dosya çözülemedi: şifreleme türü desteklenmiyor ya da dosya bozuk. [message] kullanıcıya gösterilebilir. */
 class OfficeCryptoException(message: String, cause: Throwable? = null) : Exception(message, cause)
@@ -35,9 +36,9 @@ object OfficeCrypto {
     fun decrypt(file: ByteArray, password: String): ByteArray {
         try {
             val container = Container(file)
-            val info = container.stream("EncryptionInfo") ?: throw OfficeCryptoException("Şifreleme bilgisi bulunamadı.")
-            val package_ = container.stream("EncryptedPackage") ?: throw OfficeCryptoException("Şifreli içerik bulunamadı.")
-            if (info.size < 8) throw OfficeCryptoException("Şifreleme bilgisi bozuk.")
+            val info = container.stream("EncryptionInfo") ?: throw OfficeCryptoException(Txt.docs.encryptionInfoMissing)
+            val package_ = container.stream("EncryptedPackage") ?: throw OfficeCryptoException(Txt.docs.encryptedContentMissing)
+            if (info.size < 8) throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt)
             val major = u16(info, 0)
             val minor = u16(info, 2)
             return when {
@@ -49,7 +50,7 @@ object OfficeCrypto {
                     val standard = Standard.parse(info)
                     standard.decryptPackage(standard.unlock(password), package_)
                 }
-                else -> throw OfficeCryptoException("Bu Word şifreleme türü desteklenmiyor.")
+                else -> throw OfficeCryptoException(Txt.docs.wordEncryptionUnsupported)
             }
         } catch (e: WrongPasswordException) {
             throw e
@@ -57,7 +58,7 @@ object OfficeCrypto {
             throw e
         } catch (e: Exception) {
             // Taşan indeks, geçersiz sayı… hepsi bozuk dosya demektir.
-            throw OfficeCryptoException("Şifreli Word belgesi okunamadı (bozuk olabilir).", e)
+            throw OfficeCryptoException(Txt.docs.encryptedWordUnreadableMaybeCorrupt, e)
         }
     }
 
@@ -87,32 +88,32 @@ object OfficeCrypto {
         }
 
         fun decryptPackage(key: ByteArray, stream: ByteArray): ByteArray {
-            if (stream.size < 8) throw OfficeCryptoException("Şifreli içerik bozuk.")
+            if (stream.size < 8) throw OfficeCryptoException(Txt.docs.encryptedContentCorrupt)
             val size = u64(stream, 0)
             val body = (stream.size - 8) / 16 * 16
-            if (size < 0 || size > body) throw OfficeCryptoException("Şifreli içerik bozuk.")
+            if (size < 0 || size > body) throw OfficeCryptoException(Txt.docs.encryptedContentCorrupt)
             return aesEcb(key, stream.copyOfRange(8, 8 + body)).copyOf(size.toInt())
         }
 
         companion object {
             fun parse(info: ByteArray): Standard {
                 val headerSize = u32(info, 8)
-                if (headerSize < 32 || 12 + headerSize + 4 > info.size) throw OfficeCryptoException("Şifreleme bilgisi bozuk.")
+                if (headerSize < 32 || 12 + headerSize + 4 > info.size) throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt)
                 val header = 12
                 val algorithm = u32(info, header + 8)
                 val keyBits = u32(info, header + 16).toInt()
                 // 0x660E/F, 0x6610: AES-128/192/256. Başka algoritmalar (RC4…) desteklenmez.
                 if (algorithm !in 0x660EL..0x6610L || keyBits !in listOf(128, 192, 256)) {
-                    throw OfficeCryptoException("Bu Word şifreleme türü desteklenmiyor.")
+                    throw OfficeCryptoException(Txt.docs.wordEncryptionUnsupported)
                 }
                 var o = header + headerSize.toInt()
                 val saltSize = u32(info, o).toInt()
-                if (saltSize != 16 || o + 4 + 16 + 16 + 4 + 32 > info.size) throw OfficeCryptoException("Şifreleme bilgisi bozuk.")
+                if (saltSize != 16 || o + 4 + 16 + 16 + 4 + 32 > info.size) throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt)
                 o += 4
                 val salt = info.copyOfRange(o, o + 16)
                 val encryptedVerifier = info.copyOfRange(o + 16, o + 32)
                 val hashSize = u32(info, o + 32).toInt()
-                if (hashSize !in 1..32) throw OfficeCryptoException("Şifreleme bilgisi bozuk.")
+                if (hashSize !in 1..32) throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt)
                 return Standard(keyBits, salt, encryptedVerifier, hashSize, info.copyOfRange(o + 36, o + 68))
             }
         }
@@ -155,17 +156,17 @@ object OfficeCrypto {
         }
 
         fun decryptPackage(key: ByteArray, stream: ByteArray): ByteArray {
-            if (stream.size < 8) throw OfficeCryptoException("Şifreli içerik bozuk.")
+            if (stream.size < 8) throw OfficeCryptoException(Txt.docs.encryptedContentCorrupt)
             val size = u64(stream, 0)
             val body = stream.size - 8
-            if (size < 0 || size > body) throw OfficeCryptoException("Şifreli içerik bozuk.")
+            if (size < 0 || size > body) throw OfficeCryptoException(Txt.docs.encryptedContentCorrupt)
             val out = ByteArray(size.toInt())
             var written = 0
             var segment = 0
             var pos = 8
             while (written < out.size) {
                 val len = minOf(SEGMENT, stream.size - pos) / 16 * 16 // AES blokları 16'şar bayttır
-                if (len <= 0) throw OfficeCryptoException("Şifreli içerik bozuk.")
+                if (len <= 0) throw OfficeCryptoException(Txt.docs.encryptedContentCorrupt)
                 val iv = iv(hash(keyDataHash, keyDataSalt + intLe(segment)), keyDataBlock)
                 val plain = aesCbc(key, iv, stream.copyOfRange(pos, pos + len))
                 val n = minOf(plain.size, out.size - written)
@@ -179,19 +180,19 @@ object OfficeCrypto {
 
         companion object {
             fun parse(xml: String): Agile {
-                val keyData = tag(xml, "keyData") ?: throw OfficeCryptoException("Şifreleme bilgisi bozuk.")
-                val enc = tag(xml, "encryptedKey") ?: throw OfficeCryptoException("Şifreleme bilgisi bozuk.")
+                val keyData = tag(xml, "keyData") ?: throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt)
+                val enc = tag(xml, "encryptedKey") ?: throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt)
                 for (t in listOf(keyData, enc)) {
                     if (t["cipherAlgorithm"] != "AES" || t["cipherChaining"] != "ChainingModeCBC") {
-                        throw OfficeCryptoException("Bu Word şifreleme türü desteklenmiyor.")
+                        throw OfficeCryptoException(Txt.docs.wordEncryptionUnsupported)
                     }
                 }
                 fun bytes(m: Map<String, String>, name: String) =
-                    base64(m[name] ?: throw OfficeCryptoException("Şifreleme bilgisi bozuk."))
+                    base64(m[name] ?: throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt))
                 fun int(m: Map<String, String>, name: String) =
-                    m[name]?.toIntOrNull() ?: throw OfficeCryptoException("Şifreleme bilgisi bozuk.")
+                    m[name]?.toIntOrNull() ?: throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt)
                 val spin = int(enc, "spinCount")
-                if (spin < 0 || spin > 10_000_000) throw OfficeCryptoException("Şifreleme bilgisi bozuk.")
+                if (spin < 0 || spin > 10_000_000) throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt)
                 return Agile(
                     keyDataSalt = bytes(keyData, "saltValue"),
                     keyDataBlock = int(keyData, "blockSize"),
@@ -219,7 +220,7 @@ object OfficeCrypto {
                 "SHA256" -> "SHA-256"
                 "SHA384" -> "SHA-384"
                 "SHA512" -> "SHA-512"
-                else -> throw OfficeCryptoException("Bu Word şifreleme türü desteklenmiyor.")
+                else -> throw OfficeCryptoException(Txt.docs.wordEncryptionUnsupported)
             }
         }
     }
@@ -233,7 +234,7 @@ object OfficeCrypto {
         for (c in text) {
             if (c == '=' || c.isWhitespace()) continue
             val v = alphabet.indexOf(c)
-            if (v < 0) throw OfficeCryptoException("Şifreleme bilgisi bozuk.")
+            if (v < 0) throw OfficeCryptoException(Txt.docs.encryptionInfoCorrupt)
             buffer = (buffer shl 6) or v
             bits += 6
             if (bits >= 8) {
@@ -280,10 +281,10 @@ object OfficeCrypto {
         private val rootSize: Long
 
         init {
-            if (data.size < 512) throw OfficeCryptoException("Dosya bozuk.")
+            if (data.size < 512) throw OfficeCryptoException(Txt.docs.fileCorrupt)
             sectorSize = 1 shl u16(data, 0x1E)
             miniSectorSize = 1 shl u16(data, 0x20)
-            if (sectorSize != 512 && sectorSize != 4096) throw OfficeCryptoException("Dosya bozuk.")
+            if (sectorSize != 512 && sectorSize != 4096) throw OfficeCryptoException(Txt.docs.fileCorrupt)
             miniCutoff = u32(data, 0x38)
 
             // FAT sektörlerinin listesi: başlıktaki 109 girdi + (varsa) DIFAT zinciri.
@@ -310,7 +311,7 @@ object OfficeCrypto {
             }
 
             directory = readChain(u32(data, 0x30), Long.MAX_VALUE)
-            val root = entries().firstOrNull { it.type == 5 } ?: throw OfficeCryptoException("Dosya bozuk.")
+            val root = entries().firstOrNull { it.type == 5 } ?: throw OfficeCryptoException(Txt.docs.fileCorrupt)
             rootStart = root.start
             rootSize = root.size
 
@@ -333,7 +334,7 @@ object OfficeCrypto {
 
         private fun offset(sector: Long): Int {
             val o = (sector + 1) * sectorSize
-            if (o < 0 || o + sectorSize > data.size) throw OfficeCryptoException("Dosya bozuk.")
+            if (o < 0 || o + sectorSize > data.size) throw OfficeCryptoException(Txt.docs.fileCorrupt)
             return o.toInt()
         }
 
@@ -343,7 +344,7 @@ object OfficeCrypto {
             var s = start
             var guard = 0
             while (s < END_OF_CHAIN && out.size() < limit) {
-                if (guard++ > fat.size + 1 || s >= fat.size) throw OfficeCryptoException("Dosya bozuk.")
+                if (guard++ > fat.size + 1 || s >= fat.size) throw OfficeCryptoException(Txt.docs.fileCorrupt)
                 out.write(data, offset(s), sectorSize)
                 s = fat[s.toInt()]
             }
@@ -357,9 +358,9 @@ object OfficeCrypto {
             var s = start
             var guard = 0
             while (s < END_OF_CHAIN && out.size() < size) {
-                if (guard++ > miniFat.size + 1 || s >= miniFat.size) throw OfficeCryptoException("Dosya bozuk.")
+                if (guard++ > miniFat.size + 1 || s >= miniFat.size) throw OfficeCryptoException(Txt.docs.fileCorrupt)
                 val o = s.toInt() * miniSectorSize
-                if (o + miniSectorSize > mini.size) throw OfficeCryptoException("Dosya bozuk.")
+                if (o + miniSectorSize > mini.size) throw OfficeCryptoException(Txt.docs.fileCorrupt)
                 out.write(mini, o, miniSectorSize)
                 s = miniFat[s.toInt()]
             }

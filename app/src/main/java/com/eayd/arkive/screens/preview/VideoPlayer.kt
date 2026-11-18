@@ -44,6 +44,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
 import com.eayd.arkive.data.FileDto
+import com.eayd.arkive.i18n.Txt
 import kotlinx.coroutines.delay
 
 /**
@@ -86,7 +87,7 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
     }
 
     if (failed) {
-        NoPreviewMessage(file, "Video oynatılamadı. Bu biçim telefonda desteklenmiyor olabilir.", onOpenExternally)
+        NoPreviewMessage(file, Txt.preview.videoFailed, onOpenExternally)
         return
     }
 
@@ -168,7 +169,7 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
                         IconButton(onClick = { seekBy(-10_000); interaction++ }, modifier = Modifier.size(56.dp)) {
-                            Icon(Icons.Filled.Replay10, "10 saniye geri", tint = Color.White, modifier = Modifier.size(32.dp))
+                            Icon(Icons.Filled.Replay10, Txt.preview.back10, tint = Color.White, modifier = Modifier.size(32.dp))
                         }
                         Spacer(Modifier.width(16.dp))
                         IconButton(
@@ -189,14 +190,14 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
                         ) {
                             Icon(
                                 if (playing) Icons.Filled.Pause else Icons.Filled.PlayArrow,
-                                contentDescription = if (playing) "Durdur" else "Oynat",
+                                contentDescription = if (playing) Txt.preview.pause else Txt.preview.play,
                                 tint = Color.White,
                                 modifier = Modifier.size(56.dp),
                             )
                         }
                         Spacer(Modifier.width(16.dp))
                         IconButton(onClick = { seekBy(10_000); interaction++ }, modifier = Modifier.size(56.dp)) {
-                            Icon(Icons.Filled.Forward10, "10 saniye ileri", tint = Color.White, modifier = Modifier.size(32.dp))
+                            Icon(Icons.Filled.Forward10, Txt.preview.forward10, tint = Color.White, modifier = Modifier.size(32.dp))
                         }
                     }
                     SeekBar(

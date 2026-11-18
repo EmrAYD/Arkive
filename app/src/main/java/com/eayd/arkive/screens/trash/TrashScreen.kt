@@ -45,6 +45,7 @@ import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.ConfirmDialog
 import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.FileGlyph
@@ -109,7 +110,7 @@ fun TrashScreen(
                 )
             } else {
                 TrashHeader(
-                    title = state.folderName ?: "Çöp kutusu",
+                    title = state.folderName ?: Txt.home.trash,
                     subtitle = headerSubtitle(state, inFolder),
                     showSelect = !state.isLoading && state.itemCount > 0,
                     // Tüm çöp kutusunu boşaltma yalnızca kökte; çöpteki bir klasörün içinde gösterilmez.
@@ -146,10 +147,9 @@ fun TrashScreen(
 
     if (state.confirmEmpty) {
         ConfirmDialog(
-            title = "Çöp kutusundaki her şey kalıcı olarak silinsin mi?",
-            message = "Çöp kutusundaki ${state.itemCount} öğe (klasörlerin içindekilerle birlikte) çöp kutusundan ve " +
-                "depolama alanınızdan silinecek. Bu işlem geri alınamaz.",
-            confirmLabel = "Kalıcı olarak sil",
+            title = Txt.trash.emptyAllTitle,
+            message = Txt.trash.emptyAllBody(state.itemCount),
+            confirmLabel = Txt.trash.deletePermanently,
             saving = state.busy,
             error = null,
             onConfirm = viewModel::emptyTrash,
@@ -159,10 +159,9 @@ fun TrashScreen(
 
     if (state.confirmDelete) {
         ConfirmDialog(
-            title = "${state.selection.count} öğe kalıcı olarak silinsin mi?",
-            message = "Seçilen öğeler (klasörlerin içindekilerle birlikte) çöp kutusundan ve depolama alanınızdan " +
-                "silinecek. Bu işlem geri alınamaz.",
-            confirmLabel = "Kalıcı olarak sil",
+            title = Txt.trash.deleteSelectedTitle(state.selection.count),
+            message = Txt.trash.deleteSelectedBody,
+            confirmLabel = Txt.trash.deletePermanently,
             saving = state.busy,
             error = null,
             onConfirm = viewModel::deleteSelectedForever,
@@ -191,11 +190,11 @@ private fun TrashHeader(
     ) {
         if (onOpenMenu != null) {
             IconButton(onClick = onOpenMenu) {
-                Icon(Icons.Filled.Menu, contentDescription = "Menüyü aç")
+                Icon(Icons.Filled.Menu, contentDescription = Txt.home.openMenu)
             }
         } else {
             IconButton(onClick = onBack) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Geri")
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = Txt.common.back)
             }
         }
         Column(Modifier.weight(1f)) {
@@ -217,10 +216,10 @@ private fun TrashHeader(
                 onClick = onEmpty,
                 enabled = emptyEnabled,
                 colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error),
-            ) { Text("Tümünü sil") }
+            ) { Text(Txt.trash.deleteAll) }
         }
         if (showSelect) {
-            TextButton(onClick = onSelect) { Text("Seç") }
+            TextButton(onClick = onSelect) { Text(Txt.trash.select) }
         }
     }
 }
@@ -247,27 +246,27 @@ private fun SelectionHeader(
         ) {
             SelectCircle(checked = allSelected)
             Spacer(Modifier.width(8.dp))
-            Text("Hepsi", style = MaterialTheme.typography.bodyMedium)
+            Text(Txt.trash.all, style = MaterialTheme.typography.bodyMedium)
         }
         Text(
-            text = if (count == 0) "Öğeleri seç" else "$count öğe seçildi",
+            text = if (count == 0) Txt.trash.selectItems else Txt.trash.selectedCount(count),
             style = MaterialTheme.typography.titleMedium,
             textAlign = TextAlign.Center,
             maxLines = 1,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
         )
-        TextButton(onClick = onCancel, enabled = enabled) { Text("İptal") }
+        TextButton(onClick = onCancel, enabled = enabled) { Text(Txt.common.cancel) }
     }
 }
 
 /** Başlığın altındaki satır: kökte öğe sayısı, klasör içinde "Çöp kutusunda · N gün kaldı". */
 private fun headerSubtitle(state: TrashUiState, inFolder: Boolean): String = when {
-    inFolder -> "Çöp kutusunda" + (state.folderDaysLeft?.let {
-        " · " + if (it <= 0) "bugün silinecek" else "$it gün kaldı"
+    inFolder -> Txt.trash.inTrash + (state.folderDaysLeft?.let {
+        " · " + if (it <= 0) Txt.trash.deletedToday else Txt.trash.daysLeft(it)
     } ?: "")
-    state.itemCount == 0 -> "Boş"
-    else -> "${state.itemCount} öğe"
+    state.itemCount == 0 -> Txt.trash.empty
+    else -> Txt.trash.itemCount(state.itemCount)
 }
 
 // --- Liste ------------------------------------------------------------------------------------------
@@ -298,7 +297,7 @@ private fun TrashList(
             val key = folderKey(folder.id)
             TrashRow(
                 title = folder.name,
-                subtitle = if (folder.fileCount == 0) "Klasör" else "${folder.fileCount} dosya · ${formatBytes(folder.size)}",
+                subtitle = if (folder.fileCount == 0) Txt.trash.folder else Txt.trash.folderMeta(folder.fileCount, formatBytes(folder.size)),
                 daysLeft = folder.daysLeft.takeUnless { inFolder },   // klasörün içindekiler klasörle birlikte silindi: aynı gün sayısını tekrarlamaya gerek yok
                 icon = { FolderGlyph(folderAccent(folder.color), folder.emoji) },
                 selecting = selection.active,
@@ -323,15 +322,11 @@ private fun TrashList(
     }
 }
 
-private const val FOLDER_INFO =
-    "Bu klasör çöp kutusunda. İçindeki dosya ve klasörleri seçip geri yükleyebilir ya da kalıcı olarak " +
-        "silebilirsiniz. Tek başına geri yüklenenler, klasör hâlâ çöpte olduğu için Ana Sayfa'ya gelir; " +
-        "klasörün tamamını geri yüklemek için çöp kutusuna dönüp klasörü seçin."
+private val FOLDER_INFO: String
+    get() = Txt.trash.folderInTrashNote
 
 private fun infoText(days: Int): String =
-    "Silinen dosya ve klasörler burada $days gün saklanır; süre dolunca kalıcı olarak silinir. " +
-        "Bu süreyi ayarlardan değiştirebilirsiniz. " +
-        "Çöp kutusundakiler, kalıcı olarak silinene kadar depolama alanınızı kullanmaya devam eder."
+    Txt.trash.retentionNote(days)
 
 /** Çöp kutusu satırı: ortak [ItemRow] + sağda kalıcı silinmeye kalan gün ([daysLeft] null ise gösterilmez). */
 @Composable
@@ -356,7 +351,7 @@ private fun TrashRow(
         trailing = {
             if (daysLeft != null) {
                 Text(
-                    text = if (daysLeft <= 0) "Bugün" else "$daysLeft gün",
+                    text = if (daysLeft <= 0) Txt.trash.today else Txt.trash.daysShort(daysLeft),
                     style = MaterialTheme.typography.labelMedium,
                     // Süresi dolmaya 3 gün ya da daha az kaldıysa dikkat çekmesi için kırmızı.
                     color = if (daysLeft <= 3) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
@@ -380,7 +375,7 @@ private fun ActionBar(enabled: Boolean, onRestore: () -> Unit, onDeleteForever: 
             OutlinedButton(onClick = onRestore, enabled = enabled, modifier = Modifier.weight(1f)) {
                 Icon(Icons.Filled.Restore, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Geri yükle", maxLines = 1)
+                Text(Txt.trash.restore, maxLines = 1)
             }
             Button(
                 onClick = onDeleteForever,
@@ -393,7 +388,7 @@ private fun ActionBar(enabled: Boolean, onRestore: () -> Unit, onDeleteForever: 
             ) {
                 Icon(Icons.Filled.DeleteForever, contentDescription = null, modifier = Modifier.size(18.dp))
                 Spacer(Modifier.width(8.dp))
-                Text("Kalıcı olarak sil", maxLines = 1)
+                Text(Txt.trash.deletePermanently, maxLines = 1)
             }
         }
     }
@@ -413,11 +408,11 @@ private fun EmptyTrash(retentionDays: Int, inFolder: Boolean) {
             modifier = Modifier.size(56.dp),
         )
         Spacer(Modifier.height(12.dp))
-        Text(if (inFolder) "Bu klasör boş" else "Çöp kutusu boş", style = MaterialTheme.typography.titleMedium)
+        Text(if (inFolder) Txt.trash.folderEmpty else Txt.trash.trashEmpty, style = MaterialTheme.typography.titleMedium)
         Spacer(Modifier.height(4.dp))
         Text(
-            text = if (inFolder) "Buradaki her şey geri yüklendi ya da silindi."
-            else "Sildiğiniz dosya ve klasörler burada $retentionDays gün saklanır. Bu süreyi ayarlardan değiştirebilirsiniz.",
+            text = if (inFolder) Txt.trash.allHandled
+            else Txt.trash.emptyNote(retentionDays),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.outline,
             textAlign = TextAlign.Center,

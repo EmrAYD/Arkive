@@ -45,6 +45,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.ai.SummaryDone
 import com.eayd.arkive.ai.SummaryDoneMessage
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.theme.arkiveColors
 
 /** Kartın ekranda kalma süresi (ms). Alttaki ince çizgi kalan süreyi gösterir. */
@@ -146,7 +147,7 @@ private fun BannerCard(done: SummaryDone, onOpen: (SummaryDone) -> Unit, onDismi
                 IconButton(onClick = { onDismiss(done) }, modifier = Modifier.align(Alignment.Top).size(40.dp)) {
                     Icon(
                         Icons.Filled.Close,
-                        contentDescription = "Kapat",
+                        contentDescription = Txt.common.close,
                         tint = colors.onSurfaceVariant,
                         modifier = Modifier.size(20.dp),
                     )

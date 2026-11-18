@@ -16,6 +16,8 @@ import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import com.eayd.arkive.MainActivity
 import com.eayd.arkive.R
+import com.eayd.arkive.data.AppSettings
+import com.eayd.arkive.i18n.Txt
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -39,8 +41,10 @@ class SummaryService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Süreç bu servisle (Activity olmadan) başlamış olabilir: bildirim metinleri seçili dilde olsun diye dil okunur.
+        AppSettings.storedAppLanguage(this)
         // startForegroundService() çağrısından sonra 5 sn içinde startForeground() gerekir: ilk iş budur.
-        goForeground(buildNotification("Özetleme başlıyor…"))
+        goForeground(buildNotification(Txt.ai.serviceStarting))
         acquireWakeLock()
         if (watcher == null) {
             watcher = scope.launch {
@@ -49,8 +53,8 @@ class SummaryService : Service() {
                         if (running.isEmpty()) {
                             stopSelf()
                         } else {
-                            val text = status.values.firstOrNull() ?: "Özetleniyor…"
-                            val title = if (running.size > 1) "${running.size} dosya özetleniyor" else "Dosya özetleniyor"
+                            val text = status.values.firstOrNull() ?: Txt.ai.serviceSummarizing
+                            val title = if (running.size > 1) Txt.ai.serviceSummarizingFiles(running.size) else Txt.ai.serviceSummarizingFile
                             notificationManager().notify(NOTIFICATION_ID, buildNotification(text, title))
                         }
                     }
@@ -86,10 +90,10 @@ class SummaryService : Service() {
 
     private fun notificationManager() = getSystemService(NotificationManager::class.java)
 
-    private fun buildNotification(text: String, title: String = "Dosya özetleniyor"): Notification {
+    private fun buildNotification(text: String, title: String = Txt.ai.serviceSummarizingFile): Notification {
         if (Build.VERSION.SDK_INT >= 26) {
             notificationManager().createNotificationChannel(
-                NotificationChannel(CHANNEL_ID, "Yapay zeka özetleme", NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(CHANNEL_ID, Txt.ai.serviceChannelName, NotificationManager.IMPORTANCE_LOW),
             )
         }
         val open = PendingIntent.getActivity(

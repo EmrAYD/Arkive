@@ -10,6 +10,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.eayd.arkive.MainActivity
 import com.eayd.arkive.R
+import com.eayd.arkive.i18n.Txt
 
 /**
  * Uygulama arka plandayken ya da kapalıyken özetleme bitince gösterilen sistem bildirimi. Dokununca uygulama açılır ve
@@ -30,7 +31,7 @@ object SummaryNotifier {
             if (!manager.areNotificationsEnabled()) return
             if (Build.VERSION.SDK_INT >= 26) {
                 context.getSystemService(NotificationManager::class.java).createNotificationChannel(
-                    NotificationChannel(CHANNEL_ID, "Özetleme bitti", NotificationManager.IMPORTANCE_DEFAULT),
+                    NotificationChannel(CHANNEL_ID, Txt.ai.summaryDoneTitle, NotificationManager.IMPORTANCE_DEFAULT),
                 )
             }
             val key = request.fileId.hashCode()

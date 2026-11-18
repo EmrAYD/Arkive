@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.dp
 import com.eayd.arkive.R
 import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.data.PlusOffer
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.AiIcons
 import com.eayd.arkive.ui.components.StorageSkeleton
 import com.eayd.arkive.utils.formatBytes
@@ -56,15 +57,24 @@ import com.eayd.arkive.viewmodel.StorageInfo
  * klasör ağacı gösteren bölümlerde vardır (Favorilerim ve çöp kutusunda yok).
  */
 internal enum class HomeSection(
-    val title: String,
     val icon: ImageVector,
     val location: String?,
 ) {
-    Files("Ana Sayfa", Icons.Filled.Home, FolderLocations.HOME),
-    Favorites("Favorilerim", Icons.Filled.Star, null),
+    Files(Icons.Filled.Home, FolderLocations.HOME),
+    Favorites(Icons.Filled.Star, null),
     // Uygulamanın yapay zeka simgesi (elmas ve parıltı); dosya satırlarındaki AI düğmesiyle aynı.
-    AiResults("AI Sonuçlarım", AiIcons.Filled, FolderLocations.AI_RESULTS),
-    Trash("Çöp kutusu", Icons.Filled.Delete, null),
+    AiResults(AiIcons.Filled, FolderLocations.AI_RESULTS),
+    Trash(Icons.Filled.Delete, null),
+    ;
+
+    /** Seçili dilde başlığı. */
+    val title: String
+        get() = when (this) {
+            Files -> Txt.home.home
+            Favorites -> Txt.home.favorites
+            AiResults -> Txt.home.aiResults
+            Trash -> Txt.home.trash
+        }
 }
 
 @Composable
@@ -86,7 +96,7 @@ internal fun ArkiveDrawerSheet(
             ) {
                 Icon(
                     painter = painterResource(id = R.drawable.logo),
-                    contentDescription = "Arkive Logosu",
+                    contentDescription = Txt.auth.logoA11y,
                     modifier = Modifier.size(36.dp),
                     tint = Color.Unspecified, // logo kendi renklerinde kalsın
                 )
@@ -127,7 +137,7 @@ private fun StorageSection(
         Row(verticalAlignment = Alignment.CenterVertically) {
             Icon(Icons.Outlined.Cloud, contentDescription = null)
             Spacer(Modifier.width(16.dp))
-            Text("Depolama alanı", style = MaterialTheme.typography.titleMedium)
+            Text(Txt.home.storage, style = MaterialTheme.typography.titleMedium)
         }
         Spacer(Modifier.height(16.dp))
 
@@ -140,18 +150,17 @@ private fun StorageSection(
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
-                    text = "${formatBytes(storage.limit)} toplam depolama alanından " +
-                        "${formatBytes(storage.used)} kadarı kullanılıyor",
+                    text = Txt.home.storageUsage(formatBytes(storage.limit), formatBytes(storage.used)),
                     style = MaterialTheme.typography.bodyMedium,
                 )
                 Text(
-                    text = "Kalan: ${formatBytes(storage.remaining)}  ·  Plan: ${storage.planName}",
+                    text = Txt.home.remainingAndPlan(formatBytes(storage.remaining), storage.planName),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.outline,
                 )
                 if (error != null) {
                     Text(
-                        text = "Güncellenemedi: $error",
+                        text = Txt.home.updateFailed(error),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.error,
                     )
@@ -164,7 +173,7 @@ private fun StorageSection(
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
                 ) {
                     Text(
-                        "Daha fazla depolama alanı alın",
+                        Txt.home.getMoreStorage,
                         color = MaterialTheme.colorScheme.primary,
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis,
@@ -176,11 +185,11 @@ private fun StorageSection(
 
             else -> {
                 Text(
-                    text = error ?: "Kullanım bilgisi alınamadı.",
+                    text = error ?: Txt.home.usageUnavailable,
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.error,
                 )
-                TextButton(onClick = onRetry) { Text("Tekrar dene") }
+                TextButton(onClick = onRetry) { Text(Txt.common.retry) }
             }
         }
     }
@@ -195,7 +204,7 @@ internal fun ProfileAvatar(email: String, size: Dp = 42.dp) {
             .size(size)
             .clip(CircleShape)
             .background(MaterialTheme.colorScheme.primary)
-            .semantics { contentDescription = "Profil" },
+            .semantics { contentDescription = Txt.profile.title },
         contentAlignment = Alignment.Center,
     ) {
         Text(

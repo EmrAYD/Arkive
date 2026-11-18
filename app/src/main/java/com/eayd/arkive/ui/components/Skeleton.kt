@@ -31,6 +31,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.i18n.Txt
 
 // Yüklenen içeriğin yerinde gösterilen iskelet (skeleton) görünümler: dönen çark yerine, içeriğin şeklini taklit eden
 // ve üzerinden ışık geçen gri bloklar.
@@ -70,7 +71,7 @@ fun ListSkeleton(
         modifier = modifier
             .clipToBounds()
             .padding(contentPadding)
-            .semantics { contentDescription = "Yükleniyor" },
+            .semantics { contentDescription = Txt.common.loading },
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         repeat(rows) { index -> SkeletonRow(titleWidth = 0.4f + 0.15f * (index % 3)) }
@@ -101,7 +102,7 @@ private fun SkeletonRow(titleWidth: Float) {
 @Composable
 fun StorageSkeleton(modifier: Modifier = Modifier) {
     Column(
-        modifier = modifier.fillMaxWidth().semantics { contentDescription = "Yükleniyor" },
+        modifier = modifier.fillMaxWidth().semantics { contentDescription = Txt.common.loading },
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         SkeletonBox(Modifier.fillMaxWidth().height(8.dp), RoundedCornerShape(4.dp))

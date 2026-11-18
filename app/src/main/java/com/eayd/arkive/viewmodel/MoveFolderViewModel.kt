@@ -4,6 +4,7 @@ import androidx.lifecycle.ViewModel
 import com.eayd.arkive.data.ApiClient
 import com.eayd.arkive.data.FolderDto
 import com.eayd.arkive.data.FolderLocations
+import com.eayd.arkive.i18n.Txt
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -25,7 +26,7 @@ data class MoveFolderState(
     val location: String = FolderLocations.HOME,
 ) {
     /** Sayfanın en üstünün adı. */
-    val rootName: String get() = if (location == FolderLocations.AI_RESULTS) "AI Sonuçlarım" else "Ana Sayfa"
+    val rootName: String get() = if (location == FolderLocations.AI_RESULTS) Txt.home.aiResults else Txt.home.home
 
     /** Şu anki klasörün kimliği (null = sayfanın en üstü). */
     val currentId: String? get() = path.lastOrNull()?.id

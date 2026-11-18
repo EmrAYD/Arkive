@@ -26,6 +26,7 @@ import androidx.compose.ui.unit.dp
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
 import com.eayd.arkive.data.FolderLocations
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.FileActionsMenu
 import com.eayd.arkive.ui.components.FileGlyph
 import com.eayd.arkive.ui.components.FolderActionsMenu
@@ -175,25 +176,25 @@ fun UploadRow(item: UploadItem, onCancel: () -> Unit, onDismiss: () -> Unit) {
                 IconButton(onClick = if (failed) onDismiss else onCancel) {
                     Icon(
                         Icons.Filled.Close,
-                        contentDescription = if (failed) "Kapat" else "Yüklemeyi iptal et",
+                        contentDescription = if (failed) Txt.common.close else Txt.browser.cancelUpload,
                     )
                 }
             }
             Column(Modifier.padding(end = 12.dp)) {
                 when (item.phase) {
-                    UploadPhase.Waiting -> UploadStatus("Sırada bekliyor…")
+                    UploadPhase.Waiting -> UploadStatus(Txt.browser.uploadQueued)
                     UploadPhase.Uploading -> {
                         LinearProgressIndicator(progress = { item.progress }, modifier = Modifier.fillMaxWidth())
                         Spacer(Modifier.height(4.dp))
-                        UploadStatus("Yükleniyor… %${(item.progress * 100).toInt()}")
+                        UploadStatus(Txt.browser.uploadProgress((item.progress * 100).toInt()))
                     }
                     UploadPhase.Finishing -> {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         Spacer(Modifier.height(4.dp))
-                        UploadStatus("Tamamlanıyor…")
+                        UploadStatus(Txt.browser.uploadFinishing)
                     }
                     UploadPhase.Failed -> UploadStatus(
-                        text = item.error ?: "Yükleme başarısız oldu.",
+                        text = item.error ?: Txt.browser.uploadFailed,
                         color = MaterialTheme.colorScheme.error,
                     )
                 }

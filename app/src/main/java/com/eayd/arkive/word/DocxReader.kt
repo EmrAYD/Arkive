@@ -1,5 +1,6 @@
 package com.eayd.arkive.word
 
+import com.eayd.arkive.i18n.Txt
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.IOException
@@ -29,7 +30,7 @@ internal object DocxReader {
         try {
             val parts = readParts(bytes, { it in XML_PARTS }, MAX_XML_BYTES, Long.MAX_VALUE, skipOversize = false)
             val documentXml = parts["word/document.xml"]
-                ?: throw WordFormatException("Word belgesi okunamadı (.docx değil ya da bozuk).")
+                ?: throw WordFormatException(Txt.docs.wordNotDocxOrCorrupt)
             val document = Xml.parse(documentXml)
             fun optional(name: String): XNode? = parts[name]?.let { runCatching { Xml.parse(it) }.getOrNull() }
 
@@ -48,7 +49,7 @@ internal object DocxReader {
             val images = if (wanted.isEmpty()) emptyMap() else readParts(bytes, { it in wanted }, MAX_IMAGE_BYTES, MAX_IMAGES_TOTAL, skipOversize = true)
             return WordDoc(blocks, images, converter.truncated, "docx")
         } catch (e: IOException) {
-            throw WordFormatException("Word belgesi okunamadı (bozuk olabilir).")
+            throw WordFormatException(Txt.docs.wordUnreadableMaybeCorrupt)
         }
     }
 
@@ -59,14 +60,14 @@ internal object DocxReader {
         ZipInputStream(ByteArrayInputStream(bytes)).use { zip ->
             while (true) {
                 val entry = zip.nextEntry ?: break
-                if (++count > MAX_ENTRIES) throw WordFormatException("Word belgesi bozuk.")
+                if (++count > MAX_ENTRIES) throw WordFormatException(Txt.docs.wordCorrupt)
                 if (entry.isDirectory) continue
                 val name = entry.name.trimStart('/')
                 if (!wanted(name)) continue
                 val data = readEntry(zip, maxEach)
                 if (data == null || total + data.size > maxTotal) {
                     if (skipOversize) continue
-                    throw WordFormatException("Word belgesi çok büyük.")
+                    throw WordFormatException(Txt.docs.wordTooBig)
                 }
                 total += data.size
                 out[name] = data
@@ -190,7 +191,7 @@ private class DocxConverter(
     private val footnoteOrder = ArrayList<String>()
 
     fun convert(document: XNode): List<WordBlock> {
-        val body = document.child("w:body") ?: throw WordFormatException("Word belgesi okunamadı (gövde yok).")
+        val body = document.child("w:body") ?: throw WordFormatException(Txt.docs.wordNoBody)
         val out = ArrayList<WordBlock>()
         convertBlocks(body.kids, out, Ctx.ROOT)
         appendFootnotes(out)
@@ -764,7 +765,7 @@ private class DocxConverter(
 
     private fun appendFootnotes(out: MutableList<WordBlock>) {
         if (footnoteOrder.isEmpty()) return
-        out.add(WordParagraph(listOf(WordRun("Dipnotlar", bold = true, sizePt = 12f)), beforePt = 18f, afterPt = 6f, borderTop = 0xFF9E9E9E.toInt()))
+        out.add(WordParagraph(listOf(WordRun(Txt.docs.footnotes, bold = true, sizePt = 12f)), beforePt = 18f, afterPt = 6f, borderTop = 0xFF9E9E9E.toInt()))
         var i = 0
         while (i < footnoteOrder.size) { // dipnot metni yeni dipnot içeremez, ama liste büyürse güvenle döner
             val node = footnoteNode(footnoteOrder[i])

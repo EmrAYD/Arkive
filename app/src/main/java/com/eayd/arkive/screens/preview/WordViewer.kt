@@ -66,6 +66,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.word.WordAlign
 import com.eayd.arkive.word.WordBlock
 import com.eayd.arkive.word.WordDoc
@@ -145,7 +146,7 @@ internal fun WordViewer(doc: WordDoc) {
                 if (doc.truncated) {
                     item {
                         Text(
-                            "Belge çok uzun olduğu için yalnızca ilk bölümü gösteriliyor.",
+                            Txt.preview.wordTruncated,
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline,
                             modifier = Modifier.padding(8.dp),
@@ -347,7 +348,7 @@ private fun ImageView(block: WordImage, doc: WordDoc, scale: Float, availableWid
     if (img == null) {
         if (failed) {
             Text(
-                "[Görsel gösterilemiyor]",
+                Txt.preview.imageUnavailable,
                 style = MaterialTheme.typography.bodySmall,
                 color = Color(0xFF757575),
                 modifier = Modifier.padding(vertical = 4.dp),

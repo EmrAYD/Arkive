@@ -1,5 +1,7 @@
 package com.eayd.arkive.ai
 
+import com.eayd.arkive.i18n.Txt
+
 /**
  * "Özetleme bitti" haberinin metinleri ve nasıl iletileceği. Hiçbir Android sınıfı kullanmaz; bu yüzden tek başına
  * test edilebilir (bkz. SummaryDoneMessageTest).
@@ -11,13 +13,13 @@ package com.eayd.arkive.ai
 object SummaryDoneMessage {
 
     /** Uygulama içi kartın ve sistem bildiriminin başlığı. */
-    const val NOTIFICATION_TITLE = "Özetleme bitti"
+    val NOTIFICATION_TITLE: String get() = Txt.ai.summaryDoneTitle
 
     /** Kartın tıklanabilir olduğunu söyleyen satır: dokununca özet açılır. */
-    const val TAP_HINT = "Özeti görmek için dokunun"
+    val TAP_HINT: String get() = Txt.ai.tapToView
 
     /** Kartın dosya satırı. */
-    fun fileLine(fileName: String): String = "“$fileName” özetlendi"
+    fun fileLine(fileName: String): String = Txt.ai.summarizedFile(fileName)
 
     /**
      * Kartın ayrıntı satırı. [savedOnPhoneOnly]: özet telefonda üretildi ama sunucuya henüz yüklenemedi (internet yok);
@@ -25,18 +27,17 @@ object SummaryDoneMessage {
      */
     fun detail(savedOnPhoneOnly: Boolean): String =
         if (savedOnPhoneOnly) {
-            "Sunucuya ulaşılamadı; özet telefonda saklandı, bağlantı gelince yüklenecek."
+            Txt.ai.savedOnPhoneOnly
         } else {
-            "Özet, AI Sonuçlarım sayfasına da kaydedildi."
+            Txt.ai.alsoSavedToAiResults
         }
 
     /** Sistem bildiriminin metni. */
     fun notificationText(fileName: String, savedOnPhoneOnly: Boolean): String =
         if (savedOnPhoneOnly) {
-            "“$fileName” özetlendi ama sunucuya ulaşılamadı; özet telefonda saklandı, bağlantı gelince yüklenecek. " +
-                "Özeti görmek için dokunun."
+            Txt.ai.notificationTextSavedOnPhone(fileName)
         } else {
-            "“$fileName” özetlendi. Özet, AI Sonuçlarım sayfasına da kaydedildi. Özeti görmek için dokunun."
+            Txt.ai.notificationText(fileName)
         }
 }
 
