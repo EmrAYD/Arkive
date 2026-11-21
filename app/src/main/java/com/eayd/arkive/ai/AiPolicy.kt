@@ -3,43 +3,15 @@ package com.eayd.arkive.ai
 import com.eayd.arkive.i18n.Txt
 
 /**
- * Yapay zeka özetlemesinin NEREDE yapılacağına karar veren kurallar. Hiçbir Android sınıfı kullanmaz; bu yüzden
- * tek başına test edilebilir (bkz. AiPolicyTest). Eşikleri değiştirmek için yalnızca bu dosyadaki sabitlere bakmak yeter.
+ * Yapay zeka özetlemesinin kuralları: hangi dosyalar özetlenebilir ve hangileri telefonda özetlenebilir. Hiçbir Android
+ * sınıfı kullanmaz; bu yüzden tek başına test edilebilir. Eşikleri değiştirmek için yalnızca bu dosyadaki sabitlere bakmak
+ * yeter.
  *
- * Yerel özetleme [ExtractiveSummarizer] ile yapılır (yapay zeka modeli yoktur): belgenin en önemli cümlelerini seçer.
- *
- * Karar iki aşamadır:
- *  1. [precheck]: dosyayı hiç açmadan bilinenlerle (ayar, dosya boyutu) karar verilir.
- *     Yerel özetleme hala mümkünse sonuç [Precheck.Inspect] olur.
- *  2. [afterInspection]: dosya cihazda açılıp sayfa/görsel sayısı çıkarılınca son karar verilir.
+ * Özetin nerede çıkarılacağı plana bağlıdır: Plus'ta her zaman sunucuda (bulutta); ücretsiz planda telefonda, cihazdaki
+ * yapay zekayla ([LocalSummarizer]). Telefonda özetleme iki aşamada denetlenir:
+ *  1. [localPrecheck]: dosyayı hiç açmadan (boyutuna bakarak),
+ *  2. [localRejection]: dosya cihazda açılıp sayfa/görsel sayısı çıkarılınca.
  */
-
-/** Ayarlardaki "yapay zeka işlem yeri". */
-enum class AiMode {
-    Local,
-    Cloud,
-    Hybrid,
-    ;
-
-    /** Seçili dilde adı ("Yerel + Bulut"). */
-    val label: String
-        get() = when (this) {
-            Local -> Txt.ai.modeLocal
-            Cloud -> Txt.ai.modeCloud
-            Hybrid -> Txt.ai.modeHybrid
-        }
-
-    /** Seçili dilde açıklaması (ayarlar penceresinde gösterilir). */
-    val description: String
-        get() = when (this) {
-            Local -> Txt.ai.modeLocalDescription
-            Cloud -> Txt.ai.modeCloudDescription
-            Hybrid -> Txt.ai.modeHybridDescription
-        }
-
-    val allowsLocal: Boolean get() = this != Cloud
-    val allowsCloud: Boolean get() = this != Local
-}
 
 /** Özetlenebilen dosya türleri. [Docx]: Word belgeleri; hem .docx hem eski .doc (parolalıları dahil). */
 enum class SummarizableKind { Text, Pdf, Docx }
@@ -65,18 +37,6 @@ enum class LocalRejection {
         }
 }
 
-sealed interface Precheck {
-    data object Cloud : Precheck
-    data object Inspect : Precheck
-    data class Blocked(val reason: LocalRejection) : Precheck
-}
-
-sealed interface Route {
-    data object Local : Route
-    data object Cloud : Route
-    data class Blocked(val reason: LocalRejection) : Route
-}
-
 object AiPolicy {
 
     /** Bundan büyük dosyalar yerelde özetlenmez (bayt). */
@@ -100,28 +60,11 @@ object AiPolicy {
     /** Sayfa başına bundan az kelime düşen PDF taranmış (resimden ibaret) sayılır. */
     const val SCANNED_MIN_WORDS_PER_PAGE: Int = 20
 
-    /** Dosyayı açmadan verilebilecek karar. */
-    fun precheck(mode: AiMode, sizeBytes: Long): Precheck = when {
-        !mode.allowsLocal -> Precheck.Cloud
-        sizeBytes <= LOCAL_MAX_BYTES -> Precheck.Inspect
-        mode.allowsCloud -> Precheck.Cloud
-        else -> Precheck.Blocked(LocalRejection.TooBig)
-    }
-
-    /** Belge açıldıktan sonra son karar. Yerel uygunsa yerel; değilse (ayara göre) bulut ya da engel. */
-    fun afterInspection(mode: AiMode, stats: DocumentStats): Route {
-        val reason = localRejection(stats)
-        return when {
-            reason == null -> Route.Local
-            // Metin hiç yoksa sunucu da özetleyemez (sunucu da metinle çalışır): buluta gitmenin anlamı yok.
-            reason == LocalRejection.NoText -> Route.Blocked(reason)
-            mode.allowsCloud -> Route.Cloud
-            else -> Route.Blocked(reason)
-        }
-    }
+    /** Telefonda özetleme için dosyayı açmadan verilebilecek karar: çok büyükse nedeni, açılıp bakılabilecekse null. */
+    fun localPrecheck(sizeBytes: Long): LocalRejection? = if (sizeBytes <= LOCAL_MAX_BYTES) null else LocalRejection.TooBig
 
     /**
-     * Belge yerelde özetlenemiyorsa nedeni; uygunsa null. Boyut denetimi [precheck]'tedir. Sayfa sınırı ilk bakılandır
+     * Belge yerelde özetlenemiyorsa nedeni; uygunsa null. Boyut denetimi [localPrecheck]'tedir. Sayfa sınırı ilk bakılandır
      * (çok sayfalı PDF'in metni okunmaz, [stats] boş gelir; düz metin ve DOCX'te sayfa sayısı kelimeden tahmin edilir); görsel denetimi metinsizlikten önce gelir.
      */
     fun localRejection(stats: DocumentStats): LocalRejection? = when {

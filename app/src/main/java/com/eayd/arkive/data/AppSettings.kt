@@ -3,9 +3,7 @@ package com.eayd.arkive.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Resources
-import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.ai.AiSummarizer
-import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.i18n.Lang
 import com.eayd.arkive.i18n.Txt
@@ -30,7 +28,7 @@ enum class ThemeMode {
 }
 
 /**
- * Bu cihaza özgü uygulama ayarları (tema, dil, yalnızca Wi-Fi ile aktarım, yapay zeka işlem yeri). Sunucuya gitmez;
+ * Bu cihaza özgü uygulama ayarları (tema, dil, yalnızca Wi-Fi ile aktarım). Sunucuya gitmez;
  * SharedPreferences'ta saklanır, değerler StateFlow olarak dinlenir. [init] uygulama açılırken (MainActivity) bir kez çağrılır.
  */
 object AppSettings {
@@ -39,8 +37,8 @@ object AppSettings {
     private const val KEY_THEME = "theme_mode"
     private const val KEY_WIFI_ONLY = "wifi_only"
     private const val KEY_PENDING_EULA_UID = "pending_eula_uid"
-    private const val KEY_AI_MODE = "ai_mode"
-    private const val KEY_SUMMARY_TEMPLATE = "summary_template"
+    // Kaldırılan ayarlar (yapay zeka işlem yeri, özet şablonu): eski kayıtları silmek için.
+    private val OLD_KEYS = listOf("ai_mode", "summary_template")
     private const val KEY_APP_LANGUAGE = "app_language"
     private const val KEY_SUMMARY_LANGUAGE = "summary_language"
 
@@ -58,27 +56,13 @@ object AppSettings {
     val wifiOnly: StateFlow<Boolean> = _wifiOnly.asStateFlow()
 
     /**
-     * Yapay zeka özetlemesinin nerede yapılacağı: yerel (telefon), bulut (sunucu) ya da ikisi (uygun olan yerel,
-     * olmayan bulut). Varsayılan ikisi. Kurallar için bkz. [com.eayd.arkive.ai.AiPolicy].
-     */
-    private val _aiMode = MutableStateFlow(AiMode.Hybrid)
-    val aiMode: StateFlow<AiMode> = _aiMode.asStateFlow()
-
-    /** Yeni üretilen özet PDF'inin şablonu; sunucuya her özet isteğiyle birlikte gider. Varsayılan klasik. */
-    private val _summaryTemplate = MutableStateFlow(SummaryTemplate.Default)
-    val summaryTemplate: StateFlow<SummaryTemplate> = _summaryTemplate.asStateFlow()
-
-    /**
      * Uygulamanın dili. Kullanıcı seçmediyse telefonun dili (Türkçe telefonda Türkçe, diğerlerinde İngilizce). Dil
      * değişince Activity yeniden kurulur (bkz. MainActivity).
      */
     private val _appLanguage = MutableStateFlow(AppLanguage.Turkish)
     val appLanguage: StateFlow<AppLanguage> = _appLanguage.asStateFlow()
 
-    /**
-     * Özetin yazılacağı dil (bulut özeti bu dilde yazılır; telefonda üretilen özetin başlıkları ve PDF üst bilgileri bu
-     * dildedir). Kullanıcı ayrıca seçmediyse uygulamanın diliyle aynıdır.
-     */
+    /** Özetin yazılacağı dil. Kullanıcı ayrıca seçmediyse uygulamanın diliyle aynıdır. */
     private val _summaryLanguage = MutableStateFlow(AppLanguage.Turkish)
     val summaryLanguage: StateFlow<AppLanguage> = _summaryLanguage.asStateFlow()
 
@@ -91,8 +75,7 @@ object AppSettings {
         _summaryLanguage.value = AppLanguage.fromTag(prefs.getString(KEY_SUMMARY_LANGUAGE, null)) ?: _appLanguage.value
         _themeMode.value = storedThemeMode(appContext)
         _wifiOnly.value = prefs.getBoolean(KEY_WIFI_ONLY, false)
-        _aiMode.value = AiMode.entries.firstOrNull { it.name == prefs.getString(KEY_AI_MODE, null) } ?: AiMode.Hybrid
-        _summaryTemplate.value = SummaryTemplate.fromId(prefs.getString(KEY_SUMMARY_TEMPLATE, null))
+        if (OLD_KEYS.any(prefs::contains)) prefs.edit().apply { OLD_KEYS.forEach(::remove) }.apply()
         AiSummarizer.start(appContext) // bekleyen telefon özetlerini yükler
     }
 
@@ -146,16 +129,6 @@ object AppSettings {
         set(value) {
             prefs.edit().apply { if (value == null) remove(KEY_PENDING_EULA_UID) else putString(KEY_PENDING_EULA_UID, value) }.commit()
         }
-
-    fun setAiMode(mode: AiMode) {
-        _aiMode.value = mode
-        prefs.edit().putString(KEY_AI_MODE, mode.name).apply()
-    }
-
-    fun setSummaryTemplate(template: SummaryTemplate) {
-        _summaryTemplate.value = template
-        prefs.edit().putString(KEY_SUMMARY_TEMPLATE, template.id).apply()
-    }
 
     fun setWifiOnly(enabled: Boolean) {
         _wifiOnly.value = enabled

@@ -6,9 +6,9 @@ import com.eayd.arkive.i18n.Txt
  * "Özetleme bitti" haberinin metinleri ve nasıl iletileceği. Hiçbir Android sınıfı kullanmaz; bu yüzden tek başına
  * test edilebilir (bkz. SummaryDoneMessageTest).
  *
- * Haber iki yoldan gelir ve ikisi de dokunulabilir: uygulama açıkken liste ekranında bir kart (SummaryDoneBanner), arka plandayken
- * ya da kapalıyken sistem bildirimi ([SummaryNotifier]). Dokununca özet açılır (özetin PDF dosyasının ön izlemesi, dosya
- * yoksa özet penceresi). Kullanıcı bunu bilsin diye metinlerin kendisi de bunu söyler.
+ * Uygulama açıkken özet doğrudan pencerede açılır. Açılamazsa (o sırada başka bir pencere açıksa) liste ekranında bir
+ * kart (SummaryDoneBanner), arka plandayken ya da kapalıyken sistem bildirimi ([SummaryNotifier]) çıkar; ikisine de
+ * dokununca özet penceresi açılır. Kullanıcı bunu bilsin diye metinlerin kendisi de bunu söyler.
  */
 object SummaryDoneMessage {
 

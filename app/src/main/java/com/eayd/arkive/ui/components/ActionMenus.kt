@@ -3,6 +3,7 @@ package com.eayd.arkive.ui.components
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.DriveFileMove
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.outlined.Info
@@ -52,7 +53,7 @@ fun TrashedFileActionsMenu(
     }
 }
 
-/** Bir klasörün 3 nokta menüsü: Düzenle, Taşı (AI sonuçları klasörlerinde yok), Sil (kırmızı). */
+/** Bir klasörün 3 nokta menüsü: Düzenle, Taşı ([canMove] ise), Sil (kırmızı). */
 @Composable
 fun FolderActionsMenu(
     expanded: Boolean,
@@ -66,6 +67,20 @@ fun FolderActionsMenu(
         MenuItem(Txt.common.edit, Icons.Filled.Edit) { onDismiss(); onEdit() }
         if (canMove) MenuItem(Txt.common.move, Icons.AutoMirrored.Filled.DriveFileMove) { onDismiss(); onMove() }
         MenuItem(Txt.common.delete, Icons.Filled.Delete, destructive = true) { onDismiss(); onDelete() }
+    }
+}
+
+/** AI Sonuçlarım'daki bir özetin 3 nokta menüsü: Dosyayı aç (özetin kaynak dosyası), Özeti sil (kırmızı). */
+@Composable
+fun SummaryActionsMenu(
+    expanded: Boolean,
+    onDismiss: () -> Unit,
+    onOpenFile: () -> Unit,
+    onDelete: () -> Unit,
+) {
+    DropdownMenu(expanded = expanded, onDismissRequest = onDismiss) {
+        MenuItem(Txt.ai.openSourceFile, Icons.Filled.Description) { onDismiss(); onOpenFile() }
+        MenuItem(Txt.ai.deleteSummary, Icons.Filled.Delete, destructive = true) { onDismiss(); onDelete() }
     }
 }
 

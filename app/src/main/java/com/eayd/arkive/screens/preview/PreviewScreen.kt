@@ -38,7 +38,6 @@ import com.eayd.arkive.ui.components.ConfirmDialog
 import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.FileActionsMenu
 import com.eayd.arkive.ui.components.FileInfoDialog
-import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.ui.components.MoveFolderDialog
 import com.eayd.arkive.ui.components.NameDialog
 import com.eayd.arkive.ui.components.NoticeEffect
@@ -191,7 +190,6 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
             error = host.error,
             onMove = viewModel::moveFile,
             onDismiss = close,
-            location = if (file.inAiResults) FolderLocations.AI_RESULTS else FolderLocations.HOME,
         )
 
         PreviewDialog.Info -> FileInfoDialog(file = file, storageLimit = storageLimit, onDismiss = close)

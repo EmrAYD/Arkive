@@ -57,7 +57,7 @@ import com.eayd.arkive.viewmodel.SortOption
  * "+" düz bir ikon yerine [FilledIconButton] (dolgulu, yuvarlatılmış kare) olarak çizilir; böylece
  * arka planda silik kalmaz ve dokunulabilir bir düğme olduğu belli olur.
  *  - Dosya yüklenebilen bir yerdeyken ([canUpload]) basınca küçük bir menü açılır: "Yeni klasör" / "Dosya yükle".
- *  - Yüklenemeyen yerde (ör. AI sonuçları) menü gereksizdir, doğrudan "yeni klasör" açılır.
+ *  - Yüklenemeyen yerde (ör. internet yokken) menü gereksizdir, doğrudan "yeni klasör" açılır.
  *
  * [filters] bir "slot"tur: çağıran yer `filters = { ... }` ile istediği bileşenleri (ör. [FilterPill]) verir,
  * bu dosyayı değiştirmek gerekmez.

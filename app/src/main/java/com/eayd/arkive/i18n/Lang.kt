@@ -40,7 +40,7 @@ object Lang {
     /** Tarih ve sayı biçimleri için yerel ayar (uygulamanın dili). */
     val locale: Locale get() = app.locale
 
-    /** Belirli bir dilin metin tablosu; ör. özetin içeriği uygulamanın değil özet dilinin tablosundan yazılır. */
+    /** Belirli bir dilin metin tablosu (seçili dilden bağımsız). */
     fun stringsFor(language: AppLanguage): Strings = when (language) {
         AppLanguage.Turkish -> TrStrings
         AppLanguage.English -> EnStrings

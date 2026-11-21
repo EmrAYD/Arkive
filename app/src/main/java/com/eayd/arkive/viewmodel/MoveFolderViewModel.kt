@@ -22,11 +22,11 @@ data class MoveFolderState(
     val path: List<FolderDto> = emptyList(),
     val folders: List<FolderDto>? = null,
     val error: String? = null,
-    /** Gezinilen sayfa: [FolderLocations.HOME] ya da [FolderLocations.AI_RESULTS]. */
+    /** Gezinilen sayfa (klasörler yalnızca ana sayfada: [FolderLocations.HOME]). */
     val location: String = FolderLocations.HOME,
 ) {
     /** Sayfanın en üstünün adı. */
-    val rootName: String get() = if (location == FolderLocations.AI_RESULTS) Txt.home.aiResults else Txt.home.home
+    val rootName: String get() = Txt.home.home
 
     /** Şu anki klasörün kimliği (null = sayfanın en üstü). */
     val currentId: String? get() = path.lastOrNull()?.id
@@ -65,7 +65,7 @@ class MoveFolderViewModel : ViewModel() {
         _state.value = MoveFolderState(path = path, location = location)
         val parentId = path.lastOrNull()?.id
         job = launchCatching(onError = { message -> _state.update { it.copy(error = message) } }) {
-            // Normal dosyalar ana sayfaya, yapay zeka sonuç dosyaları AI Sonuçlarım'a taşınır: kökte yalnızca o sayfanın klasörleri istenir.
+            // Kökte yalnızca o sayfanın klasörleri istenir.
             val children = ApiClient.api.getFolders(
                 parentId = parentId,
                 location = if (parentId == null) location else null,

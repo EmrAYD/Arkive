@@ -36,6 +36,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.screens.folders.BrowserContent
@@ -51,7 +52,7 @@ private const val PROFILE_SLIDE_MILLIS = 300
 
 /**
  * Ana ekran: üst çubukta solda menü (hamburger), sağda profil düğmesi; altında seçili bölümün içeriği.
- * Menü düğmesi yan menüyü açar: bölümler (yüklenen dosyalar, favorilerim, AI sonuçları, çöp kutusu) ve
+ * Menü düğmesi yan menüyü açar: bölümler (yüklenen dosyalar, favorilerim, AI sonuçları: özetlerin listesi, çöp kutusu) ve
  * kalan depolama kullanımı. Profil düğmesi profil sayfasını açar.
  *
  * Her bölümün kendi ViewModel'i vardır (key); bölüm değiştirince diğerinin listesi yeniden yüklenmez.
@@ -151,14 +152,20 @@ fun HomeScreen(
                             active = !showProfile,
                         )
 
-                        HomeSection.Files, HomeSection.AiResults -> BrowserContent(
+                        HomeSection.Files -> BrowserContent(
                             viewModel = viewModel(
-                                key = "root-${section.location}",
-                                factory = BrowserViewModel.factory(parentId = null, location = section.location),
+                                key = "root-home",
+                                factory = BrowserViewModel.factory(parentId = null, location = FolderLocations.HOME),
                             ),
                             onOpenFolder = { onOpenFolder(it.id) },
                             onOpenFile = { onOpenFile(it.id) },
                             active = !showProfile,
+                        )
+
+                        // Özetlerin listesi; dokununca özet penceresi açılır.
+                        HomeSection.AiResults -> AiSummariesContent(
+                            viewModel = viewModel(key = "summaries"),
+                            onOpenFile = onOpenFile,
                         )
                     }
                 }

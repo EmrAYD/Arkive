@@ -63,7 +63,7 @@ class FileDragState {
     // Ekrandaki (oluşturulmuş) satırların yerleri. Ekrandan çıkan satır kendini listeden siler ([trackBounds]).
     internal val itemCoords = HashMap<String, LayoutCoordinates>()     // tüm satırlar (uzun basış için)
     internal val folderCoords = HashMap<String, LayoutCoordinates>()   // bırakılabilir klasörler (anahtar: klasör id)
-    internal val folderAreas = HashMap<String, String>()               // bırakılabilir klasörün sayfası (ana sayfa / AI sonuçları)
+    internal val folderAreas = HashMap<String, String>()               // bırakılabilir klasörün sayfası (ana sayfa)
     internal var listCoords: LayoutCoordinates? = null
 
     /** Sürüklenenler; null ise sürükleme yok. */
@@ -85,11 +85,11 @@ class FileDragState {
             k !in except && c.isAttached && c.boundsInRoot().contains(pos)
         }?.key
 
-    /** Sürüklenenlerin sayfası: ana sayfa öğeleri ya da AI sonuçları; ikisi karışıksa null (hiçbir klasöre bırakılamaz). */
+    /** Sürüklenenlerin sayfası (ana sayfa); karışıksa null (hiçbir klasöre bırakılamaz). */
     private var draggedArea: String? = null
 
     // Sürüklenen klasörler kendi üstlerine bırakılamaz. Öğeler yalnızca kendi sayfalarının klasörlerine bırakılır:
-    // ana sayfa öğeleri ana sayfa klasörlerine, AI sonuçları AI sonuçları klasörlerine (sunucu da başkasına izin vermez).
+    // ana sayfa öğeleri ana sayfa klasörlerine.
     private fun folderAt(pos: Offset): String? {
         val except = dragged?.folders?.map { it.id }?.toSet().orEmpty() +
             folderAreas.filterValues { it != draggedArea }.keys
@@ -128,8 +128,7 @@ class FileDragState {
 
 /** Sürüklenen öğelerin hangi sayfaya ait olduğu (hepsi aynıysa); karışıksa null. */
 private fun areaOf(items: SelectedItems): String? =
-    (items.files.map { if (it.inAiResults) FolderLocations.AI_RESULTS else FolderLocations.HOME } +
-        items.folders.map { it.location }).toSet().singleOrNull()
+    (items.files.map { FolderLocations.HOME } + items.folders.map { it.location }).toSet().singleOrNull()
 
 /**
  * Klasör satırını bırakma hedefi olarak kaydeder: ekrandaki yeri ve hangi sayfanın klasörü olduğu ([area]). Hangi
@@ -223,7 +222,7 @@ internal fun Modifier.itemDragSource(
                         val up = change.changedToUpIgnoreConsumed() || !change.pressed
 
                         if (!dragging && !up && (pos - downRoot).getDistance() > viewConfiguration.touchSlop) {
-                            if (item == null) break   // bu seçim sürüklenemiyor (ör. AI klasörü): hareketi liste alsın
+                            if (item == null) break   // bu seçim sürüklenemiyor (ör. Favorilerim): hareketi liste alsın
                             dragging = true
                             state.start(item, pos)
                             Log.d(TAG, "sürükleme başladı: ${item.label}")

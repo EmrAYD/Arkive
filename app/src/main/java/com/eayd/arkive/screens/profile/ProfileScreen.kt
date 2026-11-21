@@ -47,10 +47,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.data.PlusOffer
-import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.i18n.Txt
@@ -78,8 +76,6 @@ fun ProfileScreen(
     val state by viewModel.state.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
     val wifiOnly by viewModel.wifiOnly.collectAsState()
-    val aiMode by viewModel.aiMode.collectAsState()
-    val summaryTemplate by viewModel.summaryTemplate.collectAsState()
     val appLanguage by viewModel.appLanguage.collectAsState()
     val summaryLanguage by viewModel.summaryLanguage.collectAsState()
     val context = LocalContext.current
@@ -126,8 +122,6 @@ fun ProfileScreen(
                 SettingsSection(
                     themeMode = themeMode,
                     wifiOnly = wifiOnly,
-                    aiMode = aiMode,
-                    summaryTemplate = summaryTemplate,
                     appLanguage = appLanguage,
                     summaryLanguage = summaryLanguage,
                     // Değer sunucudan gelene kadar satır pasif kalır.
@@ -137,8 +131,6 @@ fun ProfileScreen(
                     },
                     onTheme = { viewModel.openDialog(ProfileDialog.Theme) },
                     onWifiOnlyChange = viewModel::setWifiOnly,
-                    onAiMode = { viewModel.openDialog(ProfileDialog.AiProcessing) },
-                    onSummaryTemplate = { viewModel.openDialog(ProfileDialog.SummaryTemplateChoice) },
                     onLanguage = { viewModel.openDialog(ProfileDialog.Language) },
                     onTrashRetention = { viewModel.openDialog(ProfileDialog.TrashRetention) },
                 )
@@ -182,8 +174,6 @@ fun ProfileScreen(
 private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
     val host by viewModel.dialogs.state.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
-    val aiMode by viewModel.aiMode.collectAsState()
-    val summaryTemplate by viewModel.summaryTemplate.collectAsState()
     val appLanguage by viewModel.appLanguage.collectAsState()
     val summaryLanguage by viewModel.summaryLanguage.collectAsState()
     val close = viewModel.dialogs::close
@@ -207,31 +197,6 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
             saving = false,
             error = null,
             onSave = viewModel::setThemeMode,
-            onDismiss = close,
-        )
-
-        ProfileDialog.AiProcessing -> ChoiceDialog(
-            title = Txt.profile.aiLocation,
-            description = AiMode.entries.joinToString("\n\n") { Txt.profile.optionWithDescription(it.label, it.description) },
-            options = AiMode.entries,
-            current = aiMode,
-            optionLabel = { it.label },
-            saving = false,
-            error = null,
-            onSave = viewModel::setAiMode,
-            onDismiss = close,
-        )
-
-        ProfileDialog.SummaryTemplateChoice -> ChoiceDialog(
-            title = Txt.profile.summaryTemplate,
-            description = SummaryTemplate.entries.joinToString("\n\n") { Txt.profile.optionWithDescription(it.label, it.description) } +
-                Txt.profile.templateFutureOnly,
-            options = SummaryTemplate.entries,
-            current = summaryTemplate,
-            optionLabel = { it.label },
-            saving = false,
-            error = null,
-            onSave = viewModel::setSummaryTemplate,
             onDismiss = close,
         )
 

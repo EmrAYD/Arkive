@@ -13,11 +13,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -29,18 +31,19 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
-import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.ai.AiSummarizer
 import com.eayd.arkive.ai.SummaryUi
-import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.data.FileDto
+import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.i18n.Txt
 
 /**
  * AI düğmesine basılınca açılan pencereler: onay ("Bu dosyayı özetlemek istiyor musunuz?"), özetleme sürerken durdurma
- * sorusu ve özet metni. Özetleme başladıktan sonra pencere kapanır; ilerleme satırdaki yükleme simgesinde görünür.
+ * sorusu, özet penceresi (belgenin ne olduğunu ve neleri içerdiğini anlatan paragraf) ve özeti silme onayı. Özetleme
+ * başladıktan sonra pencere kapanır; ilerleme satırdaki yükleme simgesinde görünür, bitince özet penceresi açılır.
  */
 @Composable
 fun AiSummaryDialogHost() {
@@ -86,15 +89,12 @@ fun AiSummaryDialogHost() {
         }
 
         is SummaryUi.Password -> {
-            val mode by AppSettings.aiMode.collectAsState()
+            // Plus'ta dosya sunucuda, ücretsiz planda telefonda özetlenir; parolanın nereye gittiği buna göre söylenir.
+            val cloud = PlanStatus.quota.collectAsState().value?.cloud == true
             PasswordDialog(
                 title = Txt.ai.passwordTitle,
                 message = Txt.ai.passwordBody(state.file.name),
-                note = when (mode) {
-                    AiMode.Local -> Txt.ai.passwordLocalNote
-                    AiMode.Cloud -> Txt.ai.passwordCloudNote
-                    AiMode.Hybrid -> Txt.ai.passwordHybridNote
-                },
+                note = if (cloud) Txt.ai.passwordCloudNote else Txt.ai.passwordLocalNote,
                 confirmLabel = Txt.ai.summarize,
                 busy = false,
                 error = if (state.wrong) Txt.docs.wrongPassword else null,
@@ -117,39 +117,54 @@ fun AiSummaryDialogHost() {
 
         is SummaryUi.Viewing -> {
             val context = LocalContext.current
+            val scroll = rememberScrollState()
             AlertDialog(
                 onDismissRequest = AiSummarizer::dismiss,
-                title = { Text(Txt.ai.summaryTitle) },
+                icon = { Icon(AiIcons.Filled, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
+                title = { Text(Txt.ai.summaryOf(state.fileName), maxLines = 2, overflow = TextOverflow.Ellipsis) },
                 text = {
                     Column {
-                        Text(
-                            Txt.ai.summaryMeta(state.fileName, state.source.label),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.outline,
-                            maxLines = 2,
-                        )
                         state.note?.let {
-                            Spacer(Modifier.size(6.dp))
                             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
+                            Spacer(Modifier.size(8.dp))
                         }
-                        Spacer(Modifier.size(12.dp))
-                        // Uzun özet kaydırılır; metin seçilip kopyalanabilir.
+                        // Özet kısa bir paragraftır; yine de sığmazsa kaydırılır ve sağda kaydırma çubuğu görünür (sığıyorsa
+                        // çubuk yoktur). Metin seçilip kopyalanabilir.
                         SelectionContainer {
                             Text(
                                 state.text,
-                                style = MaterialTheme.typography.bodyMedium,
-                                modifier = Modifier.fillMaxWidth().heightIn(max = 360.dp).verticalScroll(rememberScrollState()),
+                                style = MaterialTheme.typography.bodyLarge,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .heightIn(max = 360.dp)
+                                    .verticalScrollbar(scroll, thumbColor = MaterialTheme.colorScheme.primary)
+                                    .verticalScroll(scroll)
+                                    .padding(end = 12.dp), // yazı çubuğun altında kalmasın
                             )
                         }
-                        TextButton(onClick = {
-                            val clipboard = context.getSystemService(ClipboardManager::class.java)
-                            clipboard?.setPrimaryClip(ClipData.newPlainText(Txt.ai.summaryTitle, state.text))
-                            Toast.makeText(context, Txt.ai.summaryCopied, Toast.LENGTH_SHORT).show()
-                        }) { Text(Txt.common.copy) }
                     }
                 },
                 confirmButton = { TextButton(onClick = AiSummarizer::dismiss) { Text(Txt.common.close) } },
+                dismissButton = {
+                    TextButton(onClick = {
+                        val clipboard = context.getSystemService(ClipboardManager::class.java)
+                        clipboard?.setPrimaryClip(ClipData.newPlainText(Txt.ai.summaryTitle, state.text))
+                        Toast.makeText(context, Txt.ai.summaryCopied, Toast.LENGTH_SHORT).show()
+                    }) { Text(Txt.common.copy) }
+                },
             )
         }
+
+        is SummaryUi.DeleteAsk -> AlertDialog(
+            onDismissRequest = AiSummarizer::dismiss,
+            title = { Text(Txt.ai.deleteSummary) },
+            text = { Text(Txt.ai.deleteSummaryBody(state.fileName)) },
+            confirmButton = {
+                TextButton(onClick = { AiSummarizer.deleteSummary(state.fileId, state.fileName) }) {
+                    Text(Txt.common.delete, color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = { TextButton(onClick = AiSummarizer::dismiss) { Text(Txt.common.cancel) } },
+        )
     }
 }

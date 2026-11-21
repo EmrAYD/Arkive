@@ -57,8 +57,8 @@ import kotlinx.coroutines.withContext
 
 /**
  * Bir seviyedeki klasörler ve dosyalar, üstlerinde işlem satırı ("+" düğmesi, filtreler) ve devam eden yüklemeler.
- * Ana sayfa, AI sonuçları, Favorilerim ve klasör içi ekranı aynı bileşeni kullanır; fark yalnızca verilen
- * ViewModel'dir.
+ * Ana sayfa, Favorilerim ve klasör içi ekranı aynı bileşeni kullanır; fark yalnızca verilen ViewModel'dir. (AI
+ * Sonuçlarım sayfası klasör ve dosya değil, özetlerin listesidir: bkz. AiSummariesContent.)
  *
  * Bu bileşen yalnızca çizer: liste, süzme/sıralama, seçim, pencereler ve sunucu işlemleri [BrowserViewModel]
  * içindedir; buradaki her etkileşim ViewModel'e bir çağrı olarak iletilir.
@@ -88,16 +88,17 @@ fun BrowserContent(
     // Ekran döndürülünce kapanmaz.
     LeaveEffect(viewModel) { viewModel.clearSelection() }
     LaunchedEffect(active) { if (!active) viewModel.clearSelection() }
-    // Özetleme arka planda sürer; bitince ya da olmazsa kısa bir bildirimle haber verilir.
+    // Özetleme arka planda sürer; olmazsa kısa bir bildirimle haber verilir. Bitince özet penceresi açılır (tüm ekranlar
+    // için ortak olarak ArkiveNavHost'ta).
     LaunchedEffect(viewModel) { AiSummarizer.notices.collect(viewModel::showNotice) }
-    // "Özetleme bitti" kartı (telefonda da bulutta da): dokunulunca özet açılır. Aynı anda birkaç özet biterse sırayla gösterilir.
+    // Özet bittiğinde o sırada başka bir pencere açıksa "Özetleme bitti" kartı çıkar: dokunulunca özet açılır. Aynı anda
+    // birkaç özet biterse sırayla gösterilir.
     val finished = remember { mutableStateListOf<SummaryDone>() }
     LaunchedEffect(viewModel) { AiSummarizer.done.collect { finished.add(it) } }
-    // Özet bitince liste sessizce yenilenir (AI düğmesi dolar). Dolu düğmeye basılınca özet dosyasının ön izlemesinin
-    // açılması ve özet penceresi, tüm ekranlar için ortak olarak ArkiveNavHost'tadır.
+    // Özet oluşunca ya da silinince liste sessizce yenilenir (AI düğmesi dolar/boşalır).
     LaunchedEffect(viewModel) { AiSummarizer.completed.collect { viewModel.reloadQuietly() } }
     LaunchedEffect(viewModel) { AiSummarizer.flushPending() } // internetsizken üretilen özetler varsa yükle
-    // Liste her yenilendiğinde küçük dosyalar arka planda telefona kopyalanır: internetsiz de yerel özetlenebilsinler.
+    // Liste her yenilendiğinde küçük dosyalar ve özetler arka planda telefona kopyalanır: internetsiz de açılabilsinler.
     LaunchedEffect(state.files, state.offline) { if (!state.offline) AiSummarizer.prefetch(state.files) }
     // İnternet geri gelince, liste telefondaki görüntüden gösteriliyorsa sunucudan tazelenir.
     val offlineNow by rememberUpdatedState(state.offline)
@@ -117,7 +118,6 @@ fun BrowserContent(
             SelectionBar(
                 count = selection.count,
                 allFavorite = state.selectedItems.allFavorite,
-                // AI sonuçları klasörleri taşınamaz; normal öğeler ile yapay zeka sonuç dosyaları da birlikte taşınamaz.
                 // Favorilerim'de hiç taşıma yoktur (öğeler başka yerlerden yıldızlanmıştır; yerleri orada değiştirilir).
                 canMove = !viewModel.favoritesOnly && state.moveLocation != null,
                 onClose = viewModel::clearSelection,
@@ -178,7 +178,7 @@ fun BrowserContent(
                 error != null -> PullableCenter { ErrorRetry(error, viewModel::load) }
 
                 nothingToShow -> PullableCenter {
-                    CenteredHint(text = emptyText(state, viewModel.favoritesOnly, viewModel.isAiResultsRoot))
+                    CenteredHint(text = emptyText(state, viewModel.favoritesOnly))
                 }
 
                 nothingVisible -> PullableCenter { CenteredHint(text = Txt.browser.noCategoryMatch) }
@@ -229,8 +229,7 @@ private fun PullableCenter(content: @Composable () -> Unit) {
     }
 }
 
-private fun emptyText(state: BrowserUiState, favoritesOnly: Boolean, aiResultsRoot: Boolean): String = when {
-    aiResultsRoot -> Txt.browser.emptyAiResults
+private fun emptyText(state: BrowserUiState, favoritesOnly: Boolean): String = when {
     favoritesOnly -> Txt.browser.emptyFavorites
     state.canUpload -> Txt.browser.emptyHome
     else -> Txt.browser.emptyFolders
@@ -273,8 +272,7 @@ private fun BrowserList(
         }
         items(state.visibleFolders, key = { folderKey(it.id) }) { folder ->
             val rowKey = folderKey(folder.id)
-            // Her klasör bırakma hedefidir; öğeler yalnızca kendi sayfalarının klasörlerine bırakılır (ana sayfa öğeleri
-            // ana sayfa klasörlerine, AI sonuçları AI sonuçları klasörlerine). Seçim [FileDragState]'tedir.
+            // Her klasör bırakma hedefidir. Seçim [FileDragState]'tedir.
             val rowModifier = Modifier
                 .trackBounds(dragState.itemCoords, rowKey)
                 .trackDropFolder(dragState, folder.id, folder.location)
@@ -310,7 +308,7 @@ private fun BrowserList(
                     onInfo = { viewModel.openDialog(BrowserDialog.FileInfo(file)) },
                     onDelete = { viewModel.openDialog(BrowserDialog.DeleteFile(file)) },
                 ),
-                ai = if (file.inAiResults) null else file.hasSummary || file.id in waitingUpload,
+                ai = file.hasSummary || file.id in waitingUpload,
                 aiWorking = file.id in summarizing,
                 aiStatus = summaryStatus[file.id],
                 enabled = !state.offline || file.id in availableOffline,

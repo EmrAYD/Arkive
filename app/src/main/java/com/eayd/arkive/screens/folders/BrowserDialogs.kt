@@ -102,7 +102,6 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
             error = host.error,
             onMove = viewModel::confirmMove,
             onDismiss = close,
-            location = if (dialog.file.inAiResults) FolderLocations.AI_RESULTS else FolderLocations.HOME,
         )
 
         is BrowserDialog.MoveFolder -> MoveFolderDialog(

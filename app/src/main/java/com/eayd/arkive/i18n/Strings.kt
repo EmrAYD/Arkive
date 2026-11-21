@@ -7,7 +7,6 @@ package com.eayd.arkive.i18n
 interface Strings {
     val ai: AiStrings
     val docs: DocsStrings
-    val summary: SummaryStrings
     val common: CommonStrings
     val files: FilesStrings
     val emoji: EmojiStrings
@@ -25,30 +24,19 @@ interface Strings {
 
 /** Yapay zeka özetleme: pencereler, durum ve bildirim metinleri. */
 interface AiStrings {
-    val modeLocal: String
-    val modeLocalDescription: String
-    val modeCloud: String
-    val modeCloudDescription: String
-    val modeHybrid: String
-    val modeHybridDescription: String
     val rejectTooBig: String
     val rejectTooManyPages: String
     val rejectImageHeavy: String
     val rejectNoText: String
-    val sourceLocal: String
-    val sourceCloud: String
     val preparing: String
     fun stopped(name: Any?): String
     val notUploadedYet: String
     val openingSummary: String
-    val openedFromPhoneCopy: String
     val shownFromPhoneCopy: String
     val noPhoneCopy: String
     fun summarizeFailed(name: Any?, reason: Any?): String
     fun notOnPhoneAndOffline(name: Any?): String
     val fileOpenFailed: String
-    val hintUseHybrid: String
-    fun summarizeFailedHint(name: Any?, reason: Any?, hint: Any?): String
     val readingFile: String
     val summarizingOnPhone: String
     fun saveToServerFailed(name: Any?): String
@@ -71,14 +59,6 @@ interface AiStrings {
     fun serviceSummarizingFiles(size: Any?): String
     val serviceSummarizingFile: String
     val serviceChannelName: String
-    val templateClassic: String
-    val templateClassicDescription: String
-    val templateAcademic: String
-    val templateAcademicDescription: String
-    val templateModern: String
-    val templateModernDescription: String
-    val templateCompact: String
-    val templateCompactDescription: String
     val confirmTitle: String
     fun confirmBody(name: Any?): String
     val confirmDetail: String
@@ -87,16 +67,20 @@ interface AiStrings {
     fun passwordBody(name: Any?): String
     val passwordLocalNote: String
     val passwordCloudNote: String
-    val passwordHybridNote: String
     val runningTitle: String
     fun runningBody(name: Any?): String
     val keepWaiting: String
     val summaryTitle: String
-    fun summaryMeta(fileName: Any?, label: Any?): String
     val summaryCopied: String
     val summarizing: String
     val showSummaryA11y: String
     val summarizeA11y: String
+    fun summaryOf(fileName: Any?): String
+    val needsConnection: String
+    val openSourceFile: String
+    val deleteSummary: String
+    fun deleteSummaryBody(name: Any?): String
+    fun summaryDeleted(name: Any?): String
 }
 
 /** Belge okuyucuların (PDF, Word, OLE, XML) hata mesajları. */
@@ -144,15 +128,6 @@ interface DocsStrings {
     val xmlUnreadable: String
     val xmlEmpty: String
     val xmlTooDeep: String
-}
-
-/** Özetin İÇERİĞİ (başlıklar, PDF üst/alt bilgisi): uygulamanın değil ÖZET dilinin tablosundan okunur. */
-interface SummaryStrings {
-    val summaryLabel: String
-    val keyPoints: String
-    fun page(number: Any?): String
-    val pdfTitle: String
-    fun sourceFile(sourceName: Any?): String
 }
 
 /** Birçok ekranda geçen kısa metinler (düğmeler, ortak eylemler). */
@@ -389,8 +364,9 @@ interface PlanStrings {
     val price: String
     fun freeLimitReached(limit: Any?): String
     fun cantSummarizeOnPhone(fileName: Any?, reason: Any?): String
-    val cloudModesPlusOnly: String
     val goPlus: String
+    val cloudPlusOnly: String
+    val localAiComingSoon: String
 }
 
 /** Profil, ayarlar ve şifre değiştirme. */
@@ -416,10 +392,6 @@ interface ProfileStrings {
     val notificationSettingsFailed: String
     val signOut: String
     val theme: String
-    val aiLocation: String
-    fun optionWithDescription(label: Any?, description: Any?): String
-    val summaryTemplate: String
-    val templateFutureOnly: String
     val trashRetention: String
     val trashRetentionDetail: String
     fun days(it: Any?): String

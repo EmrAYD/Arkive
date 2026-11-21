@@ -37,7 +37,7 @@ import com.eayd.arkive.viewmodel.MoveFolderViewModel
 
 /**
  * "Taşı" penceresi (dosya ve klasörler için): klasör ağacında gezip hedef klasörü seçtirir. En üstte "Ana Sayfa"
- * (kök) vardır. Yalnızca "Ana Sayfa" altındaki klasörler listelenir; AI sonuçları klasörlerine dosya konulamaz.
+ * (kök) vardır. Yalnızca "Ana Sayfa" altındaki klasörler listelenir (klasörler yalnızca ana sayfadadır).
  * Gezinti durumunu [MoveFolderViewModel] tutar; pencere her açıldığında en üstten başlar.
  *
  * @param summary taşınanları anlatan satır (ör. “rapor.pdf” ya da 3 öğe)
@@ -54,7 +54,7 @@ fun MoveFolderDialog(
     error: String?,
     onMove: (targetFolderId: String?, targetName: String) -> Unit,
     onDismiss: () -> Unit,
-    /** Hangi sayfanın klasörleri gösterilir: ana sayfa (varsayılan) ya da yapay zeka sonuçları ([FolderLocations.AI_RESULTS]). */
+    /** Hangi sayfanın klasörleri gösterilir (klasörler yalnızca ana sayfada: [FolderLocations.HOME]). */
     location: String = FolderLocations.HOME,
     viewModel: MoveFolderViewModel = viewModel(),
 ) {

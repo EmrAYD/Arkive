@@ -123,12 +123,11 @@ fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
 }
 
 /**
- * Özet açma gezinmesi; hangi ekranda olunursa olunsun çalışır:
- *  - Özetin PDF dosyası ([AiSummarizer.openFile]) açılınca ön izleme ekranına gidilir (AI düğmesine basınca, "Özeti aç"a
- *    dokununca ve bildirime dokununca aynı yol).
+ * Özet pencereleri; hangi ekranda olunursa olunsun çalışır:
+ *  - Özet penceresi ([AiSummaryDialogHost]) burada durur: AI düğmesine basınca, özetleme bitince ve AI Sonuçlarım'da bir
+ *    özete dokununca hangi ekranda olunursa olunsun açılır.
  *  - Bildirime dokunularak gelen istek ([AiSummarizer.pendingOpen]) oturum açılmış bir ekrandayken yerine getirilir; uygulama
  *    kapalıyken açılış/giriş ekranları bitene kadar bekler.
- *  - Özet penceresi ([AiSummaryDialogHost]) de burada durur: özetin dosyası yoksa özet metni hangi ekranda olunursa olunsun görünür.
  */
 @Composable
 private fun SummaryNavigation(navController: NavHostController) {
@@ -136,9 +135,6 @@ private fun SummaryNavigation(navController: NavHostController) {
     val pending by AiSummarizer.pendingOpen.collectAsState()
     val signedInScreen = route != null && route != Routes.SPLASH && route != Routes.LOGIN && route != Routes.REGISTER
 
-    LaunchedEffect(navController) {
-        AiSummarizer.openFile.collect { navController.navigate(Routes.preview(it.id)) }
-    }
     LaunchedEffect(pending, signedInScreen) {
         if (pending != null && signedInScreen) {
             AiSummarizer.takePendingOpen()?.let { AiSummarizer.openSummary(it.fileId, it.fileName) }

@@ -44,7 +44,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.R
-import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.data.PlusOffer
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.AiIcons
@@ -52,19 +51,13 @@ import com.eayd.arkive.ui.components.StorageSkeleton
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.viewmodel.StorageInfo
 
-/**
- * Yan menüden seçilen bölümler. [location] ER diyagramındaki Folders.Location değeridir; yalnızca
- * klasör ağacı gösteren bölümlerde vardır (Favorilerim ve çöp kutusunda yok).
- */
-internal enum class HomeSection(
-    val icon: ImageVector,
-    val location: String?,
-) {
-    Files(Icons.Filled.Home, FolderLocations.HOME),
-    Favorites(Icons.Filled.Star, null),
+/** Yan menüden seçilen bölümler. [AiResults]: yapay zeka özetlerinin listesi (klasör ve dosya değil). */
+internal enum class HomeSection(val icon: ImageVector) {
+    Files(Icons.Filled.Home),
+    Favorites(Icons.Filled.Star),
     // Uygulamanın yapay zeka simgesi (elmas ve parıltı); dosya satırlarındaki AI düğmesiyle aynı.
-    AiResults(AiIcons.Filled, FolderLocations.AI_RESULTS),
-    Trash(Icons.Filled.Delete, null),
+    AiResults(AiIcons.Filled),
+    Trash(Icons.Filled.Delete),
     ;
 
     /** Seçili dilde başlığı. */

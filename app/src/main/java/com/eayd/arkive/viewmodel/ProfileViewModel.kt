@@ -2,14 +2,10 @@ package com.eayd.arkive.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.eayd.arkive.ai.AiMode
-import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.ApiClient
 import com.eayd.arkive.data.AppSettings
-import com.eayd.arkive.data.PlanPolicy
 import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.data.PlanSwitcher
-import com.eayd.arkive.data.PlusOffer
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.i18n.Txt
@@ -37,13 +33,7 @@ sealed interface ProfileDialog {
     /** Tema seçimi (sistem / açık / koyu). */
     data object Theme : ProfileDialog
 
-    /** Yapay zeka işlem yeri seçimi (yerel / bulut / yerel + bulut). */
-    data object AiProcessing : ProfileDialog
-
-    /** Özet PDF'inin şablon seçimi. */
-    data object SummaryTemplateChoice : ProfileDialog
-
-    /** Dil: uygulamanın dili ve özetin dili (bulut özetinin ve özet başlıklarının dili) aynı pencerede seçilir. */
+    /** Dil: uygulamanın dili ve özetin dili aynı pencerede seçilir. */
     data object Language : ProfileDialog
 }
 
@@ -94,8 +84,6 @@ class ProfileViewModel : ViewModel() {
     /** Bu cihaza özgü ayarlar ([AppSettings]); sunucuya gitmez. */
     val themeMode: StateFlow<ThemeMode> = AppSettings.themeMode
     val wifiOnly: StateFlow<Boolean> = AppSettings.wifiOnly
-    val aiMode: StateFlow<AiMode> = AppSettings.aiMode
-    val summaryTemplate: StateFlow<SummaryTemplate> = AppSettings.summaryTemplate
     val appLanguage: StateFlow<AppLanguage> = AppSettings.appLanguage
     val summaryLanguage: StateFlow<AppLanguage> = AppSettings.summaryLanguage
 
@@ -107,21 +95,6 @@ class ProfileViewModel : ViewModel() {
         dialogs.close()
         AppSettings.setSummaryLanguage(summary)
         AppSettings.setAppLanguage(app)
-    }
-
-    fun setSummaryTemplate(template: SummaryTemplate) {
-        AppSettings.setSummaryTemplate(template)
-        dialogs.close()
-    }
-
-    fun setAiMode(mode: AiMode) {
-        dialogs.close()
-        // Bulut özeti Plus'a özel: ücretsiz planda "Bulut" ve "Yerel + Bulut" seçilince ayar değişmez, Plus tanıtılır.
-        if (mode.allowsCloud && PlanStatus.quota.value?.cloud == false) {
-            PlusOffer.show(PlanPolicy.CLOUD_MODE_MESSAGE)
-            return
-        }
-        AppSettings.setAiMode(mode)
     }
 
     fun setThemeMode(mode: ThemeMode) {

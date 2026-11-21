@@ -73,8 +73,6 @@ interface ArkiveApi {
     suspend fun getFiles(
         @Query("folder_id") folderId: String? = null,
         @Query("favorite") favorite: Boolean? = null,
-        /** Yalnızca klasörsüz listelemede: "ai_results" AI Sonuçlarım sayfasının en üstündeki dosyaları getirir. */
-        @Query("location") location: String? = null,
     ): List<FileDto>
 
     /** Tek dosyanın bilgisi (ön izleme ekranı dosyayı yalnızca id'siyle açar). */
@@ -95,7 +93,12 @@ interface ArkiveApi {
     suspend fun deleteFile(@Path("id") id: String)
 
     // --- Yapay zeka özeti -------------------------------------------------------------------------
-    // Özet sunucuda saklanır ve dosyanın içeriğine bağlıdır: aynı içerikli dosya tekrar yüklense de özeti hazır gelir.
+    // Özet, belgenin ne olduğunu ve neleri içerdiğini anlatan tek paragraftır; sunucuda (ai_results tablosunda) saklanır
+    // ve dosyanın içeriğine bağlıdır: aynı içerikli dosya tekrar yüklense de özeti hazır gelir.
+
+    /** AI Sonuçlarım sayfası: tamamlanmış özetler, en yenisi önce. */
+    @GET("summaries")
+    suspend fun getSummaries(): List<SummaryItemDto>
 
     /** Kayıtlı özet; dosyanın özeti yoksa 404. */
     @GET("files/{id}/summary")
@@ -118,6 +121,10 @@ interface ArkiveApi {
     /** Telefonda üretilen özeti kaydeder (özet zaten varsa mevcut olan korunur ve o döner). */
     @PUT("files/{id}/summary")
     suspend fun saveSummary(@Path("id") id: String, @Body body: SaveSummaryRequest): SummaryResponse
+
+    /** Dosyanın (ve aynı içerikli kopyalarının) özetini siler; dosya yeniden özetlenebilir. Özet yoksa 404. */
+    @DELETE("files/{id}/summary")
+    suspend fun deleteSummary(@Path("id") id: String)
 
     // --- Çöp kutusu -------------------------------------------------------------------------------
     // DELETE /files|folders öğeyi çöp kutusuna taşır; kalıcı silme aşağıdaki uçlarla yapılır.

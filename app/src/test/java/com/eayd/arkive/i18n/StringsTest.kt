@@ -76,7 +76,13 @@ class StringsTest {
         Lang.app = AppLanguage.English
         assertEquals("Save", Txt.common.save)
         assertEquals(Locale.forLanguageTag("en"), Lang.locale)
-        // Özetin içeriği uygulamanın değil istenen dilin tablosundan okunabilir.
-        assertEquals("Özet: ", Lang.stringsFor(AppLanguage.Turkish).summary.summaryLabel)
+        // Belirli bir dilin tablosu, seçili dilden bağımsız okunabilir.
+        assertEquals("Kaydet", Lang.stringsFor(AppLanguage.Turkish).common.save)
+    }
+
+    @Test
+    fun `ozet ogesinin adi neyin ozeti oldugunu soyler`() {
+        assertEquals("rapor.pdf özeti", TrStrings.ai.summaryOf("rapor.pdf"))
+        assertEquals("Summary of rapor.pdf", EnStrings.ai.summaryOf("rapor.pdf"))
     }
 }

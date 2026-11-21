@@ -74,10 +74,12 @@ data class TrashIdsRequest(
 
 data class TrashCountResponse(val count: Int)
 
-/** Klasörün görüneceği sayfa. Sunucudaki Folders.Location değerleriyle birebir aynı olmalı. */
+/**
+ * Klasörün görüneceği sayfa (sunucudaki Folders.Location). Klasörler yalnızca ana sayfadadır; AI Sonuçlarım sayfası
+ * klasör değil, özetlerin listesidir ([SummaryItemDto]).
+ */
 object FolderLocations {
     const val HOME = "home"
-    const val AI_RESULTS = "ai_results"
 }
 
 data class FolderDto(
@@ -112,8 +114,6 @@ data class FileDto(
     @SerializedName("created_at") val createdAt: String,
     /** Dosyanın (ya da aynı içerikli bir kopyasının) yapay zeka özeti var mı; AI düğmesi buna göre dolu görünür. */
     @SerializedName("has_summary") val hasSummary: Boolean = false,
-    /** Dosya "AI Sonuçlarım" sayfasında (yapay zekanın ürettiği bir sonuç); bunlar özetlenmez, AI düğmesi gösterilmez. */
-    @SerializedName("in_ai_results") val inAiResults: Boolean = false,
 )
 
 /** Yüklemeyi başlatırken gönderilen bilgi: dosyanın kendisi değil, yalnızca adı/boyutu/türü. */
@@ -141,40 +141,38 @@ data class DownloadUrlResponse(
 )
 
 /**
- * Dosyanın kayıtlı yapay zeka özeti (GET/POST/PUT /files/{id}/summary). [source]: "local" (telefonda) ya da "cloud"
- * (sunucuda). [truncated]: dosya çok uzun olduğu için yalnızca ilk bölümü özetlendi (sunucu bunu özet metnine de yazar).
+ * Dosyanın kayıtlı yapay zeka özeti (GET/POST/PUT /files/{id}/summary): belgenin ne olduğunu ve neleri içerdiğini
+ * anlatan tek paragraf. [truncated]: dosya çok uzun olduğu için yalnızca ilk bölümü özetlendi (sunucu bunu özetin
+ * sonuna not olarak da yazar).
  */
 data class SummaryResponse(
     val summary: String,
-    val source: String = "cloud",
-    val model: String? = null,
     val truncated: Boolean = false,
-    /** Özetin "AI Sonuçlarım" sayfasındaki PDF dosyası; düğmeye basınca bu dosyanın ön izlemesi açılır. */
-    @SerializedName("result_file_id") val resultFileId: String? = null,
+)
+
+/**
+ * AI Sonuçlarım sayfasındaki bir özet (GET /summaries). [file]: özetin kaynak dosyası; öğe bu dosyanın adıyla
+ * ("rapor.pdf özeti") gösterilir.
+ */
+data class SummaryItemDto(
+    val id: String,
+    val summary: String,
+    val truncated: Boolean = false,
+    @SerializedName("created_at") val createdAt: String,
+    val file: FileDto,
 )
 
 /**
  * Dosyanın bulutta özetlenmesi (POST /files/{id}/summary). [password]: yalnızca parolalı dosyada; bu istekte gider,
- * sunucu saklamaz. [template]: özet PDF'inin şablon adı ([com.eayd.arkive.ai.SummaryTemplate.id]). [joinOnly]: yalnızca
- * sunucuda süren özetlemeye katıl (uygulama yeniden açılınca); süren iş ya da kayıtlı özet yoksa sunucu yenisini
- * başlatmaz, 404 döner.
+ * sunucu saklamaz. [joinOnly]: yalnızca sunucuda süren özetlemeye katıl (uygulama yeniden açılınca); süren iş ya da
+ * kayıtlı özet yoksa sunucu yenisini başlatmaz, 404 döner.
  */
 data class SummarizeRequest(
     val password: String? = null,
-    val template: String? = null,
     @SerializedName("join_only") val joinOnly: Boolean = false,
     /** Özetin yazılacağı dil ("tr" / "en"); bkz. [com.eayd.arkive.data.AppSettings.summaryLanguage]. */
     val language: String? = null,
 )
 
-/** Telefonda üretilen özetin sunucuya kaydı (PUT /files/{id}/summary). */
-data class SaveSummaryRequest(
-    val summary: String,
-    val model: String? = null,
-    /** Özet PDF'inin şablon adı ([com.eayd.arkive.ai.SummaryTemplate.id]). */
-    val template: String? = null,
-    /** Telefonun ürettiği özet PDF'i (base64). Yoksa sunucu PDF'i kendisi üretir. */
-    @SerializedName("pdf_base64") val pdfBase64: String? = null,
-    /** Özetin dili ("tr" / "en"): sunucu PDF'i kendisi üretirse başlıkları ve sonuç dosyasının adı bu dilde olur. */
-    val language: String? = null,
-)
+/** Telefonda (cihazdaki yapay zekayla) üretilen özetin sunucuya kaydı (PUT /files/{id}/summary). */
+data class SaveSummaryRequest(val summary: String)

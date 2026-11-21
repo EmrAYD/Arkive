@@ -86,23 +86,14 @@ data class BrowserUiState(
     val selectedFolders: List<FolderDto> get() = folders.filter { folderKey(it.id) in selection.keys }
     val selectedItems: SelectedItems get() = SelectedItems(selectedFiles, selectedFolders)
 
-    /**
-     * Seçimin taşınabileceği sayfa ([FolderLocations.HOME] ya da [FolderLocations.AI_RESULTS]); taşınamıyorsa null.
-     * Normal dosya ve klasörler ana sayfa klasörlerine, yapay zeka sonuç dosyaları AI Sonuçlarım klasörlerine taşınır;
-     * ikisi karışık seçilmişse (Favorilerim) ve AI sonuçları klasörleri seçiliyse taşıma kapalıdır.
-     */
-    val moveLocation: String? get() {
-        if (selection.keys.isEmpty()) return null
-        val areas = selectedFiles.map { if (it.inAiResults) FolderLocations.AI_RESULTS else FolderLocations.HOME }.toSet() +
-            selectedFolders.map { it.location }.toSet()
-        return areas.singleOrNull()?.takeIf { selectedFolders.none { f -> f.location == FolderLocations.AI_RESULTS } }
-    }
+    /** Seçimin taşınabileceği sayfa: klasörler yalnızca ana sayfada olduğu için [FolderLocations.HOME]; seçim boşsa null. */
+    val moveLocation: String? get() = if (selection.keys.isEmpty()) null else FolderLocations.HOME
 }
 
 /**
  * Bir "seviyedeki" klasörleri VE dosyaları yönetir; dosya yüklemeyi, çoklu seçimi, filtreleri ve pencerelerin
  * işlemlerini de buradan yürütür.
- *  - parentId == null → [location] sayfasının kök klasörleri/dosyaları (ana sayfa ya da AI sonuçları)
+ *  - parentId == null → [location] sayfasının (ana sayfa) kök klasörleri/dosyaları
  *  - parentId != null → o klasörün içindekiler (konum üst klasörden devralınır, [location] kullanılmaz)
  *  - favoritesOnly    → derinliğine bakılmaksızın TÜM favori klasörler ve dosyalar ("Favorilerim")
  *
@@ -115,9 +106,6 @@ class BrowserViewModel(
     val favoritesOnly: Boolean = false,
 ) : ViewModel() {
 
-    /** AI Sonuçlarım sayfasının en üstü mü? (Boş durum yazısı ve yükleme kuralları buna göre değişir.) */
-    val isAiResultsRoot: Boolean get() = !favoritesOnly && parentId == null && location == FolderLocations.AI_RESULTS
-
     /** Bu ekranın telefondaki liste görüntüsünün adı ([ListCache]). */
     private val cacheKey: String = when {
         favoritesOnly -> "favorites"
@@ -125,7 +113,7 @@ class BrowserViewModel(
         else -> "root_$location"
     }
 
-    /** Bu konuma dosya yüklenebilir mi? (Ana sayfa ve klasör içleri; favorilere ve AI sonuçlarına yüklenemez.) */
+    /** Bu konuma dosya yüklenebilir mi? (Ana sayfa ve klasör içleri; favorilere yüklenemez.) */
     private val canUploadHere = !favoritesOnly && (parentId != null || location == FolderLocations.HOME)
 
     private val _state = MutableStateFlow(BrowserUiState(canUpload = canUploadHere))
@@ -233,7 +221,6 @@ class BrowserViewModel(
             ApiClient.api.getFiles(
                 folderId = parentId,
                 favorite = if (favoritesOnly) true else null,
-                location = if (parentId == null && !favoritesOnly) location else null,
             )
         }
         ListCache.Snapshot(folderD.await(), foldersD.await(), filesD.await())
@@ -252,8 +239,8 @@ class BrowserViewModel(
                 files = loaded.files,
                 selection = if (selection.keys.isEmpty()) Selection() else selection,
                 title = loaded.folder?.name ?: it.title,
-                // İnternetsizken ve AI sonuçları klasörlerinde (sunucu da reddeder) dosya yüklenemez.
-                canUpload = canUploadHere && !offline && loaded.folder?.location != FolderLocations.AI_RESULTS,
+                // İnternetsizken dosya yüklenemez.
+                canUpload = canUploadHere && !offline,
             )
         }
     }
@@ -389,12 +376,9 @@ class BrowserViewModel(
 
     /**
      * Uzun basış: öğeyi seçime ekler ve seçimin tamamını sürüklenecek olarak döner (tek öğe de olabilir).
-     * Önceden seçili öğeler varsa onlar da birlikte taşınır. AI sonuçları klasörleri taşınamaz: o zaman null.
+     * Önceden seçili öğeler varsa onlar da birlikte taşınır.
      */
-    fun longPress(key: String): SelectedItems? {
-        val items = edit { it.copy(selection = it.selection.add(key)) }.selectedItems
-        return items.takeIf { selected -> selected.folders.all { it.location == FolderLocations.HOME } }
-    }
+    fun longPress(key: String): SelectedItems? = edit { it.copy(selection = it.selection.add(key)) }.selectedItems
 
     // --- Kullanıcı işlemleri -------------------------------------------------------------------------
     // Pencerelerin işlemleri `dialogs.submit` ile çalışır: başarılıysa pencere kapanır, hata verirse pencerede
@@ -549,7 +533,7 @@ class BrowserViewModel(
         /**
          * ViewModel'in kurucusu parametre aldığı için onu üreten bir "fabrika" gerekir.
          * viewModel(key = ...) ile birlikte kullanılır: her anahtar için ayrı bir örnek yaşar
-         * (ana sayfa listesi, AI sonuçları listesi, favoriler, her klasörün kendi listesi).
+         * (ana sayfa listesi, favoriler, her klasörün kendi listesi).
          */
         fun factory(
             parentId: String?,

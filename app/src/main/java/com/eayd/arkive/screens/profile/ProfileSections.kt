@@ -16,7 +16,6 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
@@ -42,8 +41,6 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import com.eayd.arkive.ai.AiMode
-import com.eayd.arkive.ai.SummaryTemplate
 import com.eayd.arkive.data.PlusPlan
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.i18n.AppLanguage
@@ -167,24 +164,20 @@ internal fun AccountSection(email: String?, hasPassword: Boolean, onChangePasswo
 }
 
 /**
- * "Ayarlar": bildirimler (sistem ayarlarını açar), dil (uygulamanın ve özetin dili), tema, yalnızca Wi-Fi, yapay zeka işlem yeri, özet şablonu,
- * çöp kutusu saklama süresi. Tema, Wi-Fi ve yapay zeka ayarları bu cihazda, saklama süresi sunucuda tutulur; süre henüz yüklenmediyse ([trashRetentionDays] null)
+ * "Ayarlar": bildirimler (sistem ayarlarını açar), dil (uygulamanın ve özetin dili), tema, yalnızca Wi-Fi, çöp kutusu saklama
+ * süresi. Dil, tema ve Wi-Fi ayarları bu cihazda, saklama süresi sunucuda tutulur; süre henüz yüklenmediyse ([trashRetentionDays] null)
  * o satır pasiftir.
  */
 @Composable
 internal fun SettingsSection(
     themeMode: ThemeMode,
     wifiOnly: Boolean,
-    aiMode: AiMode,
-    summaryTemplate: SummaryTemplate,
     appLanguage: AppLanguage,
     summaryLanguage: AppLanguage,
     trashRetentionDays: Int?,
     onNotifications: () -> Unit,
     onTheme: () -> Unit,
     onWifiOnlyChange: (Boolean) -> Unit,
-    onAiMode: () -> Unit,
-    onSummaryTemplate: () -> Unit,
     onLanguage: () -> Unit,
     onTrashRetention: () -> Unit,
 ) {
@@ -225,22 +218,6 @@ internal fun SettingsSection(
             onClick = { onWifiOnlyChange(!wifiOnly) },
             // Satırın tamamı dokunulabilir olduğu için anahtarın kendi dokunuşu kapalıdır (çift işlem olmasın).
             trailing = { Switch(checked = wifiOnly, onCheckedChange = null) },
-        )
-        RowDivider()
-        ProfileRow(
-            icon = AiIcons.Filled, // uygulamanın yapay zeka simgesi (elmas ve parıltı)
-            title = Txt.profile.aiLocation,
-            subtitle = aiMode.label,
-            onClick = onAiMode,
-            trailing = { Chevron() },
-        )
-        RowDivider()
-        ProfileRow(
-            icon = Icons.Filled.Description,
-            title = Txt.profile.summaryTemplate,
-            subtitle = summaryTemplate.label,
-            onClick = onSummaryTemplate,
-            trailing = { Chevron() },
         )
         RowDivider()
         ProfileRow(
