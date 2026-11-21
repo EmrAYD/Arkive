@@ -20,6 +20,8 @@ interface Strings {
     val trash: TrashStrings
     val eula: EulaStrings
     val language: LanguageStrings
+    val localAi: LocalAiStrings
+    val aiMode: AiModeStrings
 }
 
 /** Yapay zeka özetleme: pencereler, durum ve bildirim metinleri. */
@@ -67,6 +69,7 @@ interface AiStrings {
     fun passwordBody(name: Any?): String
     val passwordLocalNote: String
     val passwordCloudNote: String
+    val passwordHybridNote: String
     val runningTitle: String
     fun runningBody(name: Any?): String
     val keepWaiting: String
@@ -81,6 +84,8 @@ interface AiStrings {
     val deleteSummary: String
     fun deleteSummaryBody(name: Any?): String
     fun summaryDeleted(name: Any?): String
+    val loadingModel: String
+    fun summarizingOnPhoneStep(done: Any?, total: Any?): String
 }
 
 /** Belge okuyucuların (PDF, Word, OLE, XML) hata mesajları. */
@@ -366,7 +371,7 @@ interface PlanStrings {
     fun cantSummarizeOnPhone(fileName: Any?, reason: Any?): String
     val goPlus: String
     val cloudPlusOnly: String
-    val localAiComingSoon: String
+    val localAiUnsupported: String
 }
 
 /** Profil, ayarlar ve şifre değiştirme. */
@@ -512,4 +517,57 @@ interface LanguageStrings {
     val changeA11y: String
     val title: String
     fun mixed(app: Any?, summary: Any?): String
+}
+
+/** Telefondaki yapay zeka modeli (telefonda özetleme): indirme, durum ve hata metinleri. Metinler yapay zeka işlem yerine göre değişir. */
+interface LocalAiStrings {
+    val title: String
+    fun notDownloaded(size: Any?): String
+    fun downloadingShort(percent: Any?): String
+    val waitingShort: String
+    fun ready(size: Any?): String
+    val unsupportedShort: String
+    fun intro(model: Any?, size: Any?): String
+    fun introHybrid(model: Any?, size: Any?): String
+    fun introCloud(model: Any?, size: Any?): String
+    val wifiNote: String
+    val meteredNote: String
+    val download: String
+    fun downloadingBody(done: Any?, total: Any?): String
+    val waitingBody: String
+    val downloadingNote: String
+    val cancelDownload: String
+    val summarizeInCloud: String
+    fun readyBody(model: Any?, size: Any?): String
+    fun readyBodyHybrid(model: Any?, size: Any?): String
+    fun readyBodyCloud(model: Any?, size: Any?): String
+    val deleteModel: String
+    fun deleteBody(size: Any?): String
+    val deleted: String
+    val unsupportedBody: String
+    val unsupportedBodyPlus: String
+    val unsupportedLocalMode: String
+    val downloadTitle: String
+    val downloadStarted: String
+    val downloaded: String
+    val downloadFailed: String
+    fun noSpace(size: Any?): String
+    val noStorage: String
+    val stillDownloading: String
+    val notReady: String
+    val runFailed: String
+}
+
+/** Yapay zeka işlem yeri ayarı (Yerel / Bulut / Yerel + Bulut): seçenekler, açıklamaları ve ilgili uyarılar. */
+interface AiModeStrings {
+    val title: String
+    val local: String
+    val cloud: String
+    val hybrid: String
+    fun localDetail(size: Any?, pages: Any?): String
+    val cloudDetail: String
+    fun hybridDetail(size: Any?, pages: Any?): String
+    val plusOnly: String
+    val cloudPlusOnly: String
+    fun localOnlyBlocked(fileName: Any?, reason: Any?): String
 }

@@ -2,10 +2,15 @@ package com.eayd.arkive.viewmodel
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.eayd.arkive.ai.AiMode
+import com.eayd.arkive.ai.LocalModel
+import com.eayd.arkive.ai.LocalModelState
 import com.eayd.arkive.data.ApiClient
 import com.eayd.arkive.data.AppSettings
+import com.eayd.arkive.data.PlanPolicy
 import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.data.PlanSwitcher
+import com.eayd.arkive.data.PlusOffer
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.i18n.Txt
@@ -35,6 +40,12 @@ sealed interface ProfileDialog {
 
     /** Dil: uygulamanın dili ve özetin dili aynı pencerede seçilir. */
     data object Language : ProfileDialog
+
+    /** Yapay zeka işlem yeri seçimi (yerel / bulut / yerel + bulut). */
+    data object AiProcessing : ProfileDialog
+
+    /** Telefondaki yapay zeka modeli: indir / indirmeyi durdur / sil. */
+    data object LocalAi : ProfileDialog
 }
 
 data class ProfileUiState(
@@ -84,6 +95,12 @@ class ProfileViewModel : ViewModel() {
     /** Bu cihaza özgü ayarlar ([AppSettings]); sunucuya gitmez. */
     val themeMode: StateFlow<ThemeMode> = AppSettings.themeMode
     val wifiOnly: StateFlow<Boolean> = AppSettings.wifiOnly
+
+    /** Yapay zeka işlem yeri (kayıtlı seçim; ücretsiz planda geçerli olan her zaman yereldir). */
+    val aiMode: StateFlow<AiMode> = AppSettings.aiMode
+
+    /** Dosyaları telefonda özetleyen yapay zeka modelinin durumu ("Yerel" ve "Yerel + Bulut"ta kullanılır). */
+    val localModel: StateFlow<LocalModelState> = LocalModel.state
     val appLanguage: StateFlow<AppLanguage> = AppSettings.appLanguage
     val summaryLanguage: StateFlow<AppLanguage> = AppSettings.summaryLanguage
 
@@ -103,6 +120,19 @@ class ProfileViewModel : ViewModel() {
     }
 
     fun setWifiOnly(enabled: Boolean) = AppSettings.setWifiOnly(enabled)
+
+    /**
+     * Yapay zeka işlem yerini kaydeder. Bulut Plus'a özel: ücretsiz planda "Bulut" ya da "Yerel + Bulut" seçilince ayar
+     * değişmez, nedeni yazılı Plus tanıtımı açılır.
+     */
+    fun setAiMode(mode: AiMode) {
+        dialogs.close()
+        if (mode.allowsCloud && PlanStatus.quota.value?.cloud == false) {
+            PlusOffer.show(PlanPolicy.CLOUD_MODE_MESSAGE)
+            return
+        }
+        AppSettings.setAiMode(mode)
+    }
 
     /**
      * Plan ve sınırları sunucudan alır. Sayfa her açıldığında çağrılır (ekran çağırır); bilgi zaten ekrandaysa
@@ -143,6 +173,17 @@ class ProfileViewModel : ViewModel() {
     fun clearNotice() = _state.update { it.copy(notice = null) }
 
     fun showNotice(message: String) = _state.update { it.copy(notice = message) }
+
+    /** Modeli indirmeye başlar (pencere açık kalır, ilerlemeyi gösterir); başlayamazsa nedeni bildirilir. */
+    fun downloadLocalModel() = showNotice(LocalModel.startDownload() ?: Txt.localAi.downloadStarted)
+
+    fun cancelLocalModelDownload() = LocalModel.cancelDownload()
+
+    fun deleteLocalModel() {
+        LocalModel.delete()
+        dialogs.close()
+        showNotice(Txt.localAi.deleted)
+    }
 
     fun openDialog(dialog: ProfileDialog) = dialogs.open(dialog)
 

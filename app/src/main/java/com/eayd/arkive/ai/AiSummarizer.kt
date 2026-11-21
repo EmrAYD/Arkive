@@ -63,6 +63,14 @@ sealed interface SummaryUi {
 
     /** "Özet silinsin mi?" onayı (AI Sonuçlarım sayfasından). */
     data class DeleteAsk(val fileId: String, val fileName: String) : SummaryUi
+
+    /**
+     * Dosya, yapay zeka işlem yerine göre telefonda özetlenecek ("Yerel" ya da "Yerel + Bulut", [AiPolicy.wantsModel])
+     * ama model telefonda hazır değil: modeli indirme penceresi ([LocalModel]). Pencere modelin durumunu canlı gösterir
+     * (iniyor %…, hazır). [cloudAlternative]: "Yerel + Bulut"ta bu dosya, model inmeden de "Bulutta özetle" ile hemen
+     * bulutta özetlenebilir; "Yerel"de null (bulut yok).
+     */
+    data class ModelSetup(val cloudAlternative: FileDto? = null) : SummaryUi
 }
 
 /**
@@ -83,8 +91,14 @@ class SummaryDone(val file: FileDto, val savedOnPhoneOnly: Boolean)
  * Özet, belgenin ne olduğunu ve neleri içerdiğini anlatan tek paragraftır; sunucuda saklanır ve dosyanın içeriğine
  * bağlıdır (aynı içerikle yeniden yüklenen dosyanın özeti hazır gelir). "AI Sonuçlarım" sayfası bu özetlerin listesidir.
  *
- * Özetin nerede çıkarılacağı plana bağlıdır: Plus'ta sunucudaki yapay zekayla (bulut); ücretsiz planda telefonda,
- * cihazdaki yapay zekayla ([LocalSummarizer], henüz yok: o zamana kadar ücretsiz planda Plus tanıtılır).
+ * Özetin nerede çıkarılacağını ayarlardaki yapay zeka işlem yeri ([AiMode], Profil > Ayarlar) belirler ([AiPolicy.route]):
+ *  - Yerel: yalnızca telefonda, cihazdaki yapay zekayla ([LocalSummarizer]: Gemma 4 E2B; model bir kez indirilir, bkz.
+ *    [LocalModel]). Büyük, uzun ya da görselli dosyalar özetlenemez; nedeni söylenir.
+ *  - Bulut: her zaman sunucudaki yapay zekayla; model gerekmez.
+ *  - Yerel + Bulut: küçük dosyalar telefonda; büyükler ve telefonda özetlenemeyenler (uzun/görselli belge, model hatası)
+ *    sunucuda. Model inmediyse küçük dosya için önce indirme önerilir, istenirse o dosya bulutta özetlenir.
+ * Bulut Plus'a özeldir: ücretsiz planda ayar ne olursa olsun Yerel geçerlidir. Telefonda özetlenen dosya internete
+ * gönderilmez, yalnızca çıkan özet sunucuya kaydedilir.
  *
  * Uygulama genelinde tek bir kapsamda çalışır: ekran değişse de özetleme sürer.
  */
@@ -177,11 +191,17 @@ object AiSummarizer {
     }
 
     /**
-     * Özetleme onayından önce planın hakları denetlenir (sunucudan tazelenir; internet yoksa son bilinen değer):
-     *  - Plus (bulut özeti açık): onay sorulur.
-     *  - Ücretsiz plan: telefonda özetlenir. Cihazdaki model henüz yoksa ([LocalSummarizer.available]) ya da özet sınırı
-     *    ([SummaryQuota.full]) doluysa onay yerine nedeni yazılı Plus tanıtımı açılır.
-     *  - Plan hiç bilinmiyorsa (internet yok): özetleme sunucu olmadan yapılamaz, bu söylenir.
+     * Özetleme onayından önce planın hakları denetlenir (sunucudan tazelenir; internet yoksa son bilinen değer). Sonra
+     * geçerli işlem yerine ([PlanPolicy.effectiveMode]: ücretsiz planda her zaman Yerel) bakılır:
+     *  - Dosya bulutta özetlenecekse (Bulut; Yerel + Bulut'ta büyük dosya): onay sorulur, model istenmez.
+     *  - Yerel'de dosya telefonda özetlenemeyecek kadar büyükse: onay yerine nedeni söylenir (ücretsiz planda Plus
+     *    tanıtımıyla).
+     *  - Dosya telefonda özetlenecekse model gerekir: hazırsa onay sorulur; inmediyse indirme penceresi açılır (Yerel +
+     *    Bulut'ta pencerede "Bulutta özetle" de vardır; model inerken de bu pencere açılır, Yerel'de "hala iniyor"
+     *    denir). Telefon modeli çalıştıramıyorsa Yerel + Bulut'ta dosya bulutta özetlenir; Yerel'de nedeni söylenir
+     *    (ücretsiz planda Plus tanıtımıyla).
+     *  - Ücretsiz planda özet sınırı ([SummaryQuota.full]) doluysa onay yerine nedeni yazılı Plus tanıtımı açılır.
+     *  - Plan hiç bilinmiyorsa (internet yok): hangi yolun kullanılacağı bilinemez, bu söylenir.
      */
     private fun askToSummarize(file: FileDto) {
         opening += file.id
@@ -189,17 +209,45 @@ object AiSummarizer {
             try {
                 val quota = refreshQuota()
                 val limit = quota?.limit
+                val mode = PlanPolicy.effectiveMode(AppSettings.aiMode.value, cloudAllowed = quota?.cloud == true)
                 when {
                     quota == null -> _notices.tryEmit(Txt.ai.needsConnection)
-                    quota.cloud -> _ui.value = SummaryUi.Confirm(file)
-                    !LocalSummarizer.available -> PlusOffer.show(PlanPolicy.LOCAL_AI_COMING_SOON)
                     quota.full && limit != null -> PlusOffer.show(PlanPolicy.limitMessage(limit))
-                    else -> _ui.value = SummaryUi.Confirm(file)
+                    !AiPolicy.wantsModel(mode, file.size) -> {
+                        // Bulutta özetlenecek; ya da "Yerel"de dosya telefonda özetlenemeyecek kadar büyük (model
+                        // indirmenin anlamı yok, nedeni söylenir).
+                        val tooBig = AiPolicy.localPrecheck(file.size)
+                        if (mode == AiMode.Local && tooBig != null) {
+                            report(blocked(file, tooBig))
+                        } else {
+                            _ui.value = SummaryUi.Confirm(file)
+                        }
+                    }
+                    else -> when (LocalModel.state.value) {
+                        LocalModelState.Ready -> _ui.value = SummaryUi.Confirm(file)
+                        LocalModelState.NotDownloaded ->
+                            _ui.value = SummaryUi.ModelSetup(cloudAlternative = file.takeIf { mode.allowsCloud })
+                        is LocalModelState.Downloading -> if (mode.allowsCloud) {
+                            _ui.value = SummaryUi.ModelSetup(cloudAlternative = file) // ilerleme + "Bulutta özetle"
+                        } else {
+                            _notices.tryEmit(Txt.localAi.stillDownloading)
+                        }
+                        LocalModelState.Unsupported -> when {
+                            mode.allowsCloud -> _ui.value = SummaryUi.Confirm(file) // bu telefonda hep bulutta
+                            quota.cloud -> _notices.tryEmit(Txt.localAi.unsupportedLocalMode) // Plus, "Yerel" seçili
+                            else -> PlusOffer.show(PlanPolicy.LOCAL_AI_UNSUPPORTED)
+                        }
+                    }
                 }
             } finally {
                 opening -= file.id
             }
         }
+    }
+
+    /** Özetlemenin yapılamama nedenini gösterir: Plus gerektiriyorsa nedeni yazılı Plus tanıtımı, değilse kısa bildirim. */
+    private fun report(error: Exception) {
+        if (error is PlusRequired) PlusOffer.show(error.message) else _notices.tryEmit(error.message.orEmpty())
     }
 
     /** Planın haklarını sunucudan alır (en çok 5 sn); alınamazsa son bilinen değer (hiç yoksa null). */
@@ -218,9 +266,10 @@ object AiSummarizer {
     }
 
     /**
-     * Onay penceresinde "Özetle": pencere kapanır, özetleme arka planda başlar. [password]: parolalı PDF/Word için
-     * kullanıcının girdiği parola; bulutta özetlenecekse yalnızca o isteğe eklenir, telefonda özetlenecekse dosyayı
-     * açmak için kullanılır. Hiçbir yerde saklanmaz.
+     * Onay penceresinde "Özetle" (ya da model penceresinde "Bulutta özetle"): pencere kapanır, özetleme arka planda
+     * başlar. [password]: parolalı PDF/Word için kullanıcının girdiği parola; telefonda özetlenecekse dosyayı açmak için
+     * kullanılır, bulutta özetlenecekse ("Yerel + Bulut"ta telefonda özetlenemeyince de) yalnızca o isteğe eklenir.
+     * Hiçbir yerde saklanmaz.
      */
     fun confirm(file: FileDto, password: String? = null) {
         _ui.value = null
@@ -293,6 +342,11 @@ object AiSummarizer {
     /** Pencereyi kapatır (özetleme çalışıyorsa sürer). */
     fun dismiss() {
         _ui.value = null
+    }
+
+    /** Model indirme penceresinde "İndir": indirme başlar (pencere açık kalır, ilerlemeyi gösterir). */
+    fun downloadModel() {
+        _notices.tryEmit(LocalModel.startDownload() ?: Txt.localAi.downloadStarted)
     }
 
     /** "Özeti sil" onayını açar. */
@@ -402,13 +456,42 @@ object AiSummarizer {
     /** Bu özetleme ücretsiz planda yapılamaz (bulut özeti ya da özet sınırı); mesajla birlikte Plus tanıtımı açılır. */
     private class PlusRequired(message: String) : Exception(message)
 
-    /** Dosyayı planın izin verdiği yerde özetler ve özetin metnini döndürür. */
+    /** Dosyayı işlem yerine ve planın izin verdiği yerde özetler ([AiPolicy.route]) ve özetin metnini döndürür. */
     private suspend fun summarize(file: FileDto, password: String?): String {
         val kind = AiPolicy.kindOf(file.mimeType, file.name) ?: throw AiFailure(UNSUPPORTED_MESSAGE)
-        // Plus: her zaman bulutta. Ücretsiz plan (ya da plan bilinmiyor): yalnızca telefonda, cihazdaki yapay zekayla.
-        if (PlanStatus.quota.value?.cloud == true) return summarizeInCloud(file, password)
-        if (!LocalSummarizer.available) throw PlusRequired(PlanPolicy.LOCAL_AI_COMING_SOON)
-        AiPolicy.localPrecheck(file.size)?.let { throw blocked(file, it) }
+        // Bulut özeti Plus'a özel: ücretsiz planda (ya da plan bilinmiyorsa) ayar ne olursa olsun yalnızca telefonda.
+        val mode = PlanPolicy.effectiveMode(AppSettings.aiMode.value, cloudAllowed = PlanStatus.quota.value?.cloud == true)
+        return when (AiPolicy.route(mode, modelReady = LocalSummarizer.available, sizeBytes = file.size)) {
+            SummaryRoute.Cloud -> summarizeInCloud(file, password)
+            // "Yerel + Bulut", küçük dosya: önce telefonda; telefonda olmazsa (uzun/görselli belge, model hatası…) bulutta.
+            SummaryRoute.PhoneThenCloud ->
+                summarizeOnPhone(file, kind, password, cloudFallback = true) ?: summarizeInCloud(file, password)
+            // "Yerel" (ücretsiz planda her zaman): yalnızca telefonda.
+            SummaryRoute.PhoneOnly -> {
+                if (!LocalSummarizer.available) throw AiFailure(Txt.localAi.notReady)
+                AiPolicy.localPrecheck(file.size)?.let { throw blocked(file, it) }
+                summarizeOnPhone(file, kind, password, cloudFallback = false)
+                    ?: throw AiFailure(Txt.ai.summarizeFailed(file.name, Txt.localAi.runFailed)) // olmaz: hata fırlatılır
+            }
+        }
+    }
+
+    /**
+     * Dosyayı telefonda açar ve cihazdaki yapay zekayla özetler. [cloudFallback] ("Yerel + Bulut"): dosya telefonda
+     * özetlenemezse (okunamadı, uzun ya da görselli, model hata verdi, özet boş çıktı) hata yerine null döner ve dosya
+     * bulutta özetlenir. "Yerel"de ([cloudFallback] false) nedeni hata olarak fırlatılır. Parola gerekiyorsa, belgede hiç
+     * metin yoksa (bulut da özetleyemez) ya da dosyanın telefonda kopyası yokken internet de yoksa (bulut da internetsiz
+     * çalışmaz) her durumda hata fırlatılır.
+     */
+    private suspend fun summarizeOnPhone(
+        file: FileDto,
+        kind: SummarizableKind,
+        password: String?,
+        cloudFallback: Boolean,
+    ): String? {
+        // Telefonda olmadı: "Yerel + Bulut"ta bulutta denenir (null), "Yerel"de neden söylenir.
+        fun unsuitable(error: Exception): String? = if (cloudFallback) null else throw error
+
         val doc = try {
             inspect(file, kind, password)
         } catch (e: CancellationException) {
@@ -416,25 +499,36 @@ object AiSummarizer {
         } catch (e: PasswordException) {
             throw e // parola gerekiyor ya da yanlış: kullanıcıdan istenir
         } catch (e: UnreadableDocumentException) {
-            throw AiFailure(Txt.ai.summarizeFailed(file.name, e.message))
+            return unsuitable(AiFailure(Txt.ai.summarizeFailed(file.name, e.message)))
         } catch (e: Exception) {
             // Dosyanın telefonda kopyası yok ve internet de yok: nedeni söylenir.
             if (e is IOException && e !is WifiRequiredException) {
                 throw AiFailure(Txt.ai.notOnPhoneAndOffline(file.name))
             }
-            throw AiFailure(e.message ?: Txt.ai.fileOpenFailed)
+            // "Yalnızca Wi-Fi" yüzünden dosya mobil veride indirilmedi ya da açılamadı: "Yerel + Bulut"ta bulutta özetlenir.
+            return unsuitable(AiFailure(e.message ?: Txt.ai.fileOpenFailed))
         }
-        AiPolicy.localRejection(doc.stats)?.let { throw blocked(file, it) }
-        return summarizeOnDevice(file, doc.text)
+        AiPolicy.localRejection(doc.stats)?.let { reason ->
+            if (reason == LocalRejection.NoText) throw blocked(file, reason) // bulut da özetleyemez
+            return unsuitable(blocked(file, reason))
+        }
+        val summary = runLocalModel(file, doc.text) ?: return unsuitable(
+            AiFailure(Txt.ai.summarizeFailed(file.name, Txt.localAi.runFailed)),
+        )
+        if (summary.isBlank()) return unsuitable(AiFailure(Txt.ai.summarizeFailed(file.name, LocalRejection.NoText.message)))
+        return saveLocalSummary(file, summary)
     }
 
-    /** Dosya telefonda özetlenemiyor: metni yoksa nedeni söylenir; büyük/uzun/görselliyse Plus'ta bulutta özetlenebilir. */
-    private fun blocked(file: FileDto, reason: LocalRejection): Exception =
-        if (reason == LocalRejection.NoText) {
-            AiFailure(Txt.ai.summarizeFailed(file.name, reason.message))
-        } else {
-            PlusRequired(PlanPolicy.needsCloudMessage(file.name, reason.message))
-        }
+    /**
+     * Dosya telefonda özetlenemiyor: metni yoksa nedeni söylenir (sunucu da metinle çalışır, bulut da özetleyemez).
+     * Büyük/uzun/görselliyse bulutta özetlenebilir: ücretsiz planda Plus tanıtılır; Plus'ta "Yerel" seçiliyse işlem
+     * yerinin değiştirilebileceği söylenir.
+     */
+    private fun blocked(file: FileDto, reason: LocalRejection): Exception = when {
+        reason == LocalRejection.NoText -> AiFailure(Txt.ai.summarizeFailed(file.name, reason.message))
+        PlanStatus.quota.value?.cloud == true -> AiFailure(Txt.aiMode.localOnlyBlocked(file.name, reason.message))
+        else -> PlusRequired(PlanPolicy.needsCloudMessage(file.name, reason.message))
+    }
 
     /**
      * Dosyayı (en çok 1 MB) açar. Telefonda kopyası varsa ([InputCache]) internet gerekmez; yoksa indirilir ve indirilen
@@ -521,13 +615,25 @@ object AiSummarizer {
     }
 
     /**
-     * Telefonda, cihazdaki yapay zekayla özetler ([LocalSummarizer]). Özet önce telefona, sonra sunucuya yazılır;
-     * internet yoksa telefonda bekler ve bağlantı gelince yüklenir.
+     * Metni cihazdaki yapay zekayla özetler ([LocalSummarizer]). Model yüklenemez ya da çalışırken hata verirse (ör.
+     * bellek yetmedi) null döner. Özet çıkarılamazsa boş metin döner.
      */
-    private suspend fun summarizeOnDevice(file: FileDto, text: String): String {
+    private suspend fun runLocalModel(file: FileDto, text: String): String? {
         setStatus(file.id, Txt.ai.summarizingOnPhone)
-        val summary = LocalSummarizer.summarize(text, AppSettings.summaryLanguage.value).trim()
-        if (summary.isBlank()) throw AiFailure(Txt.ai.summarizeFailed(file.name, LocalRejection.NoText.message))
+        return try {
+            LocalSummarizer.summarize(text, AppSettings.summaryLanguage.value) { step -> setStatus(file.id, step) }.trim()
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+    /**
+     * Telefonda çıkarılan özeti saklar: önce telefona, sonra sunucuya yazılır; internet yoksa telefonda bekler ve
+     * bağlantı gelince yüklenir.
+     */
+    private suspend fun saveLocalSummary(file: FileDto, summary: String): String {
         // Önce telefona yazılır: yükleme sırasında internet kesilse ya da uygulama kapansa özet kaybolmaz.
         SummaryStore.put(StoredSummary(file.id, file.name, summary, pending = true))
         // Sonra sunucuya kaydedilir; aynı içerikli dosyalar da böylece "özetlendi" olur.
@@ -623,6 +729,9 @@ object AiSummarizer {
         SummaryStore.init(context)
         InputCache.init(context)
         CloudJobs.init(context)
+        LocalModel.init(context)
+        // "Model indirildi / indirilemedi" bildirimleri açık listede gösterilir.
+        scope.launch { LocalModel.messages.collect { _notices.tryEmit(it) } }
         scope.launch { flushPending() }
         resumeCloudJobs()
         try {

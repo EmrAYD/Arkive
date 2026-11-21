@@ -47,11 +47,14 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.eayd.arkive.ai.AiMode
+import com.eayd.arkive.data.PlanPolicy
 import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.data.PlusOffer
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.i18n.Txt
+import com.eayd.arkive.ui.components.LocalModelDialog
 import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.ui.components.NoticeHost
 import com.eayd.arkive.ui.components.rememberNoticeHostState
@@ -76,6 +79,10 @@ fun ProfileScreen(
     val state by viewModel.state.collectAsState()
     val themeMode by viewModel.themeMode.collectAsState()
     val wifiOnly by viewModel.wifiOnly.collectAsState()
+    val localModel by viewModel.localModel.collectAsState()
+    val aiMode by viewModel.aiMode.collectAsState()
+    // Bulut özeti Plus'a özel; AI düğmesiyle aynı bilgiye bakılır ([PlanStatus]).
+    val cloudAllowed = PlanStatus.quota.collectAsState().value?.cloud == true
     val appLanguage by viewModel.appLanguage.collectAsState()
     val summaryLanguage by viewModel.summaryLanguage.collectAsState()
     val context = LocalContext.current
@@ -124,6 +131,8 @@ fun ProfileScreen(
                     wifiOnly = wifiOnly,
                     appLanguage = appLanguage,
                     summaryLanguage = summaryLanguage,
+                    // Ücretsiz planda bulut yok: ayar ne olursa olsun geçerli olan "Yerel" gösterilir.
+                    aiMode = PlanPolicy.effectiveMode(aiMode, cloudAllowed),
                     // Değer sunucudan gelene kadar satır pasif kalır.
                     trashRetentionDays = if (state.storage != null) state.trashRetentionDays else null,
                     onNotifications = {
@@ -132,6 +141,10 @@ fun ProfileScreen(
                     onTheme = { viewModel.openDialog(ProfileDialog.Theme) },
                     onWifiOnlyChange = viewModel::setWifiOnly,
                     onLanguage = { viewModel.openDialog(ProfileDialog.Language) },
+                    onAiMode = { viewModel.openDialog(ProfileDialog.AiProcessing) },
+                    // Her planda: "Yerel" ve "Yerel + Bulut"ta dosyalar bu modelle telefonda özetlenir.
+                    localModel = localModel,
+                    onLocalModel = { viewModel.openDialog(ProfileDialog.LocalAi) },
                     onTrashRetention = { viewModel.openDialog(ProfileDialog.TrashRetention) },
                 )
 
@@ -176,6 +189,7 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
     val themeMode by viewModel.themeMode.collectAsState()
     val appLanguage by viewModel.appLanguage.collectAsState()
     val summaryLanguage by viewModel.summaryLanguage.collectAsState()
+    val aiMode by viewModel.aiMode.collectAsState()
     val close = viewModel.dialogs::close
 
     when (host.current) {
@@ -204,6 +218,23 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
             appLanguage = appLanguage,
             summaryLanguage = summaryLanguage,
             onSave = viewModel::saveLanguages,
+            onDismiss = close,
+        )
+
+        ProfileDialog.AiProcessing -> {
+            val plus = PlanStatus.quota.collectAsState().value?.cloud == true
+            AiModeDialog(
+                current = PlanPolicy.effectiveMode(aiMode, cloudAllowed = plus),
+                plus = plus,
+                onSave = viewModel::setAiMode,
+                onDismiss = close,
+            )
+        }
+
+        ProfileDialog.LocalAi -> LocalModelDialog(
+            onDownload = viewModel::downloadLocalModel,
+            onCancelDownload = viewModel::cancelLocalModelDownload,
+            onDelete = viewModel::deleteLocalModel,
             onDismiss = close,
         )
 
@@ -292,6 +323,61 @@ private fun LanguageChoices(
             Text(language.nativeName)
         }
     }
+}
+
+/**
+ * "Yapay zeka işlem yeri" penceresi: Yerel / Bulut / Yerel + Bulut, her birinin altında açıklaması. Ücretsiz planda bulut
+ * içeren seçeneklerin altında "Plus planına özel" yazar; seçilip kaydedilince ayar değişmez, Plus tanıtılır
+ * ([ProfileViewModel.setAiMode]).
+ */
+@Composable
+private fun AiModeDialog(
+    current: AiMode,
+    plus: Boolean,
+    onSave: (AiMode) -> Unit,
+    onDismiss: () -> Unit,
+) {
+    var selected by remember { mutableStateOf(current) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(Txt.aiMode.title) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState())) {
+                AiMode.entries.forEach { mode ->
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .selectable(selected = selected == mode, role = Role.RadioButton, onClick = { selected = mode })
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.Top,
+                    ) {
+                        RadioButton(selected = selected == mode, onClick = null)
+                        Spacer(Modifier.width(12.dp))
+                        Column {
+                            Text(mode.label, style = MaterialTheme.typography.bodyLarge)
+                            Spacer(Modifier.height(2.dp))
+                            Text(
+                                mode.description,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
+                            if (!plus && mode.allowsCloud) {
+                                Spacer(Modifier.height(2.dp))
+                                Text(
+                                    Txt.aiMode.plusOnly,
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.primary,
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = { TextButton(onClick = { onSave(selected) }) { Text(Txt.common.save) } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(Txt.common.cancel) } },
+    )
 }
 
 /** Çöp kutusu için sık kullanılan süreler (gün). Sunucu 1-365 arasını kabul eder. */

@@ -3,6 +3,7 @@ package com.eayd.arkive.data
 import android.content.Context
 import android.content.SharedPreferences
 import android.content.res.Resources
+import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.ai.AiSummarizer
 import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.i18n.Lang
@@ -28,7 +29,7 @@ enum class ThemeMode {
 }
 
 /**
- * Bu cihaza özgü uygulama ayarları (tema, dil, yalnızca Wi-Fi ile aktarım). Sunucuya gitmez;
+ * Bu cihaza özgü uygulama ayarları (tema, dil, yalnızca Wi-Fi ile aktarım, yapay zeka işlem yeri). Sunucuya gitmez;
  * SharedPreferences'ta saklanır, değerler StateFlow olarak dinlenir. [init] uygulama açılırken (MainActivity) bir kez çağrılır.
  */
 object AppSettings {
@@ -37,8 +38,9 @@ object AppSettings {
     private const val KEY_THEME = "theme_mode"
     private const val KEY_WIFI_ONLY = "wifi_only"
     private const val KEY_PENDING_EULA_UID = "pending_eula_uid"
-    // Kaldırılan ayarlar (yapay zeka işlem yeri, özet şablonu): eski kayıtları silmek için.
-    private val OLD_KEYS = listOf("ai_mode", "summary_template")
+    private const val KEY_AI_MODE = "ai_mode"
+    // Kaldırılan ayarlar (özet şablonu): eski kayıtları silmek için.
+    private val OLD_KEYS = listOf("summary_template")
     private const val KEY_APP_LANGUAGE = "app_language"
     private const val KEY_SUMMARY_LANGUAGE = "summary_language"
 
@@ -62,6 +64,14 @@ object AppSettings {
     private val _appLanguage = MutableStateFlow(AppLanguage.Turkish)
     val appLanguage: StateFlow<AppLanguage> = _appLanguage.asStateFlow()
 
+    /**
+     * Yapay zeka özetlemesinin nerede yapılacağı: yerel (telefon), bulut (sunucu) ya da ikisi (küçük dosyalar telefonda,
+     * gerisi sunucuda). Varsayılan ikisi. Bulut Plus'a özeldir; ücretsiz planda ayar ne olursa olsun yerel geçerlidir
+     * ([PlanPolicy.effectiveMode]). Kurallar için bkz. [com.eayd.arkive.ai.AiPolicy].
+     */
+    private val _aiMode = MutableStateFlow(AiMode.Hybrid)
+    val aiMode: StateFlow<AiMode> = _aiMode.asStateFlow()
+
     /** Özetin yazılacağı dil. Kullanıcı ayrıca seçmediyse uygulamanın diliyle aynıdır. */
     private val _summaryLanguage = MutableStateFlow(AppLanguage.Turkish)
     val summaryLanguage: StateFlow<AppLanguage> = _summaryLanguage.asStateFlow()
@@ -75,6 +85,7 @@ object AppSettings {
         _summaryLanguage.value = AppLanguage.fromTag(prefs.getString(KEY_SUMMARY_LANGUAGE, null)) ?: _appLanguage.value
         _themeMode.value = storedThemeMode(appContext)
         _wifiOnly.value = prefs.getBoolean(KEY_WIFI_ONLY, false)
+        _aiMode.value = AiMode.entries.firstOrNull { it.name == prefs.getString(KEY_AI_MODE, null) } ?: AiMode.Hybrid
         if (OLD_KEYS.any(prefs::contains)) prefs.edit().apply { OLD_KEYS.forEach(::remove) }.apply()
         AiSummarizer.start(appContext) // bekleyen telefon özetlerini yükler
     }
@@ -133,5 +144,10 @@ object AppSettings {
     fun setWifiOnly(enabled: Boolean) {
         _wifiOnly.value = enabled
         prefs.edit().putBoolean(KEY_WIFI_ONLY, enabled).apply()
+    }
+
+    fun setAiMode(mode: AiMode) {
+        _aiMode.value = mode
+        prefs.edit().putString(KEY_AI_MODE, mode.name).apply()
     }
 }

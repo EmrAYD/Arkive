@@ -21,6 +21,7 @@ import androidx.compose.material.icons.filled.Language
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Palette
+import androidx.compose.material.icons.filled.PhoneAndroid
 import androidx.compose.material.icons.filled.Wifi
 import androidx.compose.material.icons.outlined.Cloud
 import androidx.compose.material3.Button
@@ -41,6 +42,9 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.eayd.arkive.ai.AiMode
+import com.eayd.arkive.ai.LocalModel
+import com.eayd.arkive.ai.LocalModelState
 import com.eayd.arkive.data.PlusPlan
 import com.eayd.arkive.data.ThemeMode
 import com.eayd.arkive.i18n.AppLanguage
@@ -164,9 +168,9 @@ internal fun AccountSection(email: String?, hasPassword: Boolean, onChangePasswo
 }
 
 /**
- * "Ayarlar": bildirimler (sistem ayarlarını açar), dil (uygulamanın ve özetin dili), tema, yalnızca Wi-Fi, çöp kutusu saklama
- * süresi. Dil, tema ve Wi-Fi ayarları bu cihazda, saklama süresi sunucuda tutulur; süre henüz yüklenmediyse ([trashRetentionDays] null)
- * o satır pasiftir.
+ * "Ayarlar": bildirimler (sistem ayarlarını açar), dil (uygulamanın ve özetin dili), tema, yalnızca Wi-Fi, yapay zeka işlem
+ * yeri, telefondaki yapay zeka modeli, çöp kutusu saklama süresi. Dil, tema, Wi-Fi ve işlem yeri bu cihazda, saklama süresi
+ * sunucuda tutulur; süre henüz yüklenmediyse ([trashRetentionDays] null) o satır pasiftir.
  */
 @Composable
 internal fun SettingsSection(
@@ -174,12 +178,18 @@ internal fun SettingsSection(
     wifiOnly: Boolean,
     appLanguage: AppLanguage,
     summaryLanguage: AppLanguage,
+    /** Geçerli yapay zeka işlem yeri (ücretsiz planda her zaman Yerel). */
+    aiMode: AiMode,
     trashRetentionDays: Int?,
     onNotifications: () -> Unit,
     onTheme: () -> Unit,
     onWifiOnlyChange: (Boolean) -> Unit,
     onLanguage: () -> Unit,
+    onAiMode: () -> Unit,
     onTrashRetention: () -> Unit,
+    /** Telefondaki yapay zeka modelinin durumu; null ise satır gösterilmez. */
+    localModel: LocalModelState? = null,
+    onLocalModel: () -> Unit = {},
 ) {
     SectionCard(Txt.profile.settings) {
         ProfileRow(
@@ -221,6 +231,24 @@ internal fun SettingsSection(
         )
         RowDivider()
         ProfileRow(
+            icon = AiIcons.Filled, // uygulamanın yapay zeka simgesi
+            title = Txt.aiMode.title,
+            subtitle = aiMode.label,
+            onClick = onAiMode,
+            trailing = { Chevron() },
+        )
+        if (localModel != null) {
+            RowDivider()
+            ProfileRow(
+                icon = Icons.Filled.PhoneAndroid,
+                title = Txt.localAi.title,
+                subtitle = localModelSubtitle(localModel),
+                onClick = onLocalModel,
+                trailing = { Chevron() },
+            )
+        }
+        RowDivider()
+        ProfileRow(
             icon = Icons.Filled.Delete,
             title = Txt.profile.trashRetention,
             subtitle = trashRetentionDays?.let { Txt.profile.days(it) } ?: Txt.common.loadingEllipsis,
@@ -229,6 +257,17 @@ internal fun SettingsSection(
             trailing = { Chevron() },
         )
     }
+}
+
+/** "Telefondaki yapay zeka" satırının alt yazısı: indirilmedi / iniyor %… / hazır / bu telefonda çalışmaz. */
+private fun localModelSubtitle(state: LocalModelState): String = when (state) {
+    LocalModelState.NotDownloaded -> Txt.localAi.notDownloaded(LocalModel.sizeText)
+    is LocalModelState.Downloading -> when {
+        state.waitingForNetwork -> Txt.localAi.waitingShort
+        else -> state.percent?.let { Txt.localAi.downloadingShort(it) } ?: Txt.localAi.waitingShort
+    }
+    LocalModelState.Ready -> Txt.localAi.ready(LocalModel.sizeText)
+    LocalModelState.Unsupported -> Txt.localAi.unsupportedShort
 }
 
 /** "Planım": plan adı, tek dosya ve toplam yükleme limiti, kullanım çubuğu. */

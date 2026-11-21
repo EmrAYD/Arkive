@@ -34,15 +34,22 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import com.eayd.arkive.ai.AiPolicy
 import com.eayd.arkive.ai.AiSummarizer
+import com.eayd.arkive.ai.LocalModel
+import com.eayd.arkive.ai.LocalModelState
+import com.eayd.arkive.ai.SummaryRoute
 import com.eayd.arkive.ai.SummaryUi
+import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.data.FileDto
+import com.eayd.arkive.data.PlanPolicy
 import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.i18n.Txt
 
 /**
  * AI düğmesine basılınca açılan pencereler: onay ("Bu dosyayı özetlemek istiyor musunuz?"), özetleme sürerken durdurma
- * sorusu, özet penceresi (belgenin ne olduğunu ve neleri içerdiğini anlatan paragraf) ve özeti silme onayı. Özetleme
+ * sorusu, özet penceresi (belgenin ne olduğunu ve neleri içerdiğini anlatan paragraf), özeti silme onayı ve (dosya
+ * telefonda özetlenecekken model telefonda yoksa) yapay zeka modelini indirme penceresi. Özetleme
  * başladıktan sonra pencere kapanır; ilerleme satırdaki yükleme simgesinde görünür, bitince özet penceresi açılır.
  */
 @Composable
@@ -89,12 +96,21 @@ fun AiSummaryDialogHost() {
         }
 
         is SummaryUi.Password -> {
-            // Plus'ta dosya sunucuda, ücretsiz planda telefonda özetlenir; parolanın nereye gittiği buna göre söylenir.
+            // Parolanın nereye gittiği, dosyanın nerede özetleneceğine göre söylenir ([AiPolicy.route]): yapay zeka işlem
+            // yerine (ücretsiz planda her zaman Yerel), modele ve dosyanın boyutuna göre.
             val cloud = PlanStatus.quota.collectAsState().value?.cloud == true
+            val aiMode by AppSettings.aiMode.collectAsState()
+            val modelReady = LocalModel.state.collectAsState().value == LocalModelState.Ready
+            val mode = PlanPolicy.effectiveMode(aiMode, cloud)
+            val note = when (AiPolicy.route(mode, modelReady, state.file.size)) {
+                SummaryRoute.PhoneOnly -> Txt.ai.passwordLocalNote
+                SummaryRoute.PhoneThenCloud -> Txt.ai.passwordHybridNote
+                SummaryRoute.Cloud -> Txt.ai.passwordCloudNote
+            }
             PasswordDialog(
                 title = Txt.ai.passwordTitle,
                 message = Txt.ai.passwordBody(state.file.name),
-                note = if (cloud) Txt.ai.passwordCloudNote else Txt.ai.passwordLocalNote,
+                note = note,
                 confirmLabel = Txt.ai.summarize,
                 busy = false,
                 error = if (state.wrong) Txt.docs.wrongPassword else null,
@@ -154,6 +170,15 @@ fun AiSummaryDialogHost() {
                 },
             )
         }
+
+        is SummaryUi.ModelSetup -> LocalModelDialog(
+            onDownload = AiSummarizer::downloadModel,
+            onCancelDownload = LocalModel::cancelDownload,
+            onDelete = { LocalModel.delete(); AiSummarizer.dismiss() },
+            onDismiss = AiSummarizer::dismiss,
+            // "Yerel + Bulut": model inmeden bu dosya hemen bulutta özetlenebilir (model hazır olmadığı için yol buluttur).
+            onSummarizeInCloud = state.cloudAlternative?.let { file -> { AiSummarizer.confirm(file) } },
+        )
 
         is SummaryUi.DeleteAsk -> AlertDialog(
             onDismissRequest = AiSummarizer::dismiss,

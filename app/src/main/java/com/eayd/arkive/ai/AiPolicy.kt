@@ -1,14 +1,17 @@
 package com.eayd.arkive.ai
 
 import com.eayd.arkive.i18n.Txt
+import com.eayd.arkive.utils.formatBytes
 
 /**
  * Yapay zeka özetlemesinin kuralları: hangi dosyalar özetlenebilir ve hangileri telefonda özetlenebilir. Hiçbir Android
  * sınıfı kullanmaz; bu yüzden tek başına test edilebilir. Eşikleri değiştirmek için yalnızca bu dosyadaki sabitlere bakmak
  * yeter.
  *
- * Özetin nerede çıkarılacağı plana bağlıdır: Plus'ta her zaman sunucuda (bulutta); ücretsiz planda telefonda, cihazdaki
- * yapay zekayla ([LocalSummarizer]). Telefonda özetleme iki aşamada denetlenir:
+ * Özetin nerede çıkarılacağını ayarlardaki yapay zeka işlem yeri ([AiMode]) ve [route] belirler: "Yerel"de yalnızca
+ * telefonda, cihazdaki yapay zekayla ([LocalSummarizer]); "Bulut"ta her zaman sunucuda; "Yerel + Bulut"ta küçük dosyalar
+ * önce telefonda, gerisi (ve telefonda özetlenemeyenler) sunucuda. Ücretsiz planda ayar ne olursa olsun "Yerel" geçerlidir
+ * ([com.eayd.arkive.data.PlanPolicy.effectiveMode]). Telefonda özetleme iki aşamada denetlenir:
  *  1. [localPrecheck]: dosyayı hiç açmadan (boyutuna bakarak),
  *  2. [localRejection]: dosya cihazda açılıp sayfa/görsel sayısı çıkarılınca.
  */
@@ -37,6 +40,53 @@ enum class LocalRejection {
         }
 }
 
+/**
+ * Ayarlardaki "yapay zeka işlem yeri" ([com.eayd.arkive.data.AppSettings.aiMode]). Varsayılan [Hybrid]. Bulut Plus'a
+ * özeldir: ücretsiz planda ayar ne olursa olsun [Local] geçerlidir.
+ */
+enum class AiMode {
+    /** Yalnızca telefonda, cihazdaki yapay zekayla; model gerekir. Büyük/uzun/görselli dosyalar özetlenemez. */
+    Local,
+
+    /** Her zaman sunucuda; telefona model gerekmez. */
+    Cloud,
+
+    /** Küçük, metin ağırlıklı dosyalar telefonda (model gerekir), gerisi ve telefonda özetlenemeyenler sunucuda. */
+    Hybrid,
+    ;
+
+    val allowsLocal: Boolean get() = this != Cloud
+    val allowsCloud: Boolean get() = this != Local
+
+    /** Seçili dilde adı. */
+    val label: String
+        get() = when (this) {
+            Local -> Txt.aiMode.local
+            Cloud -> Txt.aiMode.cloud
+            Hybrid -> Txt.aiMode.hybrid
+        }
+
+    /** Seçili dilde açıklaması (ayar penceresinde seçeneğin altında). */
+    val description: String
+        get() = when (this) {
+            Local -> Txt.aiMode.localDetail(formatBytes(AiPolicy.LOCAL_MAX_BYTES), AiPolicy.LOCAL_MAX_PAGES)
+            Cloud -> Txt.aiMode.cloudDetail
+            Hybrid -> Txt.aiMode.hybridDetail(formatBytes(AiPolicy.LOCAL_MAX_BYTES), AiPolicy.LOCAL_MAX_PAGES)
+        }
+}
+
+/** Özetin nerede çıkarılacağı; dosya açılmadan, işlem yerine, modele ve dosyanın boyutuna bakılarak belirlenir ([AiPolicy.route]). */
+enum class SummaryRoute {
+    /** "Yerel": yalnızca telefonda. Telefonda özetlenemezse nedeni söylenir (ücretsiz planda Plus önerilir). */
+    PhoneOnly,
+
+    /** "Yerel + Bulut", model telefonda hazır ve dosya küçük: önce telefonda; telefonda özetlenemezse bulutta. */
+    PhoneThenCloud,
+
+    /** "Bulut"; ya da "Yerel + Bulut"ta dosya büyük veya model telefonda hazır değil: doğrudan bulutta. */
+    Cloud,
+}
+
 object AiPolicy {
 
     /** Bundan büyük dosyalar yerelde özetlenmez (bayt). */
@@ -62,6 +112,25 @@ object AiPolicy {
 
     /** Telefonda özetleme için dosyayı açmadan verilebilecek karar: çok büyükse nedeni, açılıp bakılabilecekse null. */
     fun localPrecheck(sizeBytes: Long): LocalRejection? = if (sizeBytes <= LOCAL_MAX_BYTES) null else LocalRejection.TooBig
+
+    /**
+     * Özetin nerede çıkarılacağı. [mode]: geçerli işlem yeri (plana göre düzeltilmiş,
+     * [com.eayd.arkive.data.PlanPolicy.effectiveMode]); [modelReady]: telefondaki yapay zeka modeli inmiş ve hazır mı;
+     * [sizeBytes]: dosyanın boyutu. "Yerel + Bulut"ta model hazır değilse (inmedi / iniyor / bu telefonda çalışmaz) dosya
+     * bulutta özetlenir; AI düğmesi bu durumda önce modeli indirmeyi önerir ([wantsModel]).
+     */
+    fun route(mode: AiMode, modelReady: Boolean, sizeBytes: Long): SummaryRoute = when (mode) {
+        AiMode.Local -> SummaryRoute.PhoneOnly
+        AiMode.Cloud -> SummaryRoute.Cloud
+        AiMode.Hybrid ->
+            if (modelReady && localPrecheck(sizeBytes) == null) SummaryRoute.PhoneThenCloud else SummaryRoute.Cloud
+    }
+
+    /**
+     * Bu dosya, işlem yerine göre telefonda özetlenecek mi (bunun için telefonda model gerekir): "Yerel"de ve
+     * "Yerel + Bulut"ta, dosya telefonda özetlenebilecek kadar küçükse. Model yoksa AI düğmesi indirme penceresini açar.
+     */
+    fun wantsModel(mode: AiMode, sizeBytes: Long): Boolean = mode.allowsLocal && localPrecheck(sizeBytes) == null
 
     /**
      * Belge yerelde özetlenemiyorsa nedeni; uygunsa null. Boyut denetimi [localPrecheck]'tedir. Sayfa sınırı ilk bakılandır

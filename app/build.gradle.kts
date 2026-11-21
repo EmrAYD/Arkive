@@ -99,4 +99,6 @@ dependencies {
 
     implementation("com.tom-roush:pdfbox-android:2.0.27.0")
 
+    implementation("com.google.ai.edge.litertlm:litertlm-android:0.19.1")
+
 }

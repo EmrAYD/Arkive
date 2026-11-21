@@ -1,5 +1,6 @@
 package com.eayd.arkive.data
 
+import com.eayd.arkive.ai.AiMode
 import com.eayd.arkive.i18n.Txt
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -34,6 +35,9 @@ data class SummaryQuota(val planName: String, val count: Int, val limit: Int?, v
 /** Plana bağlı özetleme kuralları ve mesajları. Hiçbir Android sınıfı kullanmaz (bkz. PlusPlanTest). */
 object PlanPolicy {
 
+    /** Bulut özeti yoksa (ücretsiz plan ya da plan bilinmiyor) ayar ne olursa olsun yalnızca telefonda özetlenir. */
+    fun effectiveMode(mode: AiMode, cloudAllowed: Boolean): AiMode = if (cloudAllowed) mode else AiMode.Local
+
     fun limitMessage(limit: Int): String =
         Txt.plan.freeLimitReached(limit)
 
@@ -45,9 +49,13 @@ object PlanPolicy {
     val CLOUD_PLUS_ONLY_MESSAGE: String
         get() = Txt.plan.cloudPlusOnly
 
-    /** Ücretsiz planda özetler telefonda çıkarılacak; cihazdaki yapay zeka henüz yok ([com.eayd.arkive.ai.LocalSummarizer]). */
-    val LOCAL_AI_COMING_SOON: String
-        get() = Txt.plan.localAiComingSoon
+    /** Ücretsiz planda özetler telefonda çıkarılır ama bu telefon modeli çalıştıramıyor ([com.eayd.arkive.ai.LocalModel]). */
+    val LOCAL_AI_UNSUPPORTED: String
+        get() = Txt.plan.localAiUnsupported
+
+    /** Ücretsiz planda "Bulut" ya da "Yerel + Bulut" seçilince (ayar değişmez, Plus tanıtılır). */
+    val CLOUD_MODE_MESSAGE: String
+        get() = Txt.aiMode.cloudPlusOnly
 }
 
 /**
