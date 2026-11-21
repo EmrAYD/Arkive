@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.getAndUpdate
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -310,7 +311,13 @@ object AiSummarizer {
      * kullanılır, bulutta özetlenecekse ("Yerel + Bulut"ta telefonda özetlenemeyince de) yalnızca o isteğe eklenir.
      * Hiçbir yerde saklanmaz.
      */
-    fun confirm(file: FileDto, password: String? = null) {
+    fun confirm(file: FileDto, password: String? = null) = startJob(file, password, preferCloud = false)
+
+    /**
+     * Özetlemeyi arka planda başlatır. [preferCloud]: "Yerel + Bulut"ta küçük dosya da doğrudan bulutta özetlenir
+     * (telefonda özetlenirken uygulama kapanmış bir dosya sürdürülürken, [resumeLocalJobs]).
+     */
+    private fun startJob(file: FileDto, password: String?, preferCloud: Boolean) {
         _ui.value = null
         if (file.id in _running.value) return
         _running.update { it + file.id }
@@ -320,26 +327,55 @@ object AiSummarizer {
         runCatching { SummaryService.start(AppSettings.appContext) }
         jobs[file.id] = scope.launch {
             try {
-                val summary = summarize(file, password)
+                val summary = summarize(file, password, preferCloud)
                 announceDone(file, summary)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: PasswordException) {
                 _ui.value = SummaryUi.Password(file, e.wrong) // parola istenir; girilince özetleme yeniden başlar
+                // Uygulama ekranda değilse pencere görülmez: bildirimle haber verilir, dokununca uygulama açılır ve
+                // parola penceresi görünür.
+                if (!AppVisibility.visible) {
+                    notifyFailure(file.id, SummaryFailedMessage.PASSWORD_TITLE, SummaryFailedMessage.passwordText(file.name))
+                }
             } catch (e: PlusRequired) {
                 PlusOffer.show(e.message) // planın izin vermediği özetleme: neden yazılı Plus tanıtımı
+                // Tanıtım uygulama açılınca görünür; o zamana kadar nedeni bildirimde yazar.
+                if (!AppVisibility.visible) {
+                    notifyFailure(file.id, SummaryFailedMessage.TITLE, SummaryFailedMessage.text(file.name, e.message.orEmpty()))
+                }
             } catch (e: AiFailure) {
-                _notices.tryEmit(e.message.orEmpty())
+                reportFailure(file.id, file.name, e.message.orEmpty())
             } catch (e: Exception) {
-                _notices.tryEmit(e.toApiErrorMessage())
+                reportFailure(file.id, file.name, e.toApiErrorMessage())
             } finally {
                 _running.update { it - file.id }
                 _status.update { it - file.id }
                 clearProgress(file.id)
                 jobs.remove(file.id)
+                // Sürdürülen bir iş telefona gelmeden bittiyse (ör. model artık yok) kaydı da kalmasın; yoksa her açılışta
+                // yeniden denenirdi. Telefondaki adım kendi kaydını zaten siler ([summarizeOnPhone]).
+                LocalJobs.remove(file.id)
             }
         }
     }
+
+    /**
+     * Özetlemenin başarısız olduğunu söyler. Uygulama ekrandaysa ve bildirimi gösterecek bir liste açıksa uygulama içi
+     * kısa bildirimle; değilse (uygulama arka planda, kapalı ya da ön izleme gibi başka bir ekranda) sistem bildirimiyle
+     * ([SummaryNotifier.notifyFailed]); dokununca uygulama açılır. "Özetleme bitti" haberiyle aynı kural
+     * ([SummaryDoneDelivery]).
+     */
+    private fun reportFailure(fileId: String, fileName: String, message: String) {
+        if (SummaryDoneDelivery.useNotification(AppVisibility.visible, _notices.subscriptionCount.value)) {
+            notifyFailure(fileId, SummaryFailedMessage.TITLE, SummaryFailedMessage.text(fileName, message))
+        } else {
+            _notices.tryEmit(message)
+        }
+    }
+
+    private fun notifyFailure(fileId: String, title: String, text: String) =
+        runCatching { SummaryNotifier.notifyFailed(AppSettings.appContext, fileId, title, text) }
 
     /**
      * Özetleme bitti: açık liste yenilenir ve özet penceresi açılır. Uygulama arka plandaysa (ya da kapalıysa) sistem
@@ -497,12 +533,16 @@ object AiSummarizer {
     /** Bu özetleme ücretsiz planda yapılamaz (bulut özeti ya da özet sınırı); mesajla birlikte Plus tanıtımı açılır. */
     private class PlusRequired(message: String) : Exception(message)
 
-    /** Dosyayı işlem yerine ve planın izin verdiği yerde özetler ([AiPolicy.route]) ve özetin metnini döndürür. */
-    private suspend fun summarize(file: FileDto, password: String?): String {
+    /**
+     * Dosyayı işlem yerine ve planın izin verdiği yerde özetler ([AiPolicy.route]) ve özetin metnini döndürür.
+     * [preferCloud]: "önce telefonda, olmazsa bulutta" yerine doğrudan bulutta.
+     */
+    private suspend fun summarize(file: FileDto, password: String?, preferCloud: Boolean = false): String {
         val kind = AiPolicy.kindOf(file.mimeType, file.name) ?: throw AiFailure(UNSUPPORTED_MESSAGE)
         // Bulut özeti Plus'a özel: ücretsiz planda (ya da plan bilinmiyorsa) ayar ne olursa olsun yalnızca telefonda.
         val mode = PlanPolicy.effectiveMode(AppSettings.aiMode.value, cloudAllowed = PlanStatus.quota.value?.cloud == true)
-        return when (AiPolicy.route(mode, modelReady = LocalSummarizer.available, sizeBytes = file.size)) {
+        val route = AiPolicy.route(mode, modelReady = LocalSummarizer.available, sizeBytes = file.size)
+        return when (if (preferCloud && route == SummaryRoute.PhoneThenCloud) SummaryRoute.Cloud else route) {
             SummaryRoute.Cloud -> summarizeInCloud(file, password)
             // "Yerel + Bulut", küçük dosya: önce telefonda; telefonda olmazsa (uzun/görselli belge, model hatası…) bulutta.
             SummaryRoute.PhoneThenCloud ->
@@ -523,8 +563,25 @@ object AiSummarizer {
      * bulutta özetlenir. "Yerel"de ([cloudFallback] false) nedeni hata olarak fırlatılır. Parola gerekiyorsa, belgede hiç
      * metin yoksa (bulut da özetleyemez) ya da dosyanın telefonda kopyası yokken internet de yoksa (bulut da internetsiz
      * çalışmaz) her durumda hata fırlatılır.
+     *
+     * Telefonda özetleme sürerken dosya [LocalJobs]'a yazılır, nasıl biterse bitsin silinir: uygulama bu sırada
+     * kapanırsa (süreç sonlandırılırsa) kayıt kalır ve uygulama yeniden açılınca özetleme sürdürülür ([resumeLocalJobs]).
      */
     private suspend fun summarizeOnPhone(
+        file: FileDto,
+        kind: SummarizableKind,
+        password: String?,
+        cloudFallback: Boolean,
+    ): String? {
+        LocalJobs.begin(file)
+        try {
+            return summarizeOnPhoneNow(file, kind, password, cloudFallback)
+        } finally {
+            LocalJobs.remove(file.id)
+        }
+    }
+
+    private suspend fun summarizeOnPhoneNow(
         file: FileDto,
         kind: SummarizableKind,
         password: String?,
@@ -763,7 +820,7 @@ object AiSummarizer {
                 // İnternetsizken üretilen özet, bağlanınca planın sınırına takıldı: kaydedilemedi.
                 is Upload.PlanLimit -> {
                     _completed.tryEmit(entry.fileId) // satırdaki "yüklenmeyi bekliyor" görünümü kalksın
-                    _notices.tryEmit(Txt.ai.saveFailed(entry.fileName, result.message))
+                    reportFailure(entry.fileId, entry.fileName, Txt.ai.saveFailed(entry.fileName, result.message))
                 }
             }
         }
@@ -783,11 +840,13 @@ object AiSummarizer {
         SummaryStore.init(context)
         InputCache.init(context)
         CloudJobs.init(context)
+        LocalJobs.init(context)
         LocalModel.init(context)
         // "Model indirildi / indirilemedi" bildirimleri açık listede gösterilir.
         scope.launch { LocalModel.messages.collect { _notices.tryEmit(it) } }
         scope.launch { flushPending() }
         resumeCloudJobs()
+        resumeLocalJobs()
         try {
             context.getSystemService(ConnectivityManager::class.java)?.registerDefaultNetworkCallback(
                 object : ConnectivityManager.NetworkCallback() {
@@ -855,6 +914,74 @@ object AiSummarizer {
     }
 
     /**
+     * Uygulama açılınca: telefonda özetlenirken uygulamanın kapandığı (sürecin sonlandırıldığı) dosyalar sürdürülür
+     * ([LocalJobs]; kurallar [LocalJobPolicy]). Bulut kullanılabiliyorsa ("Yerel + Bulut", "Bulut") dosya bulutta
+     * özetlenir; "Yerel"de telefonda bir kez daha başlatılır, telefonda ikinci kez de yarıda kaldıysa (bellek yetmiyor
+     * olabilir) yeniden denenmez. Ne yapıldığı kısa bildirimle söylenir. Özeti zaten çıkmış (telefona yazılmış) ya da
+     * silinmiş dosyalar atlanır.
+     */
+    private fun resumeLocalJobs() {
+        val pending = LocalJobs.all()
+        if (pending.isEmpty()) return
+        scope.launch {
+            // Uygulama ekrana gelsin (ön plan servisi ancak o zaman başlatılabilir) ve bildirimi gösterecek liste açılsın.
+            withTimeoutOrNull(10_000) { while (!AppVisibility.visible) delay(100) }
+            withTimeoutOrNull(5_000) { _notices.subscriptionCount.first { it > 0 } }
+            // Plan (bulut kullanılabilir mi) sunucudan tazelenir; internet yoksa son bilinen değer, o da yoksa telefonda.
+            val quota = refreshQuota()
+            val mode = PlanPolicy.effectiveMode(AppSettings.aiMode.value, cloudAllowed = quota?.cloud == true)
+            val now = System.currentTimeMillis()
+            for (job in pending) {
+                val id = job.file.id
+                if (id in _running.value) continue // kullanıcı bu arada kendisi başlattı
+                if (SummaryStore.get(id) != null) {
+                    LocalJobs.remove(id) // özet çıkmış, telefona yazılmış (yüklenmesi [flushPending]'de)
+                    continue
+                }
+                val route = AiPolicy.route(mode, modelReady = LocalSummarizer.available, sizeBytes = job.file.size)
+                val decision = LocalJobPolicy.decide(route, job.attempts, job.startedAtMs, now)
+                if (decision == LocalResume.Drop) {
+                    LocalJobs.remove(id)
+                    continue
+                }
+                if (decision == LocalResume.GiveUp) {
+                    LocalJobs.remove(id)
+                    reportFailure(id, job.file.name, Txt.ai.phoneRunInterrupted(job.file.name))
+                    continue
+                }
+                val file = currentFile(job.file)
+                if (file == null) {
+                    LocalJobs.remove(id) // dosya silinmiş ya da artık özeti var
+                    continue
+                }
+                if (decision == LocalResume.InCloud) {
+                    LocalJobs.remove(id)
+                    _notices.tryEmit(Txt.ai.resumedInCloud(file.name))
+                    startJob(file, password = null, preferCloud = true)
+                } else {
+                    // Kayıt kalır: telefonda yeniden başlarken deneme sayısı bir artar ([LocalJobs.begin]).
+                    _notices.tryEmit(Txt.ai.resumedOnPhone(file.name))
+                    startJob(file, password = null, preferCloud = false)
+                }
+            }
+        }
+    }
+
+    /**
+     * Dosyanın sunucudaki güncel hali; dosya silinmişse ya da artık özeti varsa null. Sunucuya ulaşılamazsa (internet
+     * yok) saklanan bilgiler kullanılır: dosyanın telefonda kopyası varsa telefonda yine özetlenebilir.
+     */
+    private suspend fun currentFile(stored: FileDto): FileDto? = try {
+        ApiClient.api.getFile(stored.id).takeUnless { it.hasSummary }
+    } catch (e: CancellationException) {
+        throw e
+    } catch (e: HttpException) {
+        if (e.code() == 404) null else stored
+    } catch (e: Exception) {
+        stored
+    }
+
+    /**
      * Uygulama açılınca: önceki açılışta başlatılıp sonucu gelmeden kalan bulut özetlemelerine yeniden katılır. Sunucu
      * işi bitirdiyse sonuç hemen gelir ve özet gösterilir; hala sürüyorsa satırda yükleme simgesi döner ve bitince
      * gösterilir. Yeni özetleme başlatılmaz ([SummarizeRequest.joinOnly]).
@@ -894,7 +1021,7 @@ object AiSummarizer {
                     CloudJobs.remove(job.fileId)
                     _completed.tryEmit(job.fileId)
                     if (e.code() == 404) {
-                        _notices.tryEmit(Txt.ai.serverJobFailed(job.fileName))
+                        reportFailure(job.fileId, job.fileName, Txt.ai.serverJobFailed(job.fileName))
                     }
                 } catch (e: Exception) {
                     CloudJobs.remove(job.fileId)

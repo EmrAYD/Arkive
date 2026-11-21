@@ -47,6 +47,32 @@ import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.i18n.Txt
 
 /**
+ * Özetlemeyi başlatan işlev ([AiSummarizer.confirm]). Android 13 ve sonrasında bildirim izni yoksa önce izin istenir:
+ * özetleme sürerken ilerleme bildirimi, uygulama arka plandayken bitince "özet hazır" bildirimi bununla gösterilir.
+ * İzin verilmese de özetleme başlar (yalnızca bildirimler görünmez).
+ */
+@Composable
+private fun rememberSummaryStarter(): (FileDto) -> Unit {
+    val context = LocalContext.current
+    var pending by remember { mutableStateOf<FileDto?>(null) }
+    val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
+        pending?.let { AiSummarizer.confirm(it) }
+        pending = null
+    }
+    return { file ->
+        val needsAsk = Build.VERSION.SDK_INT >= 33 &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        if (needsAsk) {
+            pending = file
+            permission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        } else {
+            AiSummarizer.confirm(file)
+        }
+    }
+}
+
+/**
  * [file]'ın nerede özetleneceği ([AiPolicy.route]): yapay zeka işlem yerine (ücretsiz planda her zaman Yerel), modelin
  * telefonda hazır olup olmadığına ve dosyanın boyutuna göre. Ayar, plan ya da model durumu değişince yeniden hesaplanır.
  */
@@ -68,28 +94,13 @@ private fun summaryRoute(file: FileDto): SummaryRoute {
 @Composable
 fun AiSummaryDialogHost() {
     val ui by AiSummarizer.ui.collectAsState()
+    // Pencerelerin dışında tutulur: izin penceresi açıkken özet penceresi değişse de izin sonucu kaybolmasın.
+    val startSummary = rememberSummaryStarter()
     when (val state = ui) {
         null -> Unit
 
         is SummaryUi.Confirm -> {
-            val context = LocalContext.current
-            // Android 13+: özetleme sırasında ilerleme bildirimi için izin istenir. Verilmese de özetleme aynen sürer.
-            var pending by remember { mutableStateOf<FileDto?>(null) }
-            val permission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
-                pending?.let { AiSummarizer.confirm(it) }
-                pending = null
-            }
-            val start = {
-                val needsAsk = Build.VERSION.SDK_INT >= 33 &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                    PackageManager.PERMISSION_GRANTED
-                if (needsAsk) {
-                    pending = state.file
-                    permission.launch(Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    AiSummarizer.confirm(state.file)
-                }
-            }
+            val start = { startSummary(state.file) }
             AlertDialog(
                 onDismissRequest = AiSummarizer::dismiss,
                 title = { Text(Txt.ai.confirmTitle) },
@@ -190,7 +201,8 @@ fun AiSummaryDialogHost() {
             onDelete = { LocalModel.delete(); AiSummarizer.dismiss() },
             onDismiss = AiSummarizer::dismiss,
             // "Yerel + Bulut": model inmeden bu dosya hemen bulutta özetlenebilir (model hazır olmadığı için yol buluttur).
-            onSummarizeInCloud = state.cloudAlternative?.let { file -> { AiSummarizer.confirm(file) } },
+            // Onay penceresi atlandığından bildirim izni burada da istenir.
+            onSummarizeInCloud = state.cloudAlternative?.let { file -> { startSummary(file) } },
         )
 
         is SummaryUi.DeleteAsk -> AlertDialog(

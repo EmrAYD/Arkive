@@ -69,6 +69,15 @@ object EnStrings : Strings {
         override fun summaryDeleted(name: Any?): String = "The summary of “${name}” was deleted."
         override val loadingModel: String = "Loading the AI model…"
         override fun summarizingOnPhoneStep(done: Any?, total: Any?): String = "Summarizing on the phone… (${done}/${total})"
+        override fun resumedOnPhone(name: Any?): String = "The app closed while “${name}” was being summarized on the phone; the summary has been restarted."
+        override fun resumedInCloud(name: Any?): String = "The app closed while “${name}” was being summarized on the phone; it's now being summarized in the cloud."
+        override fun phoneRunInterrupted(name: Any?): String = "“${name}” couldn't be summarized: the app closed again while it was being summarized on the phone (the phone may not have enough memory). You can summarize the file again."
+        override val summaryFailedChannel: String = "Files that couldn't be summarized"
+        override val failedNotificationTitle: String = "Summary couldn't be completed"
+        override fun failedNotificationText(name: Any?, message: Any?): String = "“${name}”: ${message}"
+        override fun failedPlain(name: Any?): String = "“${name}” couldn't be summarized."
+        override val passwordNeededTitle: String = "Password needed"
+        override fun passwordNeededText(name: Any?): String = "“${name}” is password-protected. Open the app and enter the password to summarize it."
     }
     override val docs: DocsStrings = object : DocsStrings {
         override val wrongPassword: String = "Wrong password."

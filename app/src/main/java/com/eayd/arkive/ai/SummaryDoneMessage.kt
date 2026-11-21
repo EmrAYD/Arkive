@@ -41,6 +41,30 @@ object SummaryDoneMessage {
         }
 }
 
+/**
+ * "Özetleme tamamlanamadı" sistem bildiriminin metinleri (uygulama arka plandayken ya da kapalıyken özetleme başarısız
+ * olunca, ya da dosya parola isteyince; [SummaryNotifier.notifyFailed]). Uygulama ekrandayken aynı haber uygulama içi
+ * kısa bildirimle verilir.
+ */
+object SummaryFailedMessage {
+
+    /** Başarısız özetleme bildiriminin başlığı. */
+    val TITLE: String get() = Txt.ai.failedNotificationTitle
+
+    /** Dosya parola isteyince gösterilen bildirimin başlığı. */
+    val PASSWORD_TITLE: String get() = Txt.ai.passwordNeededTitle
+
+    /** Parola bildiriminin metni: uygulamayı açıp parolayı girmesi gerektiği. */
+    fun passwordText(fileName: String): String = Txt.ai.passwordNeededText(fileName)
+
+    /** Bildirimin metni: hatanın açıklaması. Açıklamada dosyanın adı geçmiyorsa başına eklenir; açıklama yoksa yalnızca ad. */
+    fun text(fileName: String, message: String): String = when {
+        message.isBlank() -> Txt.ai.failedPlain(fileName)
+        fileName.isNotEmpty() && message.contains(fileName) -> message
+        else -> Txt.ai.failedNotificationText(fileName, message)
+    }
+}
+
 /** "Özetleme bitti" haberinin hangi yoldan verileceği. */
 object SummaryDoneDelivery {
 

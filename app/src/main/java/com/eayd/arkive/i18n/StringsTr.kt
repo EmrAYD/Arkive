@@ -69,6 +69,15 @@ object TrStrings : Strings {
         override fun summaryDeleted(name: Any?): String = "“${name}” özeti silindi."
         override val loadingModel: String = "Yapay zeka modeli yükleniyor…"
         override fun summarizingOnPhoneStep(done: Any?, total: Any?): String = "Telefonda özetleniyor… (${done}/${total})"
+        override fun resumedOnPhone(name: Any?): String = "“${name}” telefonda özetlenirken uygulama kapanmıştı; özetleme yeniden başlatıldı."
+        override fun resumedInCloud(name: Any?): String = "“${name}” telefonda özetlenirken uygulama kapanmıştı; özetleme bulutta sürdürülüyor."
+        override fun phoneRunInterrupted(name: Any?): String = "“${name}” özetlenemedi: telefonda özetlenirken uygulama yine kapandı (telefonun belleği yetmemiş olabilir). Dosyayı yeniden özetleyebilirsiniz."
+        override val summaryFailedChannel: String = "Özetlenemeyen dosyalar"
+        override val failedNotificationTitle: String = "Özetleme tamamlanamadı"
+        override fun failedNotificationText(name: Any?, message: Any?): String = "“${name}”: ${message}"
+        override fun failedPlain(name: Any?): String = "“${name}” özetlenemedi."
+        override val passwordNeededTitle: String = "Parola gerekiyor"
+        override fun passwordNeededText(name: Any?): String = "“${name}” parolayla korunuyor. Özetlemek için uygulamayı açıp parolayı girin."
     }
     override val docs: DocsStrings = object : DocsStrings {
         override val wrongPassword: String = "Parola yanlış."

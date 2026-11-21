@@ -89,6 +89,15 @@ interface AiStrings {
     fun summaryDeleted(name: Any?): String
     val loadingModel: String
     fun summarizingOnPhoneStep(done: Any?, total: Any?): String
+    fun resumedOnPhone(name: Any?): String
+    fun resumedInCloud(name: Any?): String
+    fun phoneRunInterrupted(name: Any?): String
+    val summaryFailedChannel: String
+    val failedNotificationTitle: String
+    fun failedNotificationText(name: Any?, message: Any?): String
+    fun failedPlain(name: Any?): String
+    val passwordNeededTitle: String
+    fun passwordNeededText(name: Any?): String
 }
 
 /** Belge okuyucuların (PDF, Word, OLE, XML) hata mesajları. */
