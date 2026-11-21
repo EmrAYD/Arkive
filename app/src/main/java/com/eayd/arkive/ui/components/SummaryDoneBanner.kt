@@ -158,6 +158,7 @@ private fun BannerCard(done: SummaryDone, onOpen: (SummaryDone) -> Unit, onDismi
                 modifier = Modifier.fillMaxWidth().height(3.dp),
                 color = colors.primary,
                 trackColor = Color.Transparent,
+                drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
             )
         }
     }

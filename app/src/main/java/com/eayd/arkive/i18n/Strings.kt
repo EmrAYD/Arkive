@@ -63,7 +63,9 @@ interface AiStrings {
     val serviceChannelName: String
     val confirmTitle: String
     fun confirmBody(name: Any?): String
-    val confirmDetail: String
+    val confirmOnPhone: String
+    val confirmPhoneThenCloud: String
+    val confirmInCloud: String
     val summarize: String
     val passwordTitle: String
     fun passwordBody(name: Any?): String
@@ -76,6 +78,7 @@ interface AiStrings {
     val summaryTitle: String
     val summaryCopied: String
     val summarizing: String
+    fun progressPercent(percent: Any?): String
     val showSummaryA11y: String
     val summarizeA11y: String
     fun summaryOf(fileName: Any?): String

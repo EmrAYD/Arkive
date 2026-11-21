@@ -61,30 +61,30 @@ object LocalSummarizer {
 
     /**
      * Belgenin ne olduğunu ve neleri içerdiğini anlatan tek paragraflık özet ([language] dilinde; bulut özetiyle aynı
-     * biçim). [onStep]: o anki adım ("Model yükleniyor…", "Telefonda özetleniyor… (2/5)"). Özet çıkarılamazsa boş metin
+     * biçim). [onPhase]: o anki aşama (model yükleniyor; telefonda özetleniyor, adım 2/5). Özet çıkarılamazsa boş metin
      * döner. Model çalıştırılamazsa hata fırlatır. Coroutine iptal edilirse model o anki işi bırakır.
      */
-    suspend fun summarize(text: String, language: AppLanguage, onStep: (String) -> Unit = {}): String = lock.withLock {
-        closer?.cancel()
-        try {
-            val loaded = engine ?: run {
-                onStep(Txt.ai.loadingModel)
-                // Model yüklenirken özetleme durdurulsa da yüklenen model kaydedilir (sonra kapatılsın, sızmasın).
-                withContext(Dispatchers.IO) { open().also { engine = it } }
-            }
-            onStep(Txt.ai.summarizingOnPhone)
-            LocalSummaryPipeline(
-                language = language,
-                ask = { prompt, maxTokens -> ask(loaded, language, prompt, maxTokens) },
-                onStep = { done, total -> onStep(Txt.ai.summarizingOnPhoneStep(done, total)) },
-            ).summarize(text)
-        } finally {
-            closer = scope.launch {
-                delay(IDLE_CLOSE_MS)
-                lock.withLock { closeEngine() }
+    suspend fun summarize(text: String, language: AppLanguage, onPhase: (SummaryPhase) -> Unit = {}): String =
+        lock.withLock {
+            closer?.cancel()
+            try {
+                val loaded = engine ?: run {
+                    onPhase(SummaryPhase.LoadingModel)
+                    // Model yüklenirken özetleme durdurulsa da yüklenen model kaydedilir (sonra kapatılsın, sızmasın).
+                    withContext(Dispatchers.IO) { open().also { engine = it } }
+                }
+                LocalSummaryPipeline(
+                    language = language,
+                    ask = { prompt, maxTokens -> ask(loaded, language, prompt, maxTokens) },
+                    onStep = { done, total -> onPhase(SummaryPhase.OnPhone(done, total)) },
+                ).summarize(text)
+            } finally {
+                closer = scope.launch {
+                    delay(IDLE_CLOSE_MS)
+                    lock.withLock { closeEngine() }
+                }
             }
         }
-    }
 
     /** Modeli bellekten çıkarır (ör. model silinirken). */
     fun release() {

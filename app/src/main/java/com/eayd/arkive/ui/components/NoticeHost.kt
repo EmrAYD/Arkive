@@ -175,6 +175,7 @@ private fun NoticeCard(notice: Notice, onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().height(3.dp),
                 color = style.accent,
                 trackColor = Color.Transparent,
+                drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
             )
         }
     }

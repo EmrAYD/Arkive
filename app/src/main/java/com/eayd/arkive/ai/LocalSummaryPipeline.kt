@@ -21,7 +21,7 @@ class LocalSummaryPipeline(
     private val language: AppLanguage,
     /** İstemi modele gönderir ve yanıtını döndürür; [maxTokens]: yanıtın en çok belirteç sayısı. */
     private val ask: suspend (prompt: String, maxTokens: Int) -> String,
-    /** Uzun belgede ilerleme: [done]. adım başlıyor, toplam [total] adım (bölümler + birleştirme). */
+    /** İlerleme: [done]. adım başlıyor, toplam [total] adım (uzun belgede bölümler + birleştirme; kısa belgede 1/1). */
     private val onStep: (done: Int, total: Int) -> Unit = { _, _ -> },
 ) {
     private val p = prompts(language)
@@ -30,7 +30,10 @@ class LocalSummaryPipeline(
     suspend fun summarize(text: String): String {
         val parts = chunks(text)
         if (parts.isEmpty()) return ""
-        if (parts.size == 1) return paragraph(ask(p.single(parts[0]), FINAL_MAX_TOKENS))
+        if (parts.size == 1) {
+            onStep(1, 1)
+            return paragraph(ask(p.single(parts[0]), FINAL_MAX_TOKENS))
+        }
         val total = parts.size + 1
         val notes = parts.mapIndexed { i, part ->
             onStep(i + 1, total)

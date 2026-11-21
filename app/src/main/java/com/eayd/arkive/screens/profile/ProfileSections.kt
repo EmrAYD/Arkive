@@ -308,6 +308,7 @@ private fun PlanDetails(storage: StorageInfo) {
         progress = { storage.fraction },
         modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
         trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+        drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
     )
     Spacer(Modifier.height(8.dp))
     Text(

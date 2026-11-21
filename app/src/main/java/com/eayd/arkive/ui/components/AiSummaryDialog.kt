@@ -47,10 +47,23 @@ import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.i18n.Txt
 
 /**
+ * [file]'ın nerede özetleneceği ([AiPolicy.route]): yapay zeka işlem yerine (ücretsiz planda her zaman Yerel), modelin
+ * telefonda hazır olup olmadığına ve dosyanın boyutuna göre. Ayar, plan ya da model durumu değişince yeniden hesaplanır.
+ */
+@Composable
+private fun summaryRoute(file: FileDto): SummaryRoute {
+    val cloud = PlanStatus.quota.collectAsState().value?.cloud == true
+    val aiMode by AppSettings.aiMode.collectAsState()
+    val modelReady = LocalModel.state.collectAsState().value == LocalModelState.Ready
+    return AiPolicy.route(PlanPolicy.effectiveMode(aiMode, cloud), modelReady, file.size)
+}
+
+/**
  * AI düğmesine basılınca açılan pencereler: onay ("Bu dosyayı özetlemek istiyor musunuz?"), özetleme sürerken durdurma
  * sorusu, özet penceresi (belgenin ne olduğunu ve neleri içerdiğini anlatan paragraf), özeti silme onayı ve (dosya
  * telefonda özetlenecekken model telefonda yoksa) yapay zeka modelini indirme penceresi. Özetleme
- * başladıktan sonra pencere kapanır; ilerleme satırdaki yükleme simgesinde görünür, bitince özet penceresi açılır.
+ * başladıktan sonra pencere kapanır; ilerleme satırdaki yükleme simgesinde ve yüzdede görünür, bitince özet penceresi
+ * açılır. Onay penceresi dosyanın nerede (telefonda / bulutta) özetleneceğini söyler.
  */
 @Composable
 fun AiSummaryDialogHost() {
@@ -83,8 +96,13 @@ fun AiSummaryDialogHost() {
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(Txt.ai.confirmBody(state.file.name))
+                        // Dosyanın nerede özetleneceği: telefonda / önce telefonda, olmazsa bulutta / bulutta.
                         Text(
-                            Txt.ai.confirmDetail,
+                            when (summaryRoute(state.file)) {
+                                SummaryRoute.PhoneOnly -> Txt.ai.confirmOnPhone
+                                SummaryRoute.PhoneThenCloud -> Txt.ai.confirmPhoneThenCloud
+                                SummaryRoute.Cloud -> Txt.ai.confirmInCloud
+                            },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.outline,
                         )
@@ -96,13 +114,8 @@ fun AiSummaryDialogHost() {
         }
 
         is SummaryUi.Password -> {
-            // Parolanın nereye gittiği, dosyanın nerede özetleneceğine göre söylenir ([AiPolicy.route]): yapay zeka işlem
-            // yerine (ücretsiz planda her zaman Yerel), modele ve dosyanın boyutuna göre.
-            val cloud = PlanStatus.quota.collectAsState().value?.cloud == true
-            val aiMode by AppSettings.aiMode.collectAsState()
-            val modelReady = LocalModel.state.collectAsState().value == LocalModelState.Ready
-            val mode = PlanPolicy.effectiveMode(aiMode, cloud)
-            val note = when (AiPolicy.route(mode, modelReady, state.file.size)) {
+            // Parolanın nereye gittiği, dosyanın nerede özetleneceğine göre söylenir.
+            val note = when (summaryRoute(state.file)) {
                 SummaryRoute.PhoneOnly -> Txt.ai.passwordLocalNote
                 SummaryRoute.PhoneThenCloud -> Txt.ai.passwordHybridNote
                 SummaryRoute.Cloud -> Txt.ai.passwordCloudNote

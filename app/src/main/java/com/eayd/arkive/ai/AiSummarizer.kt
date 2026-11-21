@@ -117,10 +117,49 @@ object AiSummarizer {
 
     private val _status = MutableStateFlow<Map<String, String>>(emptyMap())
 
-    /** Özetlenen dosyaların o anki adımı ("Dosya okunuyor…", "Sunucuda özetleniyor…"); satırda ve bildirimde gösterilir. */
+    /**
+     * Özetlenen dosyaların o anki adımı ("Dosya okunuyor…", "Sunucuda özetleniyor…"); bildirimde gösterilir. Satırda,
+     * yüzdesi olmayan işlerde (ör. "Özet açılıyor…") gösterilir; özetlemede satırda yüzde ([progress]) görünür.
+     */
     val status: StateFlow<Map<String, String>> = _status.asStateFlow()
 
     private fun setStatus(fileId: String, text: String) = _status.update { it + (fileId to text) }
+
+    private val _progress = MutableStateFlow<Map<String, Int>>(emptyMap())
+
+    /**
+     * Özetlenen dosyaların yüzdesi (0-[SummaryProgress.MAX]); dosya satırında adım yazısı yerine bu gösterilir. Yüzde,
+     * aşamalardan ve beklenen sürelerden tahmin edilir ([SummaryProgress]); yarım saniyede bir güncellenir.
+     */
+    val progress: StateFlow<Map<String, Int>> = _progress.asStateFlow()
+
+    private val phases = java.util.concurrent.ConcurrentHashMap<String, PhaseRun>()
+    private var ticker: Job? = null
+
+    /** [fileId]'nin özetlemesi [phase] aşamasına geçti ([startedAtMs]: aşamanın başladığı an; varsayılan şimdi). */
+    private fun setPhase(fileId: String, phase: SummaryPhase, startedAtMs: Long = System.currentTimeMillis()) {
+        phases[fileId] = SummaryProgress.start(phase, currentPercent = _progress.value[fileId] ?: 0, nowMs = startedAtMs)
+        tick()
+        if (ticker?.isActive != true) {
+            ticker = scope.launch {
+                while (phases.isNotEmpty()) {
+                    delay(500)
+                    tick()
+                }
+            }
+        }
+    }
+
+    private fun tick() {
+        val now = System.currentTimeMillis()
+        _progress.value = phases.mapValues { (_, run) -> SummaryProgress.percent(run, now) }
+    }
+
+    /** Özetleme bitti ya da durdu: yüzdesi silinir. */
+    private fun clearProgress(fileId: String) {
+        phases.remove(fileId)
+        _progress.update { it - fileId }
+    }
 
     private val _completed = MutableSharedFlow<String>(extraBufferCapacity = 8)
 
@@ -276,6 +315,7 @@ object AiSummarizer {
         if (file.id in _running.value) return
         _running.update { it + file.id }
         setStatus(file.id, Txt.ai.preparing)
+        setPhase(file.id, SummaryPhase.Reading)
         // Uygulama arka plana alınsa da iş sürsün: ön plan servisi süreci canlı tutar.
         runCatching { SummaryService.start(AppSettings.appContext) }
         jobs[file.id] = scope.launch {
@@ -295,6 +335,7 @@ object AiSummarizer {
             } finally {
                 _running.update { it - file.id }
                 _status.update { it - file.id }
+                clearProgress(file.id)
                 jobs.remove(file.id)
             }
         }
@@ -621,12 +662,25 @@ object AiSummarizer {
     private suspend fun runLocalModel(file: FileDto, text: String): String? {
         setStatus(file.id, Txt.ai.summarizingOnPhone)
         return try {
-            LocalSummarizer.summarize(text, AppSettings.summaryLanguage.value) { step -> setStatus(file.id, step) }.trim()
+            LocalSummarizer.summarize(text, AppSettings.summaryLanguage.value) { phase -> showLocalPhase(file.id, phase) }
+                .trim()
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
             null
         }
+    }
+
+    /** Telefondaki adım: bildirimde adımın metni ("Model yükleniyor…", "Telefonda özetleniyor… (2/5)"), satırda yüzdesi. */
+    private fun showLocalPhase(fileId: String, phase: SummaryPhase) {
+        val text = when (phase) {
+            SummaryPhase.LoadingModel -> Txt.ai.loadingModel
+            is SummaryPhase.OnPhone ->
+                if (phase.total > 1) Txt.ai.summarizingOnPhoneStep(phase.step, phase.total) else Txt.ai.summarizingOnPhone
+            else -> Txt.ai.summarizingOnPhone
+        }
+        setStatus(fileId, text)
+        setPhase(fileId, phase)
     }
 
     /**
@@ -751,6 +805,7 @@ object AiSummarizer {
     /** Sunucudaki yapay zekayla özetler (Plus) ve özetin metnini döndürür. */
     private suspend fun summarizeInCloud(file: FileDto, password: String?): String {
         setStatus(file.id, Txt.ai.summarizingOnServer)
+        setPhase(file.id, SummaryPhase.InCloud(file.size))
         // Uygulama özetleme sürerken kapanırsa sunucu işi yine bitirir; uygulama açılınca bu kayıtla sonuca yeniden katılır.
         CloudJobs.add(file.id, file.name)
         var stillRunningOnServer = false
@@ -814,6 +869,8 @@ object AiSummarizer {
             if (job.fileId in _running.value) continue
             _running.update { it + job.fileId }
             setStatus(job.fileId, Txt.ai.summarizingOnServer)
+            // Uygulama kapanmadan önce başlamıştı: yüzde, başladığı andan beri geçen süreye göre sürer.
+            setPhase(job.fileId, SummaryPhase.InCloud(sizeBytes = 0), startedAtMs = job.startedAtMs)
             runCatching { SummaryService.start(AppSettings.appContext) }
             jobs[job.fileId] = scope.launch {
                 try {
@@ -844,6 +901,7 @@ object AiSummarizer {
                 } finally {
                     _running.update { it - job.fileId }
                     _status.update { it - job.fileId }
+                    clearProgress(job.fileId)
                     jobs.remove(job.fileId)
                 }
             }

@@ -110,7 +110,7 @@ fun FileRow(
     dimmed: Boolean = false,   // sürüklenen dosyanın yerindeki satır soluk görünür
     ai: Boolean? = false,      // dosyanın özeti var mı (AI düğmesi dolu görünür); null ise düğme hiç gösterilmez
     aiWorking: Boolean = false, // özet hazırlanıyor mu (AI düğmesi yerine yükleme simgesi)
-    aiStatus: String? = null,   // özetleme sürerken hangi adımda olduğu (boyutun yanında gösterilir)
+    aiStatus: String? = null,   // özetleme sürerken yüzdesi ya da adımı (boyutun yanında gösterilir: "1,2 MB · %40")
     enabled: Boolean = true,    // false: satır pasif (internetsizken telefonda kopyası olmayan dosya)
     menuEnabled: Boolean = true, // internetsizken 3 nokta menüsü pasiftir
 ) {
@@ -184,7 +184,11 @@ fun UploadRow(item: UploadItem, onCancel: () -> Unit, onDismiss: () -> Unit) {
                 when (item.phase) {
                     UploadPhase.Waiting -> UploadStatus(Txt.browser.uploadQueued)
                     UploadPhase.Uploading -> {
-                        LinearProgressIndicator(progress = { item.progress }, modifier = Modifier.fillMaxWidth())
+                        LinearProgressIndicator(
+                            progress = { item.progress },
+                            modifier = Modifier.fillMaxWidth(),
+                            drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
+                        )
                         Spacer(Modifier.height(4.dp))
                         UploadStatus(Txt.browser.uploadProgress((item.progress * 100).toInt()))
                     }

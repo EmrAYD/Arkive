@@ -28,13 +28,15 @@ class LocalSummaryPipelineTest {
     @Test
     fun `kisa belge tek istekte ozetlenir`() = runBlocking {
         val calls = Calls()
-        val out = pipeline(calls = calls) { "Bu belge bir toplantı notudur.\n\nKararları içerir." }
+        val steps = mutableListOf<Pair<Int, Int>>()
+        val out = pipeline(calls = calls, steps = steps) { "Bu belge bir toplantı notudur.\n\nKararları içerir." }
             .summarize("Toplantı salı günü yapılacak.")
         assertEquals("Bu belge bir toplantı notudur. Kararları içerir.", out)
         val (prompt, tokens) = calls.prompts.single()
         assertEquals(LocalSummaryPipeline.FINAL_MAX_TOKENS, tokens)
         assertTrue(prompt.contains("Toplantı salı günü yapılacak."))
         assertTrue(prompt.contains("\"Bu belge\" diye başla") && prompt.contains("tek paragrafta"))
+        assertEquals(listOf(1 to 1), steps) // kısa belgede de ilerleme bildirilir
     }
 
     @Test

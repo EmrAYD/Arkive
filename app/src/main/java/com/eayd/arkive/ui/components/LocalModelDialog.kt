@@ -91,7 +91,11 @@ fun LocalModelDialog(
                         )
                         val percent = s.percent
                         if (percent != null) {
-                            LinearProgressIndicator(progress = { percent / 100f }, modifier = Modifier.fillMaxWidth())
+                            LinearProgressIndicator(
+                                progress = { percent / 100f },
+                                modifier = Modifier.fillMaxWidth(),
+                                drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
+                            )
                         } else {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                         }

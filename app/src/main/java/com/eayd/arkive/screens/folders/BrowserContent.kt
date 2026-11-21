@@ -250,6 +250,7 @@ private fun BrowserList(
     val summarizing by AiSummarizer.running.collectAsState()
     val waitingUpload by SummaryStore.pendingIds.collectAsState() // telefonda üretilmiş, yüklenmeyi bekleyen özetler
     val summaryStatus by AiSummarizer.status.collectAsState()
+    val summaryProgress by AiSummarizer.progress.collectAsState()
     // İnternetsizken yalnızca telefonda kopyası olan dosyalar açılabilir; diğerleri pasif görünür.
     val availableOffline by produceState(emptySet<String>(), state.files, state.offline) {
         value = if (!state.offline) emptySet() else withContext(Dispatchers.IO) {
@@ -310,7 +311,8 @@ private fun BrowserList(
                 ),
                 ai = file.hasSummary || file.id in waitingUpload,
                 aiWorking = file.id in summarizing,
-                aiStatus = summaryStatus[file.id],
+                // Özetlenirken yüzdesi ("%40"); yüzdesi olmayan işte (özet açılıyor) adımın yazısı.
+                aiStatus = summaryProgress[file.id]?.let { Txt.ai.progressPercent(it) } ?: summaryStatus[file.id],
                 enabled = !state.offline || file.id in availableOffline,
                 menuEnabled = !state.offline,
                 dimmed = dragState.dragged?.keys?.contains(rowKey) == true,
