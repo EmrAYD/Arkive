@@ -19,6 +19,7 @@ interface Strings {
     val language: LanguageStrings
     val localAi: LocalAiStrings
     val aiMode: AiModeStrings
+    val search: SearchStrings
 }
 
 /** Yapay zeka özetleme metinleri. */
@@ -579,4 +580,17 @@ interface AiModeStrings {
     val plusOnly: String
     val cloudPlusOnly: String
     fun localOnlyBlocked(fileName: Any?, reason: Any?): String
+}
+
+/** Arama ekranı. */
+interface SearchStrings {
+    val title: String
+    val hint: String
+    val clear: String
+    val modeAll: String
+    val modeName: String
+    val modeContent: String
+    val prompt: String
+    fun noResults(query: Any?): String
+    val contentNote: String
 }

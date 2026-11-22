@@ -8,8 +8,11 @@ import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawingPadding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Menu
@@ -19,9 +22,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ModalNavigationDrawer
-import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberDrawerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -31,10 +31,10 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.data.PlanStatus
@@ -42,6 +42,7 @@ import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.screens.folders.BrowserContent
 import com.eayd.arkive.screens.profile.ProfileScreen
 import com.eayd.arkive.screens.trash.TrashScreen
+import com.eayd.arkive.ui.components.SearchBox
 import com.eayd.arkive.viewmodel.BrowserViewModel
 import com.eayd.arkive.viewmodel.HomeViewModel
 import com.eayd.arkive.viewmodel.TrashViewModel
@@ -50,7 +51,7 @@ import kotlinx.coroutines.launch
 /** Profil sayfasının kayma süresi (ms). */
 private const val PROFILE_SLIDE_MILLIS = 300
 
-/** Ana ekran: üstte menü ve profil düğmeleri, altında seçili bölüm. */
+/** Ana ekran: üstte menü düğmesi, arama kutusu ve profil düğmesi, altında seçili bölüm. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -59,6 +60,7 @@ fun HomeScreen(
     onOpenFile: (fileId: String) -> Unit,
     onOpenTrashFolder: (folderId: String) -> Unit,
     onOpenTrashFile: (fileId: String) -> Unit,
+    onOpenSearch: () -> Unit,
     homeViewModel: HomeViewModel = viewModel(),
 ) {
     val state by homeViewModel.state.collectAsState()
@@ -100,19 +102,16 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize().safeDrawingPadding(),
             ) {
                 if (section != HomeSection.Trash) {
-                    TopAppBar(
-                        title = { Text(section.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                        navigationIcon = {
-                            IconButton(onClick = { scope.launch { drawerState.open() } }) {
-                                Icon(Icons.Filled.Menu, contentDescription = Txt.home.openMenu)
-                            }
-                        },
-                        actions = {
-                            ProfileButton(email = state.userEmail, onClick = { showProfile = true })
-                        },
-                        colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                        windowInsets = WindowInsets(0, 0, 0, 0),
-                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth().height(64.dp).padding(horizontal = 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                    ) {
+                        IconButton(onClick = { scope.launch { drawerState.open() } }) {
+                            Icon(Icons.Filled.Menu, contentDescription = Txt.home.openMenu)
+                        }
+                        SearchBox(onClick = onOpenSearch, modifier = Modifier.weight(1f).padding(horizontal = 4.dp))
+                        ProfileButton(email = state.userEmail, onClick = { showProfile = true })
+                    }
                     HorizontalDivider()
                 }
 

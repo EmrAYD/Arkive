@@ -528,4 +528,15 @@ object TrStrings : Strings {
         override val cloudPlusOnly: String = "“Bulut” ve “Yerel + Bulut” seçenekleri Plus planına özeldir. Ücretsiz planda dosyalar yalnızca telefonda özetlenir."
         override fun localOnlyBlocked(fileName: Any?, reason: Any?): String = "“${fileName}” telefonda özetlenemiyor: ${reason} Bulutta özetlemek için Profil > Ayarlar > Yapay zeka işlem yeri'nden “Bulut” ya da “Yerel + Bulut”u seçin."
     }
+    override val search: SearchStrings = object : SearchStrings {
+        override val title: String = "Ara"
+        override val hint: String = "Dosya ve klasörlerde ara"
+        override val clear: String = "Temizle"
+        override val modeAll: String = "Tümü"
+        override val modeName: String = "Adında"
+        override val modeContent: String = "İçeriğinde"
+        override val prompt: String = "Dosya ve klasör adlarında, metin içeren dosyaların (PDF, Word, metin, sunum, tablo…) içinde arar. Aramak için en az 2 harf yazın."
+        override fun noResults(query: Any?): String = "“${query}” için sonuç bulunamadı."
+        override val contentNote: String = "Parolalı ve taranmış (yazısız) dosyaların içinde arama yapılamaz."
+    }
 }

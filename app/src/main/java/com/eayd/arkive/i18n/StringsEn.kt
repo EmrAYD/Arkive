@@ -528,4 +528,15 @@ object EnStrings : Strings {
         override val cloudPlusOnly: String = "“Cloud” and “On device + Cloud” are exclusive to the Plus plan. On the free plan, files are summarized only on the phone."
         override fun localOnlyBlocked(fileName: Any?, reason: Any?): String = "“${fileName}” can't be summarized on the phone: ${reason} To summarize it in the cloud, choose “Cloud” or “On device + Cloud” in Profile > Settings > AI processing location."
     }
+    override val search: SearchStrings = object : SearchStrings {
+        override val title: String = "Search"
+        override val hint: String = "Search files and folders"
+        override val clear: String = "Clear"
+        override val modeAll: String = "All"
+        override val modeName: String = "In name"
+        override val modeContent: String = "In content"
+        override val prompt: String = "Searches file and folder names and the text inside files (PDF, Word, text, slides, spreadsheets…). Type at least 2 letters."
+        override fun noResults(query: Any?): String = "No results for “${query}”."
+        override val contentNote: String = "Password-protected and scanned (image-only) files can't be searched inside."
+    }
 }

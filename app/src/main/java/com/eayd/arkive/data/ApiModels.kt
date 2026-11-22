@@ -155,3 +155,17 @@ data class SummarizeRequest(
 
 /** Telefonda çıkan özetin sunucuya kaydı. */
 data class SaveSummaryRequest(val summary: String)
+
+/**
+ * Arama sonucu: bir dosya ya da klasör. [path] bulunduğu klasörün yolu (kökten). [nameRanges] adda,
+ * [snippetRanges] metin parçasında aranan kelimelerin yerleri: [başlangıç, bitiş) çiftleri.
+ */
+data class SearchHitDto(
+    val type: String,
+    val file: FileDto? = null,
+    val folder: FolderDto? = null,
+    val path: List<String> = emptyList(),
+    @SerializedName("name_ranges") val nameRanges: List<List<Int>> = emptyList(),
+    val snippet: String? = null,
+    @SerializedName("snippet_ranges") val snippetRanges: List<List<Int>> = emptyList(),
+)

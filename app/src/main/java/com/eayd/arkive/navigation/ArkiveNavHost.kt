@@ -21,6 +21,7 @@ import com.eayd.arkive.screens.auth.SplashScreen
 import com.eayd.arkive.screens.folders.FolderScreen
 import com.eayd.arkive.screens.home.HomeScreen
 import com.eayd.arkive.screens.preview.PreviewScreen
+import com.eayd.arkive.screens.search.SearchScreen
 import com.eayd.arkive.screens.trash.TrashScreen
 import com.eayd.arkive.ui.components.AiSummaryDialogHost
 import com.eayd.arkive.ui.components.PlusOfferHost
@@ -63,11 +64,20 @@ fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
                 onOpenFile = { navController.goFrom(entry, Routes.preview(it)) },
                 onOpenTrashFolder = { navController.goFrom(entry, Routes.trashFolder(it)) },
                 onOpenTrashFile = { navController.goFrom(entry, Routes.preview(it, readOnly = true)) },
+                onOpenSearch = { navController.goFrom(entry, Routes.SEARCH) },
                 onLogout = {
                     authViewModel.logout(context) {
                         navController.navigateClearing(entry, Routes.LOGIN, popUpTo = Routes.HOME)
                     }
                 },
+            )
+        }
+
+        composable(Routes.SEARCH) { entry ->
+            SearchScreen(
+                onBack = { navController.popFrom(entry) },
+                onOpenFolder = { navController.goFrom(entry, Routes.folder(it)) },
+                onOpenFile = { navController.goFrom(entry, Routes.preview(it)) },
             )
         }
 

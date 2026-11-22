@@ -80,6 +80,10 @@ interface ArkiveApi {
     @DELETE("files/{id}")
     suspend fun deleteFile(@Path("id") id: String)
 
+    /** Dosya ve klasör adlarında, dosyaların içinde arar. [mode]: "all", "name" ya da "content". */
+    @GET("search")
+    suspend fun search(@Query("q") query: String, @Query("mode") mode: String): List<SearchHitDto>
+
     /** Tamamlanmış özetler, en yenisi önce. */
     @GET("summaries")
     suspend fun getSummaries(): List<SummaryItemDto>
