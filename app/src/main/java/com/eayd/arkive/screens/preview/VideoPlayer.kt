@@ -47,16 +47,7 @@ import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.i18n.Txt
 import kotlinx.coroutines.delay
 
-/**
- * Video: Android'in yerleşik [VideoView]'ı imzalı adresten akış olarak oynatır (dosya önce indirilmez).
- * Denetimler (oynat/durdur, 10 sn geri/ileri, ilerleme çubuğu) yerleşik MediaController yerine bu ekranda
- * çizilir; çünkü yerleşik denetim paneli video duraklatılınca bile birkaç saniyede kayboluyor ve görünümü eski.
- *
- * Denetimlerin görünme kuralı:
- *  - Video DURAKLATILMIŞSA (ya da bittiyse, hazırlanıyorsa) denetimler hep görünür.
- *  - Video OYNUYORSA ekrana dokunulunca görünür, son dokunuştan 4 sn sonra kaybolur.
- *  - Ekrana dokunmak denetimleri açar/kapatır.
- */
+/** Video oynatıcı; dosyayı indirmeden akıştan oynatır. Denetimler bu ekranda çizilir. */
 @Composable
 internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Unit) {
     var failed by remember(url) { mutableStateOf(false) }
@@ -67,9 +58,7 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
     var duration by remember(url) { mutableStateOf(0) }
     var dragging by remember(url) { mutableStateOf(false) }
     var controlsVisible by remember(url) { mutableStateOf(true) }
-    // Her dokunuşta artar; otomatik gizleme sayacı bu yüzden sıfırlanır.
     var interaction by remember(url) { mutableStateOf(0) }
-    // Oynatıcıyı ekrandan çıkınca durdurabilmek ve komut verebilmek için görünüm burada tutulur.
     val holder = remember(url) { arrayOfNulls<VideoView>(1) }
 
     DisposableEffect(url) {
@@ -78,7 +67,6 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
 
     TrackPosition(playing, dragging, current = { holder[0]?.currentPosition }) { position = it }
 
-    // Otomatik gizleme: yalnızca video oynuyor ve kullanıcı çubuğu sürüklemiyorsa.
     LaunchedEffect(controlsVisible, playing, dragging, interaction) {
         if (controlsVisible && playing && !dragging) {
             delay(4000)
@@ -105,7 +93,7 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
             factory = { ctx ->
                 val video = VideoView(ctx)
                 holder[0] = video
-                video.keepScreenOn = true   // izlerken ekran kararmasın
+                video.keepScreenOn = true
                 video.setOnPreparedListener { mp ->
                     duration = video.duration
                     prepared = true
@@ -123,7 +111,6 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
                 video.setOnCompletionListener { playing = false; controlsVisible = true }
                 video.setOnErrorListener { _, _, _ -> failed = true; true }
                 video.setVideoURI(Uri.parse(url))
-                // VideoView, görüntü oranını koruyarak verilen alana sığar; FrameLayout ile ortalanır.
                 FrameLayout(ctx).apply {
                     addView(
                         video,
@@ -133,7 +120,6 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
             },
         )
 
-        // Videonun üstündeki şeffaf katman: dokunuşları yakalar (alttaki VideoView'a gitmez).
         Box(
             Modifier
                 .fillMaxSize()
@@ -158,7 +144,6 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
             Column(
                 Modifier
                     .fillMaxWidth()
-                    // Videoyla karışmasın diye altta yumuşak koyu geçiş
                     .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.75f))))
                     .padding(start = 16.dp, end = 16.dp, top = 32.dp, bottom = 12.dp),
             ) {
@@ -179,7 +164,6 @@ internal fun VideoPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
                                     video?.pause()
                                     playing = false
                                 } else {
-                                    // Video bittiyse baştan oynat
                                     if (duration > 0 && position >= duration - 500) { video?.seekTo(0); position = 0 }
                                     video?.start()
                                     playing = true

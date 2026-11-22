@@ -27,21 +27,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * Telefonda, cihazdaki yapay zeka modeliyle özetleme ([LocalModel]: Gemma 4 E2B). Yapay zeka işlem yeri "Yerel"ken
- * (ücretsiz planda her zaman) tüm özetler, "Yerel + Bulut"ta küçük dosyaların özetleri burada çıkarılır ([AiPolicy.route];
- * ücretsiz plan sınırı: en çok [com.eayd.arkive.data.PlusPlan.FREE_SUMMARY_LIMIT] özet, sunucu da kaydederken denetler).
- * Dosya internete gönderilmez; yalnızca çıkan özet sunucuya kaydedilir.
+ * Dosyaları telefondaki yapay zeka modeliyle özetler.
  *
- * Modeli Google'ın LiteRT-LM çalıştırıcısı çalıştırır. Önce telefonun grafik işlemcisi (GPU) denenir: hem daha hızlıdır
- * hem ana bellekten daha az yer kaplar. GPU desteklenmiyorsa ana işlemciye (CPU) geçilir. Modeli belleğe yüklemek
- * birkaç saniye sürer ve ~1-2 GB bellek ister; bu yüzden model ilk özetlemede yüklenir, art arda özetlemelerde açık
- * kalır ve bir dakika kullanılmayınca kapatılır.
- *
- * Özetleme adımları (bölümlere ayırma, istemler, tek paragraf) [LocalSummaryPipeline]'dadır.
+ * Model ilk özetlemede yüklenir, bir dakika kullanılmazsa bellekten çıkarılır.
  */
 object LocalSummarizer {
 
-    /** Modelin bir istekte işleyebileceği en çok belirteç (istem + yanıt). Bölüm boyutları buna göre seçilmiştir. */
+    /** Modelin bir istekte işleyebileceği en çok belirteç (istem ve yanıt birlikte). */
     const val MAX_TOKENS = 4096
 
     private const val IDLE_CLOSE_MS = 60_000L
@@ -55,22 +47,17 @@ object LocalSummarizer {
     private var engine: Engine? = null
     private var closer: Job? = null
 
-    /** GPU bu telefonda bir kez başarısız olduysa bir daha denenmez (her seferinde beklememek için). */
+    /** GPU bir kez başarısız olduysa bir daha denenmez. */
     @Volatile
     private var gpuFailed = false
 
-    /**
-     * Belgenin ne olduğunu ve neleri içerdiğini anlatan tek paragraflık özet ([language] dilinde; bulut özetiyle aynı
-     * biçim). [onPhase]: o anki aşama (model yükleniyor; telefonda özetleniyor, adım 2/5). Özet çıkarılamazsa boş metin
-     * döner. Model çalıştırılamazsa hata fırlatır. Coroutine iptal edilirse model o anki işi bırakır.
-     */
+    /** Metnin tek paragraflık özetini çıkarır. Özet çıkmazsa boş metin döner, model çalışmazsa hata atar. */
     suspend fun summarize(text: String, language: AppLanguage, onPhase: (SummaryPhase) -> Unit = {}): String =
         lock.withLock {
             closer?.cancel()
             try {
                 val loaded = engine ?: run {
                     onPhase(SummaryPhase.LoadingModel)
-                    // Model yüklenirken özetleme durdurulsa da yüklenen model kaydedilir (sonra kapatılsın, sızmasın).
                     withContext(Dispatchers.IO) { open().also { engine = it } }
                 }
                 LocalSummaryPipeline(
@@ -86,7 +73,7 @@ object LocalSummarizer {
             }
         }
 
-    /** Modeli bellekten çıkarır (ör. model silinirken). */
+    /** Modeli bellekten çıkarır. */
     fun release() {
         closer?.cancel()
         scope.launch { lock.withLock { closeEngine() } }
@@ -97,11 +84,7 @@ object LocalSummarizer {
         engine = null
     }
 
-    /**
-     * Modeli yükler. Sırayla denenir: GPU (hızlı tahmin açık), CPU (hızlı tahmin açık), CPU (düz). "Hızlı tahmin"
-     * (speculative decoding / MTP), modelin birkaç belirteci birden tahmin edip doğrulamasıdır; özetlemede yazmayı
-     * belirgin hızlandırır. ADAPTIVE: yalnızca gerçekten hızlandırdığı sürece kullanılır.
-     */
+    /** Modeli yükler. Önce GPU, olmazsa CPU denenir; hızlı tahmin açık değilse en son düz CPU. */
     private fun open(): Engine {
         val model = LocalModel.file() ?: throw IllegalStateException(Txt.localAi.notReady)
         val fast = SpeculativeDecodingConfig(mode = SpeculativeDecodingMode.ADAPTIVE)
@@ -117,7 +100,6 @@ object LocalSummarizer {
                     modelPath = model.path,
                     backend = backend,
                     maxNumTokens = MAX_TOKENS,
-                    // Derlenmiş model parçaları burada tutulur: ikinci yükleme daha hızlıdır.
                     cacheDir = AppSettings.appContext.cacheDir.path,
                     speculativeDecodingConfig = speculative,
                 ),
@@ -134,19 +116,14 @@ object LocalSummarizer {
         throw last ?: IllegalStateException(Txt.localAi.runFailed)
     }
 
-    /**
-     * Tek bir istek: yeni bir konuşma açılır, istem gönderilir, yanıt beklenir. İstek sürerken coroutine iptal edilirse
-     * modele "dur" denir ([com.google.ai.edge.litertlm.Conversation.cancelProcess]) ve model durunca konuşma kapatılır.
-     */
+    /** Modele tek bir istek gönderir. İş iptal edilirse modele dur denir. */
     private suspend fun ask(engine: Engine, language: AppLanguage, prompt: String, maxTokens: Int): String =
         withContext(Dispatchers.IO) {
             val conversation = engine.createConversation(
                 ConversationConfig(
                     systemInstruction = Contents.of(LocalSummaryPipeline.systemPrompt(language)),
-                    // Düşük sıcaklık: özet belgeye sadık kalsın, uydurmasın.
                     samplerConfig = SamplerConfig(topK = 40, topP = 0.95, temperature = 0.3),
                     maxOutputToken = maxTokens,
-                    // Özet için "düşünme" adımı gerekmez; yalnızca yavaşlatır.
                     thinkingConfig = ThinkingConfig(enableThinking = false),
                 ),
             )

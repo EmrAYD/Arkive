@@ -23,11 +23,7 @@ import com.eayd.arkive.screens.auth.PasswordRuleItem
 import com.eayd.arkive.ui.components.PasswordInput
 import com.eayd.arkive.viewmodel.PasswordRules
 
-/**
- * Şifre değiştirme penceresi: mevcut şifre, yeni şifre ve yeni şifre tekrarı. Yeni şifre kayıt ekranındakiyle aynı
- * kuralları sağlamalı (en az [PasswordRules.MIN_LENGTH] karakter, özel karakter, büyük ve küçük harf), mevcut
- * şifreden farklı olmalı ve tekrarıyla aynı olmalı. Kurallar yazarken tik/çarpı olarak gösterilir. [error]: Firebase'in verdiği hata (ör. "Mevcut şifre hatalı."), pencerede gösterilir.
- */
+/** Şifre değiştirme penceresi. Yeni şifre kayıttaki kurallara uymalı ve eskisinden farklı olmalı. */
 @Composable
 internal fun ChangePasswordDialog(
     saving: Boolean,
@@ -51,7 +47,6 @@ internal fun ChangePasswordDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = { Text(Txt.profile.changePassword) },
         text = {
-            // Küçük ekranda ya da klavye açıkken üç alan sığmayabilir: kaydırılabilir.
             Column(
                 modifier = Modifier.verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -65,7 +60,6 @@ internal fun ChangePasswordDialog(
                     error = newError,
                     modifier = Modifier.onFocusChanged { newFocused = it.isFocused },
                 )
-                // Kayıt ekranındaki gibi: alana odaklanınca ya da bir şey yazılınca kurallar görünür.
                 if (newFocused || new.isNotEmpty()) {
                     Column(Modifier.fillMaxWidth().padding(start = 8.dp)) {
                         PasswordRuleItem(Txt.auth.ruleMinLengthN(PasswordRules.MIN_LENGTH), rules.longEnough)

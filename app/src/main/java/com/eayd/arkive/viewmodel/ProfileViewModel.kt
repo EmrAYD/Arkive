@@ -29,40 +29,40 @@ import kotlinx.coroutines.tasks.await
 
 /** Profil ekranından açılan pencereler. */
 sealed interface ProfileDialog {
-    /** "Şifreyi değiştir": mevcut şifre, yeni şifre ve tekrarı. */
+    /** Şifre değiştirme. */
     data object ChangePassword : ProfileDialog
 
-    /** Çöp kutusunda saklama süresi seçimi. */
+    /** Çöp kutusu saklama süresi. */
     data object TrashRetention : ProfileDialog
 
-    /** Tema seçimi (sistem / açık / koyu). */
+    /** Tema seçimi. */
     data object Theme : ProfileDialog
 
-    /** Dil: uygulamanın dili ve özetin dili aynı pencerede seçilir. */
+    /** Uygulamanın ve özetin dili. */
     data object Language : ProfileDialog
 
-    /** Yapay zeka işlem yeri seçimi (yerel / bulut / yerel + bulut). */
+    /** Yapay zeka işlem yeri. */
     data object AiProcessing : ProfileDialog
 
-    /** Telefondaki yapay zeka modeli: indir / indirmeyi durdur / sil. */
+    /** Telefondaki yapay zeka modeli. */
     data object LocalAi : ProfileDialog
 }
 
 data class ProfileUiState(
     val email: String?,
-    /** E-posta + şifreyle açılmış hesap. Google ile giriş yapanların şifresi Google'dadır; burada değiştirilemez. */
+    /** E-posta ve şifreyle açılmış hesap mı; Google hesaplarının şifresi burada değiştirilemez. */
     val hasPassword: Boolean,
     val isLoading: Boolean = true,
-    /** Plan adı, toplam kota ve dosya başına sınır (GET /me). Yüklenene kadar null. */
+    /** Plan ve sınırlar; yüklenene kadar null. */
     val storage: StorageInfo? = null,
     val trashRetentionDays: Int = 30,
-    /** Bilgiler hiç yüklenemediyse ekranın ortasında "Tekrar dene" ile gösterilir. */
+    /** Bilgiler hiç yüklenemedi. */
     val error: String? = null,
-    /** Kısa bildirim (Snackbar). */
+    /** Kısa bildirim. */
     val notice: String? = null,
 )
 
-/** Şifre değiştirirken Firebase hatalarını kullanıcıya gösterilecek Türkçe mesaja çevirir. */
+/** Şifre değiştirirken çıkan Firebase hatalarını kullanıcıya gösterilecek mesaja çevirir. */
 private fun Throwable.toPasswordChangeMessage(): String = when {
     this is FirebaseAuthInvalidCredentialsException -> Txt.profile.currentPasswordWrong
     this is FirebaseAuthException && (errorCode == "ERROR_WRONG_PASSWORD" || errorCode == "ERROR_INVALID_CREDENTIAL") ->
@@ -72,10 +72,7 @@ private fun Throwable.toPasswordChangeMessage(): String = when {
     else -> toAuthErrorMessage(Txt.profile.passwordChangeFailed)
 }
 
-/**
- * Profil ekranının durumu: oturumdaki kullanıcının e-postası (Firebase), planı ve sınırları (GET /me),
- * çöp kutusu saklama süresi ayarı (PATCH /me) ve şifre değiştirme (Firebase).
- */
+/** Profil ekranının durumu: hesap, plan, ayarlar ve şifre değiştirme. */
 class ProfileViewModel : ViewModel() {
 
     private val auth = FirebaseAuth.getInstance()
@@ -92,22 +89,19 @@ class ProfileViewModel : ViewModel() {
 
     val dialogs = DialogHost<ProfileDialog>(viewModelScope)
 
-    /** Bu cihaza özgü ayarlar ([AppSettings]); sunucuya gitmez. */
+    /** Bu cihaza ait ayarlar. */
     val themeMode: StateFlow<ThemeMode> = AppSettings.themeMode
     val wifiOnly: StateFlow<Boolean> = AppSettings.wifiOnly
 
-    /** Yapay zeka işlem yeri (kayıtlı seçim; ücretsiz planda geçerli olan her zaman yereldir). */
+    /** Kayıtlı yapay zeka işlem yeri. */
     val aiMode: StateFlow<AiMode> = AppSettings.aiMode
 
-    /** Dosyaları telefonda özetleyen yapay zeka modelinin durumu ("Yerel" ve "Yerel + Bulut"ta kullanılır). */
+    /** Telefondaki modelin durumu. */
     val localModel: StateFlow<LocalModelState> = LocalModel.state
     val appLanguage: StateFlow<AppLanguage> = AppSettings.appLanguage
     val summaryLanguage: StateFlow<AppLanguage> = AppSettings.summaryLanguage
 
-    /**
-     * Dil penceresinde seçilenleri kaydeder. Özet dili önce yazılır: uygulamanın dili değişince Activity yeniden kurulur
-     * ve bütün ekranlar yeni dilde açılır.
-     */
+    /** Dilleri kaydeder. Özet dili önce yazılır; uygulamanın dili değişince Activity yeniden kurulur. */
     fun saveLanguages(app: AppLanguage, summary: AppLanguage) {
         dialogs.close()
         AppSettings.setSummaryLanguage(summary)
@@ -121,10 +115,7 @@ class ProfileViewModel : ViewModel() {
 
     fun setWifiOnly(enabled: Boolean) = AppSettings.setWifiOnly(enabled)
 
-    /**
-     * Yapay zeka işlem yerini kaydeder. Bulut Plus'a özel: ücretsiz planda "Bulut" ya da "Yerel + Bulut" seçilince ayar
-     * değişmez, nedeni yazılı Plus tanıtımı açılır.
-     */
+    /** İşlem yerini kaydeder. Ücretsiz planda bulut seçilirse ayar değişmez, Plus tanıtılır. */
     fun setAiMode(mode: AiMode) {
         dialogs.close()
         if (mode.allowsCloud && PlanStatus.quota.value?.cloud == false) {
@@ -134,16 +125,12 @@ class ProfileViewModel : ViewModel() {
         AppSettings.setAiMode(mode)
     }
 
-    /**
-     * Plan ve sınırları sunucudan alır. Sayfa her açıldığında çağrılır (ekran çağırır); bilgi zaten ekrandaysa
-     * yükleniyor göstermeden sessizce tazelenir.
-     */
+    /** Planı sunucudan alır; bilgi zaten ekrandaysa sessizce tazeler. */
     fun load() {
         _state.update { if (it.storage == null) it.copy(isLoading = true, error = null) else it }
         launchCatching(
             onError = { message ->
                 _state.update {
-                    // Eski bilgi ekrandaysa onu bozmadan kısa bildirim göster; hiç yoksa tam ekran hata.
                     if (it.storage == null) it.copy(isLoading = false, error = message)
                     else it.copy(isLoading = false, notice = message)
                 }
@@ -162,7 +149,7 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    /** DENEME İÇİN: ücretsiz plana döner (ödeme sistemi yokken Plus'ı denedikten sonra geri dönmek için). */
+    /** Deneme için ücretsiz plana döner. */
     fun switchToFree() {
         launchCatching(onError = { message -> _state.update { it.copy(notice = message) } }) {
             val me = PlanSwitcher.switchTo("Free")
@@ -174,7 +161,7 @@ class ProfileViewModel : ViewModel() {
 
     fun showNotice(message: String) = _state.update { it.copy(notice = message) }
 
-    /** Modeli indirmeye başlar (pencere açık kalır, ilerlemeyi gösterir); başlayamazsa nedeni bildirilir. */
+    /** Modeli indirmeye başlar; başlayamazsa nedeni bildirilir. */
     fun downloadLocalModel() = showNotice(LocalModel.startDownload() ?: Txt.localAi.downloadStarted)
 
     fun cancelLocalModelDownload() = LocalModel.cancelDownload()
@@ -187,10 +174,7 @@ class ProfileViewModel : ViewModel() {
 
     fun openDialog(dialog: ProfileDialog) = dialogs.open(dialog)
 
-    /**
-     * Şifreyi değiştirir: önce [current] ile kimlik yeniden doğrulanır (Firebase hassas işlemlerde bunu ister), sonra
-     * şifre [new] yapılır. Hata olursa pencerede Türkçe mesajla gösterilir; başarıda pencere kapanır.
-     */
+    /** Şifreyi değiştirir. Firebase önce mevcut şifreyle yeniden doğrulama ister. */
     fun changePassword(current: String, new: String) {
         val user = auth.currentUser
         val email = user?.email
@@ -212,7 +196,7 @@ class ProfileViewModel : ViewModel() {
         }
     }
 
-    /** Çöp kutusunda saklama süresini değiştirir; sunucu 1-365 gün arasını kabul eder. */
+    /** Çöp kutusunda saklama süresini değiştirir (1-365 gün). */
     fun saveTrashRetention(days: Int) {
         if (days == _state.value.trashRetentionDays) {
             dialogs.close()

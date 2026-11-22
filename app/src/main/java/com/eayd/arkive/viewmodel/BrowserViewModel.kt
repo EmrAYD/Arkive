@@ -31,10 +31,10 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
-/** Bir yüklemenin hangi aşamada olduğu. */
+/** Yüklemenin aşaması. */
 enum class UploadPhase { Waiting, Uploading, Finishing, Failed }
 
-/** Listede gösterilen devam eden (ya da başarısız olan) yükleme. */
+/** Listede gösterilen süren ya da başarısız yükleme. */
 data class UploadItem(
     val id: Long,
     val name: String,
@@ -43,7 +43,7 @@ data class UploadItem(
     val error: String? = null,
 )
 
-/** Liste ekranında açılabilen pencereler. Aynı anda en fazla biri açıktır ([DialogHost]). */
+/** Liste ekranının pencereleri; aynı anda en çok biri açık olur. */
 sealed interface BrowserDialog {
     data object NewFolder : BrowserDialog
     data class EditFolder(val folder: FolderDto) : BrowserDialog
@@ -57,12 +57,12 @@ sealed interface BrowserDialog {
     data object DeleteSelection : BrowserDialog
 }
 
-/** Klasör/dosya listesi ekranının tüm durumu. Ekran yalnızca bu nesneye bakarak çizilir. */
+/** Liste ekranının durumu. */
 data class BrowserUiState(
     val isLoading: Boolean = true,
-    /** Kullanıcı listeyi aşağı çekerek yeniliyor (çekerek yenileme göstergesi açık). */
+    /** Aşağı çekerek yenileme sürüyor. */
     val refreshing: Boolean = false,
-    /** Sunucudan gelen listeler. Ekranda [visibleFolders] ve [visibleFiles] (süzülmüş, sıralanmış) çizilir. */
+    /** Sunucudan gelen listeler; ekranda süzülmüş halleri çizilir. */
     val folders: List<FolderDto> = emptyList(),
     val files: List<FileDto> = emptyList(),
     val visibleFolders: List<FolderDto> = emptyList(),
@@ -71,64 +71,52 @@ data class BrowserUiState(
     val category: CategoryOption = CategoryOption.All,
     val selection: Selection = Selection(),
     val uploads: List<UploadItem> = emptyList(),
-    /** İçinde bulunulan klasörün adı (kök listede null). */
+    /** İçinde bulunulan klasörün adı. */
     val title: String? = null,
-    /** Şu an bu konuma dosya yüklenebilir mi? */
+    /** Buraya dosya yüklenebilir mi. */
     val canUpload: Boolean = false,
-    /** Sunucuya ulaşılamadı: liste telefondaki son görüntüden gösteriliyor (yalnızca okuma). */
+    /** Sunucuya ulaşılamadı; telefondaki son liste gösteriliyor. */
     val offline: Boolean = false,
-    /** Liste yüklenemedi: ekranın ortasında "Tekrar dene" ile gösterilir. */
+    /** Liste yüklenemedi. */
     val errorMessage: String? = null,
-    /** Kısa bildirim (Snackbar): işlem hatası ya da "taşındı" gibi sonuç mesajı. */
+    /** Kısa bildirim. */
     val notice: String? = null,
 ) {
     val selectedFiles: List<FileDto> get() = files.filter { fileKey(it.id) in selection.keys }
     val selectedFolders: List<FolderDto> get() = folders.filter { folderKey(it.id) in selection.keys }
     val selectedItems: SelectedItems get() = SelectedItems(selectedFiles, selectedFolders)
 
-    /** Seçimin taşınabileceği sayfa: klasörler yalnızca ana sayfada olduğu için [FolderLocations.HOME]; seçim boşsa null. */
+    /** Seçimin taşınabileceği sayfa; seçim boşsa null. */
     val moveLocation: String? get() = if (selection.keys.isEmpty()) null else FolderLocations.HOME
 }
 
-/**
- * Bir "seviyedeki" klasörleri VE dosyaları yönetir; dosya yüklemeyi, çoklu seçimi, filtreleri ve pencerelerin
- * işlemlerini de buradan yürütür.
- *  - parentId == null → [location] sayfasının (ana sayfa) kök klasörleri/dosyaları
- *  - parentId != null → o klasörün içindekiler (konum üst klasörden devralınır, [location] kullanılmaz)
- *  - favoritesOnly    → derinliğine bakılmaksızın TÜM favori klasörler ve dosyalar ("Favorilerim")
- *
- * Ekran ile sunucu arasındaki tek kapı budur: ekran işlemi ViewModel'e bildirir, ViewModel sunucuya
- * gider, sonuç gelince [state] güncellenir ve ekran kendiliğinden yeniden çizilir (tek yönlü veri akışı).
- */
+/** Bir sayfanın ya da klasörün içindeki klasörleri ve dosyaları yönetir: yükleme, seçim, filtreler ve pencereler. */
 class BrowserViewModel(
     val parentId: String?,
     private val location: String?,
     val favoritesOnly: Boolean = false,
 ) : ViewModel() {
 
-    /** Bu ekranın telefondaki liste görüntüsünün adı ([ListCache]). */
+    /** Bu ekranın telefondaki liste kaydının adı. */
     private val cacheKey: String = when {
         favoritesOnly -> "favorites"
         parentId != null -> "folder_$parentId"
         else -> "root_$location"
     }
 
-    /** Bu konuma dosya yüklenebilir mi? (Ana sayfa ve klasör içleri; favorilere yüklenemez.) */
     private val canUploadHere = !favoritesOnly && (parentId != null || location == FolderLocations.HOME)
 
     private val _state = MutableStateFlow(BrowserUiState(canUpload = canUploadHere))
     val state: StateFlow<BrowserUiState> = _state.asStateFlow()
 
-    /** Açık pencere (yeni klasör, sil, taşı…) ve kaydediliyor/hata durumu. */
+    /** Açık pencere ve kaydetme durumu. */
     val dialogs = DialogHost<BrowserDialog>(viewModelScope)
 
     private val storage = StorageLimitLoader(viewModelScope)
 
-    /** "Bilgi" penceresi için hesabın toplam kotası (yüklenene kadar null). */
+    /** Hesabın toplam kotası; yüklenene kadar null. */
     val storageLimit: StateFlow<Long?> = storage.limit
 
-    // Yüklemeler sırayla yapılır (aynı anda tek dosya): telefonun bant genişliğini bölmez, ilerleme
-    // çubukları anlaşılır kalır. Mutex bir "kilit"tir; kuyruktaki işler sırayla içeri girer.
     private val uploadLock = Mutex()
     private val uploadJobs = mutableMapOf<Long, Job>()
     private var nextUploadId = 0L
@@ -137,17 +125,16 @@ class BrowserViewModel(
         fetch(showSpinner = true)
     }
 
-    // Ekran her görününce (ör. klasörden geri dönünce) bir kez yenilenir; ilk gösterim zaten init'te yüklendi.
     private var skipNextShowRefresh = true
 
     fun onShown() {
         if (skipNextShowRefresh) skipNextShowRefresh = false else fetch(showSpinner = false)
     }
 
-    /** Listeyi sessizce yeniler (yükleme çarkı çıkmaz): ör. bir dosyanın özeti bitince AI düğmesi dolsun diye. */
+    /** Listeyi yükleme çarkı göstermeden yeniler. */
     fun reloadQuietly() = fetch(showSpinner = false)
 
-    /** Listeyi baştan yükler ("Tekrar dene" için). */
+    /** Listeyi baştan yükler. */
     fun load() = fetch(showSpinner = true)
 
     fun clearNotice() = edit { it.copy(notice = null) }
@@ -156,10 +143,7 @@ class BrowserViewModel(
         edit { it.copy(notice = message) }
     }
 
-    /**
-     * Durumu değiştirir. Sunucu listesi, sıralama ya da kategori değiştiyse ekranda gösterilen süzülmüş listeler
-     * de yeniden hesaplanır (yükleme ilerlemesi gibi sık güncellemelerde hesaplanmaz).
-     */
+    /** Durumu değiştirir; liste ya da filtre değiştiyse ekrandaki süzülmüş listeleri yeniden hesaplar. */
     private fun edit(transform: (BrowserUiState) -> BrowserUiState): BrowserUiState = _state.updateAndGet { old ->
         val new = transform(old)
         if (new.folders === old.folders && new.files === old.files &&
@@ -168,16 +152,13 @@ class BrowserViewModel(
             new
         } else {
             new.copy(
-                // Klasörlerin türü olmadığı için bir kategori seçiliyken yalnızca o türdeki dosyalar gösterilir.
                 visibleFolders = if (new.category == CategoryOption.All) new.folders.sortedFolders(new.sort) else emptyList(),
                 visibleFiles = new.files.filter { new.category.matches(it.mimeType) }.sortedFiles(new.sort),
             )
         }
     }
 
-    // --- Yükleme (liste) ---------------------------------------------------------------------------
-
-    /** Sunucudan güncel listeyi çeker (klasörler ve dosyalar aynı anda istenir) ve durumu günceller. */
+    /** Klasörleri ve dosyaları sunucudan çeker. */
     private suspend fun reload() {
         val loaded = try {
             download()
@@ -191,15 +172,11 @@ class BrowserViewModel(
         apply(loaded, offline = false)
     }
 
-    /**
-     * Sunucuya ulaşılamadığında (internet yok) ekrandaki listeyi korur ya da telefondaki son liste görüntüsünü
-     * gösterir. Görüntü yoksa ya da hata ağ hatası değilse (ör. 401, 500) false döner ve hata her zamanki gibi gösterilir.
-     */
+    /** İnternet yoksa ekrandaki ya da telefondaki son listeyi gösterir. Ağ hatası değilse false döner. */
     private suspend fun showOffline(error: Throwable): Boolean {
         if (error !is IOException) return false
         val current = _state.value
         if (!current.isLoading && (current.files.isNotEmpty() || current.folders.isNotEmpty())) {
-            // Ekranda zaten bir liste var: aynen kalır, yalnızca "internet yok" durumuna geçilir.
             edit { it.copy(offline = true, canUpload = false) }
             return true
         }
@@ -228,7 +205,6 @@ class BrowserViewModel(
 
     private fun apply(loaded: ListCache.Snapshot, offline: Boolean) {
         edit {
-            // Sunucu ada göre sıralı verir; sort kararlıdır. Listeden kalkmış (taşınmış, silinmiş) öğeler seçimden düşer.
             val existing = loaded.files.map { f -> fileKey(f.id) }.toSet() + loaded.folders.map { f -> folderKey(f.id) }.toSet()
             val selection = it.selection.retain(existing)
             it.copy(
@@ -239,16 +215,12 @@ class BrowserViewModel(
                 files = loaded.files,
                 selection = if (selection.keys.isEmpty()) Selection() else selection,
                 title = loaded.folder?.name ?: it.title,
-                // İnternetsizken dosya yüklenemez.
                 canUpload = canUploadHere && !offline,
             )
         }
     }
 
-    /**
-     * showSpinner = false: işlemden sonra yenilerken mevcut liste ekranda kalır, yükleme çarkı çıkmaz;
-     * yenileme başarısız olursa yalnızca kısa bir bildirim gösterilir.
-     */
+    /** Listeyi yükler. [showSpinner] false ise mevcut liste ekranda kalır. */
     private fun fetch(showSpinner: Boolean) {
         if (showSpinner) edit { it.copy(isLoading = true, errorMessage = null) }
         launchCatching(
@@ -258,10 +230,7 @@ class BrowserViewModel(
         ) { reload() }
     }
 
-    /**
-     * Çekerek yenileme: liste ekranda kalır, üstte yenileme göstergesi döner. Başarısız olursa yalnızca kısa bir
-     * bildirim çıkar. Zaten yenileniyorsa ikinci bir istek başlatılmaz.
-     */
+    /** Aşağı çekerek yenileme; zaten yenileniyorsa ikinci istek başlatılmaz. */
     fun refresh() {
         if (_state.value.refreshing) return
         edit { it.copy(refreshing = true) }
@@ -274,7 +243,7 @@ class BrowserViewModel(
         }
     }
 
-    /** Bir işlemden sonra listeyi yeniler; yenileme başarısız olursa işlemin kendisi başarısız sayılmaz. */
+    /** Bir işlemden sonra listeyi yeniler; yenileme başarısız olsa da işlem başarılı sayılır. */
     private suspend fun refreshQuietly() {
         try {
             reload()
@@ -285,8 +254,6 @@ class BrowserViewModel(
         }
     }
 
-    // --- Sıralama ve kategori ------------------------------------------------------------------------
-
     fun setSort(sort: SortOption) {
         edit { it.copy(sort = sort) }
     }
@@ -295,13 +262,10 @@ class BrowserViewModel(
         edit { it.copy(category = category) }
     }
 
-    // --- Dosya yükleme -------------------------------------------------------------------------
-
-    /** Seçilen dosyaları kuyruğa alır; sırayla yüklenir. Her biri için listede bir ilerleme satırı görünür. */
+    /** Seçilen dosyaları sıraya alır; her biri için listede bir ilerleme satırı çıkar. */
     fun uploadFiles(resolver: ContentResolver, uris: List<Uri>) {
         if (uris.isEmpty() || !_state.value.canUpload) return
         viewModelScope.launch {
-            // Dosya adları (içerik sağlayıcıdan sorgulanır) ana iş parçacığını bloklamasın diye IO'da okunur.
             val named = withContext(Dispatchers.IO) { uris.map { it to FileUploader.queryName(resolver, it) } }
             named.forEach { (uri, name) -> enqueueUpload(resolver, uri, name) }
         }
@@ -319,15 +283,14 @@ class BrowserViewModel(
                         resolver = resolver,
                         uri = uri,
                         folderId = parentId,
-                        // Bu geri çağrılar ağ iş parçacığından gelir; MutableStateFlow güncellemesi iş parçacığı güvenlidir.
                         onProgress = { p -> updateUpload(id) { it.copy(progress = p) } },
                         onFinishing = { updateUpload(id) { it.copy(phase = UploadPhase.Finishing) } },
                     )
                 }
                 removeUpload(id)
-                fetch(showSpinner = false)   // yeni dosya listede görünsün
+                fetch(showSpinner = false)
             } catch (e: CancellationException) {
-                removeUpload(id)             // kullanıcı iptal etti: satır kalkar (sunucu kaydını FileUploader siler)
+                removeUpload(id)
                 throw e
             } catch (e: Exception) {
                 updateUpload(id) { it.copy(phase = UploadPhase.Failed, error = e.toApiErrorMessage()) }
@@ -341,7 +304,7 @@ class BrowserViewModel(
         uploadJobs[id]?.cancel()
     }
 
-    /** Başarısız yükleme satırını listeden kaldırır. */
+    /** Başarısız yükleme satırını kaldırır. */
     fun dismissUpload(id: Long) = removeUpload(id)
 
     private fun updateUpload(id: Long, change: (UploadItem) -> UploadItem) {
@@ -351,9 +314,6 @@ class BrowserViewModel(
     private fun removeUpload(id: Long) {
         edit { s -> s.copy(uploads = s.uploads.filterNot { it.id == id }) }
     }
-
-    // --- Çoklu seçim ---------------------------------------------------------------------------------
-    // Seçim modu satırlara basılı tutunca açılır, seçili öğe kalmayınca kapanır.
 
     fun clearSelection() {
         edit { it.copy(selection = Selection()) }
@@ -366,7 +326,7 @@ class BrowserViewModel(
         }
     }
 
-    /** "Tümünü seç": ekranda görünen (süzülmüş) öğelerin hepsi. */
+    /** Ekranda görünen öğelerin hepsini seçer. */
     fun selectAllVisible() {
         edit { s ->
             val visible = s.visibleFiles.map { fileKey(it.id) }.toSet() + s.visibleFolders.map { folderKey(it.id) }.toSet()
@@ -374,15 +334,8 @@ class BrowserViewModel(
         }
     }
 
-    /**
-     * Uzun basış: öğeyi seçime ekler ve seçimin tamamını sürüklenecek olarak döner (tek öğe de olabilir).
-     * Önceden seçili öğeler varsa onlar da birlikte taşınır.
-     */
+    /** Uzun basılan öğeyi seçime ekler ve sürüklenecek öğeleri döner. */
     fun longPress(key: String): SelectedItems? = edit { it.copy(selection = it.selection.add(key)) }.selectedItems
-
-    // --- Kullanıcı işlemleri -------------------------------------------------------------------------
-    // Pencerelerin işlemleri `dialogs.submit` ile çalışır: başarılıysa pencere kapanır, hata verirse pencerede
-    // gösterilir. Satırdaki işlemler (favori…) hatayı kısa bildirimle gösterir.
 
     fun openDialog(dialog: BrowserDialog) {
         if (dialog is BrowserDialog.FileInfo) storage.ensureLoaded()
@@ -403,11 +356,10 @@ class BrowserViewModel(
     }
 
     fun editFolder(folder: FolderDto, newName: String, newColor: String?, newEmoji: String?) = dialogs.submit {
-        // Yalnızca gerçekten değişen alanlar gönderilir (PATCH = kısmi güncelleme).
         val fields = buildMap<String, Any?> {
             if (newName != folder.name) put("name", newName)
             if (newColor != folder.color) put("color", newColor)
-            if (newEmoji != folder.emoji) put("emoji", newEmoji)   // null = emojiyi sil (serializeNulls)
+            if (newEmoji != folder.emoji) put("emoji", newEmoji)
         }
         if (fields.isNotEmpty()) ApiClient.api.updateFolder(folder.id, fields)
         reload()
@@ -442,10 +394,6 @@ class BrowserViewModel(
         }
     }
 
-    // --- Toplu işlemler ------------------------------------------------------------------------------
-    // Öğelere sırayla uygulanır. Biri başarısız olsa da diğerleri denenir; sonunda liste her durumda sunucudan
-    // yenilenir (işlenenler ekranda doğru görünsün). Başarısız olan olursa [BatchFailure] fırlatılır.
-
     private suspend fun runBatch(
         items: SelectedItems,
         onFile: suspend (FileDto) -> Unit,
@@ -471,7 +419,7 @@ class BrowserViewModel(
         }
     }
 
-    /** Öğeleri bir klasöre taşır ([targetFolderId] null ise ana sayfanın en üstüne) ve sonucu bildirir. */
+    /** Öğeleri bir klasöre taşır; [targetFolderId] null ise ana sayfaya. */
     private suspend fun moveItems(items: SelectedItems, targetFolderId: String?, targetName: String) {
         runBatch(
             items,
@@ -482,7 +430,7 @@ class BrowserViewModel(
         edit { it.copy(selection = Selection(), notice = Txt.browser.movedTo(what, targetName)) }
     }
 
-    /** "Taşı" penceresinde hedef seçildi: tek dosya, tek klasör ya da seçimin tamamı taşınır. */
+    /** "Taşı" penceresinde hedef seçildi. */
     fun confirmMove(targetFolderId: String?, targetName: String) {
         val items = when (val d = dialogs.state.value.current) {
             is BrowserDialog.MoveFile -> SelectedItems(listOf(d.file), emptyList())
@@ -493,7 +441,7 @@ class BrowserViewModel(
         dialogs.submit { moveItems(items, targetFolderId, targetName) }
     }
 
-    /** Sürükle-bırak: seçilen öğeleri [folderId] klasörüne taşır. */
+    /** Sürükle-bırak ile öğeleri [folderId] klasörüne taşır. */
     fun dropItems(items: SelectedItems, folderId: String) {
         val name = _state.value.folders.firstOrNull { it.id == folderId }?.name ?: Txt.browser.folderFallback
         launchCatching(::showNotice) { moveItems(items, folderId, name) }
@@ -530,11 +478,7 @@ class BrowserViewModel(
     }
 
     companion object {
-        /**
-         * ViewModel'in kurucusu parametre aldığı için onu üreten bir "fabrika" gerekir.
-         * viewModel(key = ...) ile birlikte kullanılır: her anahtar için ayrı bir örnek yaşar
-         * (ana sayfa listesi, favoriler, her klasörün kendi listesi).
-         */
+        /** ViewModel'i üreten fabrika; her anahtar için ayrı bir örnek yaşar. */
         fun factory(
             parentId: String?,
             location: String?,

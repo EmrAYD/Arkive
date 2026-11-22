@@ -1,8 +1,5 @@
 package com.eayd.arkive.i18n
 
-// Uygulamanın metinleri üç dosyadadır: Strings.kt (hangi metinler var), StringsTr.kt (Türkçe), StringsEn.kt
-// (İngilizce). Yeni bir metin eklerken üçüne de aynı üyeyi ekle; bir dilde eksik kalan metin derleme hatası verir.
-
 /** Türkçe metinler. */
 object TrStrings : Strings {
     override val ai: AiStrings = object : AiStrings {

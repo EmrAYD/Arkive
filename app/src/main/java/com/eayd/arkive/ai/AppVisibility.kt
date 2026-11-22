@@ -1,9 +1,6 @@
 package com.eayd.arkive.ai
 
-/**
- * Uygulamanın şu an ekranda olup olmadığı. [com.eayd.arkive.MainActivity] görününce/gizlenince günceller. Özetleme
- * bitince haberin uygulama içi mesajla mı, sistem bildirimiyle mi verileceğini belirlemek için kullanılır.
- */
+/** Uygulamanın ekranda olup olmadığı. MainActivity günceller. */
 object AppVisibility {
     @Volatile
     var visible: Boolean = false

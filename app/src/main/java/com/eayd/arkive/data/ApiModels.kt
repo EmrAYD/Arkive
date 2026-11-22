@@ -2,34 +2,30 @@ package com.eayd.arkive.data
 
 import com.google.gson.annotations.SerializedName
 
-// Sunucunun döndürdüğü / beklediği JSON'a karşılık gelen sınıflar (DTO = Data Transfer Object).
-// Alan adı sunucudakinden farklıysa @SerializedName ile eşlenir (sunucu snake_case, Kotlin camelCase kullanır).
-// Sunucunun null dönebileceği alanlar Kotlin'de "?" ile işaretlenir.
-
 data class MeResponse(
     val id: String,
     val email: String?,
     @SerializedName("used_storage") val usedStorage: Long,
     @SerializedName("plan_name") val planName: String,
     @SerializedName("storage_limit") val storageLimit: Long,
-    /** Tek bir dosyanın en büyük boyutu (bayt); plana göre değişir. */
+    /** Tek dosyanın en büyük boyutu; plana göre değişir. */
     @SerializedName("max_file_size") val maxFileSize: Long,
     /** Çöp kutusunda saklama süresi (gün). */
     @SerializedName("trash_retention_days") val trashRetentionDays: Int = 30,
-    /** Kullanıcının tamamlanmış yapay zeka özeti sayısı. */
+    /** Kullanıcının özet sayısı. */
     @SerializedName("summary_count") val summaryCount: Int = 0,
-    /** Plana göre en çok kaç dosya özetlenebilir; null: sınırsız (Plus). */
+    /** En çok kaç dosya özetlenebilir; Plus'ta null. */
     @SerializedName("summary_limit") val summaryLimit: Int? = null,
-    /** Bulutta (sunucudaki yapay zekayla) özetleyebilir mi (Plus). */
+    /** Bulutta özetleyebilir mi (Plus). */
     @SerializedName("cloud_summary") val cloudSummary: Boolean = false,
 ) {
     fun summaryQuota() = SummaryQuota(planName, summaryCount, summaryLimit, cloudSummary)
 }
 
-/** POST /me/plan gövdesi (deneme için plan değiştirme): "Plus" ya da "Free". */
+/** Deneme için plan değiştirme isteği: "Plus" ya da "Free". */
 data class ChangePlanRequest(val plan: String)
 
-/** Çöp kutusundaki dosya. [daysLeft]: kalıcı silinmesine kalan gün (sunucu hesaplar). */
+/** Çöp kutusundaki dosya. [daysLeft] kalıcı silinmesine kalan gün. */
 data class TrashFileDto(
     val id: String,
     val name: String,
@@ -39,12 +35,12 @@ data class TrashFileDto(
     @SerializedName("days_left") val daysLeft: Int,
 )
 
-/** Çöp kutusundaki klasör; [fileCount]/[size] içindeki hazır dosyaların sayısı ve toplam boyutu. */
+/** Çöp kutusundaki klasör. */
 data class TrashFolderDto(
     val id: String,
     val name: String,
     val color: String?,
-    /** Klasör simgesinin ortasındaki emoji; yoksa null. */
+    /** Klasör simgesindeki emoji. */
     val emoji: String? = null,
     @SerializedName("file_count") val fileCount: Int,
     val size: Long,
@@ -58,7 +54,7 @@ data class TrashResponse(
     val folders: List<TrashFolderDto>,
 )
 
-/** Çöpteki bir klasörün içi (salt okunur). */
+/** Çöpteki bir klasörün içi. */
 data class TrashFolderContents(
     @SerializedName("retention_days") val retentionDays: Int,
     val folder: TrashFolderDto,
@@ -66,7 +62,7 @@ data class TrashFolderContents(
     val files: List<TrashFileDto>,
 )
 
-/** Geri yükle / kalıcı sil istekleri için seçilen kimlikler. */
+/** Geri yüklenecek ya da silinecek öğelerin kimlikleri. */
 data class TrashIdsRequest(
     @SerializedName("file_ids") val fileIds: List<String>,
     @SerializedName("folder_ids") val folderIds: List<String>,
@@ -74,10 +70,7 @@ data class TrashIdsRequest(
 
 data class TrashCountResponse(val count: Int)
 
-/**
- * Klasörün görüneceği sayfa (sunucudaki Folders.Location). Klasörler yalnızca ana sayfadadır; AI Sonuçlarım sayfası
- * klasör değil, özetlerin listesidir ([SummaryItemDto]).
- */
+/** Klasörün görüneceği sayfa. */
 object FolderLocations {
     const val HOME = "home"
 }
@@ -87,8 +80,8 @@ data class FolderDto(
     @SerializedName("parent_id") val parentId: String?,
     val name: String,
     val location: String,
-    val color: String?,       // "#RRGGBB" ya da null (renk yok)
-    val emoji: String? = null,   // simgenin ortasındaki emoji ya da null (emoji yok)
+    val color: String?,
+    val emoji: String? = null,
     val favorite: Boolean,
     @SerializedName("created_at") val createdAt: String,
 )
@@ -96,13 +89,13 @@ data class FolderDto(
 data class CreateFolderRequest(
     val name: String,
     @SerializedName("parent_id") val parentId: String? = null,
-    val location: String? = null,   // yalnızca kök klasörde gönderilir; alt klasör üstünden devralır
+    val location: String? = null,
     val color: String? = null,
     val emoji: String? = null,
     val favorite: Boolean = false,
 )
 
-/** Sunucudaki dosya kaydı. `status`: "uploading" (yükleniyor), "ready" (hazır), "failed" (başarısız). */
+/** Sunucudaki dosya kaydı. [status]: "uploading", "ready" ya da "failed". */
 data class FileDto(
     val id: String,
     @SerializedName("folder_id") val folderId: String?,
@@ -112,11 +105,11 @@ data class FileDto(
     val favorite: Boolean,
     val status: String,
     @SerializedName("created_at") val createdAt: String,
-    /** Dosyanın (ya da aynı içerikli bir kopyasının) yapay zeka özeti var mı; AI düğmesi buna göre dolu görünür. */
+    /** Dosyanın ya da aynı içerikli bir kopyasının özeti var mı. */
     @SerializedName("has_summary") val hasSummary: Boolean = false,
 )
 
-/** Yüklemeyi başlatırken gönderilen bilgi: dosyanın kendisi değil, yalnızca adı/boyutu/türü. */
+/** Yükleme başlatma isteği: dosyanın adı, boyutu ve türü. */
 data class InitUploadRequest(
     val name: String,
     val size: Long,
@@ -124,10 +117,7 @@ data class InitUploadRequest(
     @SerializedName("folder_id") val folderId: String?,
 )
 
-/**
- * Sunucunun yükleme başlatma yanıtı: oluşturulan kayıt + dosyanın doğrudan RustFS'e yükleneceği
- * imzalı adres. [uploadHeaders] yükleme isteğine AYNEN eklenmelidir (imza bunlara göre atıldı).
- */
+/** Yükleme başlatma yanıtı: dosya kaydı ve depolamaya yükleme adresi. [uploadHeaders] isteğe aynen eklenmeli. */
 data class InitUploadResponse(
     val file: FileDto,
     @SerializedName("upload_url") val uploadUrl: String,
@@ -140,20 +130,13 @@ data class DownloadUrlResponse(
     @SerializedName("expires_in") val expiresIn: Int,
 )
 
-/**
- * Dosyanın kayıtlı yapay zeka özeti (GET/POST/PUT /files/{id}/summary): belgenin ne olduğunu ve neleri içerdiğini
- * anlatan tek paragraf. [truncated]: dosya çok uzun olduğu için yalnızca ilk bölümü özetlendi (sunucu bunu özetin
- * sonuna not olarak da yazar).
- */
+/** Dosyanın kayıtlı özeti. [truncated] dosyanın yalnızca ilk bölümünün özetlendiğini söyler. */
 data class SummaryResponse(
     val summary: String,
     val truncated: Boolean = false,
 )
 
-/**
- * AI Sonuçlarım sayfasındaki bir özet (GET /summaries). [file]: özetin kaynak dosyası; öğe bu dosyanın adıyla
- * ("rapor.pdf özeti") gösterilir.
- */
+/** AI Sonuçlarım sayfasındaki bir özet. */
 data class SummaryItemDto(
     val id: String,
     val summary: String,
@@ -162,17 +145,13 @@ data class SummaryItemDto(
     val file: FileDto,
 )
 
-/**
- * Dosyanın bulutta özetlenmesi (POST /files/{id}/summary). [password]: yalnızca parolalı dosyada; bu istekte gider,
- * sunucu saklamaz. [joinOnly]: yalnızca sunucuda süren özetlemeye katıl (uygulama yeniden açılınca); süren iş ya da
- * kayıtlı özet yoksa sunucu yenisini başlatmaz, 404 döner.
- */
+/** Bulutta özetleme isteği. [password] saklanmaz; [joinOnly] yalnızca süren işe katılır. */
 data class SummarizeRequest(
     val password: String? = null,
     @SerializedName("join_only") val joinOnly: Boolean = false,
-    /** Özetin yazılacağı dil ("tr" / "en"); bkz. [com.eayd.arkive.data.AppSettings.summaryLanguage]. */
+    /** Özetin dili ("tr" ya da "en"). */
     val language: String? = null,
 )
 
-/** Telefonda (cihazdaki yapay zekayla) üretilen özetin sunucuya kaydı (PUT /files/{id}/summary). */
+/** Telefonda çıkan özetin sunucuya kaydı. */
 data class SaveSummaryRequest(val summary: String)

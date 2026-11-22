@@ -18,20 +18,13 @@ import com.eayd.arkive.utils.fileTypeLabel
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.utils.formatServerDateTime
 
-/**
- * "Bilgi" penceresi: tür, boyut, kullandığı alan ve oluşturulma tarihi.
- *
- * @param storageLimit hesabın toplam kotası (bayt). Henüz gelmediyse ya da alınamadıysa null: "Kullandığı alan"
- *                     satırı kota oranı olmadan gösterilir.
- */
+/** Dosya bilgi penceresi. [storageLimit] bilinmiyorsa kota oranı gösterilmez. */
 @Composable
 fun FileInfoDialog(
     file: FileDto,
     storageLimit: Long?,
     onDismiss: () -> Unit,
 ) {
-    // "Kullandığı alan": dosyanın kotadan kapladığı yer. Dosya kotaya tam boyutuyla yazıldığı için boyutla aynıdır;
-    // asıl bilgi, bunun kotanın ne kadarı olduğudur.
     val usedSpace = buildString {
         append(formatBytes(file.size))
         if (storageLimit != null && storageLimit > 0) {

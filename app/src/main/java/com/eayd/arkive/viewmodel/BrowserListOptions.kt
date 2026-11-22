@@ -8,7 +8,7 @@ import com.eayd.arkive.utils.TurkishLocale
 import com.eayd.arkive.utils.fileKind
 import java.text.Collator
 
-/** "Sırala" seçenekleri. Sıralama yalnızca ekrandaki liste üzerinde, istemcide yapılır. */
+/** Sıralama seçenekleri. */
 enum class SortOption {
     NameAsc,
     NameDesc,
@@ -18,7 +18,6 @@ enum class SortOption {
     Smallest,
     ;
 
-    /** Seçili dilde adı. */
     val label: String
         get() = when (this) {
             NameAsc -> Txt.browser.sortNameAsc
@@ -30,7 +29,7 @@ enum class SortOption {
         }
 }
 
-/** "Kategori" seçenekleri: dosyaları türüne göre süzer. */
+/** Dosyaları türüne göre süzen seçenekler. */
 enum class CategoryOption {
     All,
     Images,
@@ -40,7 +39,6 @@ enum class CategoryOption {
     Other,
     ;
 
-    /** Seçili dilde adı. */
     val label: String
         get() = when (this) {
             All -> Txt.browser.categoryAll
@@ -68,17 +66,14 @@ private val documentKinds = setOf(
     FileKind.Pdf, FileKind.Text, FileKind.Word, FileKind.Excel, FileKind.Presentation, FileKind.Document,
 )
 
-// Türkçe harfleri (ç, ğ, ı, ö, ş, ü) doğru sıralayan karşılaştırıcı; düz string karşılaştırması bunları sona atardı.
 private val turkishCollator: Collator = Collator.getInstance(TurkishLocale)
 
-/** Favoriler her zaman üstte; kendi aralarında seçilen sıralama uygulanır. */
+/** Favoriler hep üstte, kendi aralarında seçilen sırada. */
 fun List<FolderDto>.sortedFolders(sort: SortOption): List<FolderDto> {
-    // created_at sunucudan hep aynı (ISO 8601, UTC) biçimde gelir; metin olarak karşılaştırmak tarih sırasını verir.
     val order = when (sort) {
         SortOption.NameDesc -> Comparator<FolderDto> { a, b -> turkishCollator.compare(b.name, a.name) }
         SortOption.Newest -> compareByDescending<FolderDto> { it.createdAt }
         SortOption.Oldest -> compareBy<FolderDto> { it.createdAt }
-        // Klasörün boyutu yok: boyut sıralamasında ada göre.
         else -> Comparator<FolderDto> { a, b -> turkishCollator.compare(a.name, b.name) }
     }
     return sortedWith(compareByDescending<FolderDto> { it.favorite }.then(order))

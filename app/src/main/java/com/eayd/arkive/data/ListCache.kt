@@ -5,17 +5,10 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.gson.Gson
 import java.io.File
 
-/**
- * Klasör/dosya listelerinin telefondaki son görüntüsü. Sunucuya ulaşılamayınca (internet yok) uygulama bu görüntüyü
- * gösterir; böylece uygulama internetsiz açılsa bile liste görünür, telefonda kopyası olan dosyalar özetlenebilir.
- *
- * Her ekran (ana sayfa, AI sonuçları, Favorilerim, bir klasörün içi) için ayrı bir dosya tutulur:
- * `files/list_cache/<kullanıcı>_<ekran>.json`. Kayıtlar kullanıcıya özeldir; başka hesapla girilince görünmez.
- * Yalnızca okuma amaçlıdır: internetsizken sunucuya yazan işlemler (yükleme, silme, taşıma) yapılamaz.
- */
+/** Listelerin telefondaki son hali; internet yokken bu gösterilir. */
 object ListCache {
 
-    /** Bir ekranın listesi: [folder] içinde bulunulan klasör (kök ekranlarda null). */
+    /** Bir ekranın listesi. */
     class Snapshot(
         val folder: FolderDto?,
         val folders: List<FolderDto>,
@@ -37,12 +30,10 @@ object ListCache {
         val target = fileOf(screenKey) ?: return
         try {
             target.writeTextAtomically(gson.toJson(snapshot))
-        } catch (e: Exception) {
-            // Önbellek yazılamadıysa liste yine de sunucudan gösterilir; yalnızca internetsiz görünüm eksik kalır.
-        }
+        } catch (e: Exception) {}
     }
 
-    /** Bu kullanıcının kayıtlı listelerinden birinde geçen dosya (internetsiz ön izleme için dosya bilgisi). */
+    /** Kayıtlı listelerde geçen dosya; internetsiz ön izleme için. */
     @Synchronized
     fun findFile(fileId: String): FileDto? {
         val uid = FirebaseAuth.getInstance().currentUser?.uid ?: return null

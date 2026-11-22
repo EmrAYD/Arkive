@@ -8,12 +8,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.graphics.vector.path
 import androidx.compose.ui.unit.dp
 
-/**
- * Yapay zeka düğmesinin simgesi: yüzeyleri çizili bir elmas ve sağ üstünde bir parıltı. Favori yıldızı gibi iki hali var:
- *  - [Outlined] (kapalı): yalnızca çizgiler; elmas, yüzey çizgileri ve parıltının dış hattı.
- *  - [Filled] (açık): elmasın yüzeyleri neredeyse tam dolu (yalnızca üst yüzey ve orta yüzey biraz açık bırakılır), parıltı tamamen dolu.
- * Rengi `Icon(tint = …)` belirler; buradaki siyah yalnızca şekli (ve yüzeylerin saydamlığını) çizer.
- */
+/** Yapay zeka düğmesinin simgesi: parıltılı bir elmas. Favori yıldızı gibi boş ve dolu hali var. */
 object AiIcons {
     val Outlined: ImageVector by lazy { build(filled = false) }
     val Filled: ImageVector by lazy { build(filled = true) }
@@ -28,7 +23,6 @@ object AiIcons {
             viewportHeight = 24f,
         ).apply {
             if (filled) {
-                // Üst yüzey
                 path(fill = ink, fillAlpha = 0.6f) {
                     moveTo(5.2f, 2.8f)
                     lineTo(14.6f, 2.8f)
@@ -36,35 +30,30 @@ object AiIcons {
                     lineTo(6.3f, 9.2f)
                     close()
                 }
-                // Taç solu
                 path(fill = ink, fillAlpha = 0.82f) {
                     moveTo(1.3f, 9.2f)
                     lineTo(5.2f, 2.8f)
                     lineTo(6.3f, 9.2f)
                     close()
                 }
-                // Taç sağı
                 path(fill = ink, fillAlpha = 0.82f) {
                     moveTo(14.6f, 2.8f)
                     lineTo(18.5f, 9.2f)
                     lineTo(13.5f, 9.2f)
                     close()
                 }
-                // Alt kısım solu
                 path(fill = ink, fillAlpha = 1f) {
                     moveTo(1.3f, 9.2f)
                     lineTo(6.3f, 9.2f)
                     lineTo(9.9f, 20.8f)
                     close()
                 }
-                // Alt kısım ortası
                 path(fill = ink, fillAlpha = 0.78f) {
                     moveTo(6.3f, 9.2f)
                     lineTo(13.5f, 9.2f)
                     lineTo(9.9f, 20.8f)
                     close()
                 }
-                // Alt kısım sağı
                 path(fill = ink, fillAlpha = 1f) {
                     moveTo(13.5f, 9.2f)
                     lineTo(18.5f, 9.2f)
@@ -73,7 +62,6 @@ object AiIcons {
                 }
             }
 
-            // Elmasın dış hattı
             path(
                 stroke = ink,
                 strokeLineWidth = 1.5f,
@@ -88,7 +76,6 @@ object AiIcons {
                 close()
             }
 
-            // Yüzey çizgileri (kuşak, taç ve alt kısım)
             path(
                 stroke = ink,
                 strokeLineWidth = if (filled) 0.9f else 1.2f,
@@ -107,7 +94,6 @@ object AiIcons {
                 lineTo(9.9f, 20.8f)
             }
 
-            // Sağ üstteki dört köşeli parıltı
             if (filled) {
                 path(
                     fill = ink,

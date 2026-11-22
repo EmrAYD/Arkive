@@ -27,7 +27,7 @@ import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.formatBytes
 
-/** Ön izleme yapılamayan dosyanın ortada gösterilen kartı: simge, ad, boyut, [reason] ve düğmeler ([actions]). */
+/** Ön izlenemeyen dosyanın kartı: simge, ad, boyut, neden ve düğmeler. */
 @Composable
 private fun FileMessage(file: FileDto, icon: ImageVector, reason: String, actions: @Composable () -> Unit) {
     Column(
@@ -53,7 +53,7 @@ internal fun NoPreviewMessage(file: FileDto, reason: String, onOpenExternally: (
     }
 }
 
-/** Parolalı dosya: parola penceresi kapatıldıysa buradan yeniden açılır. */
+/** Parolalı dosyanın kartı; parola penceresi buradan yeniden açılır. */
 @Composable
 internal fun PasswordProtectedMessage(file: FileDto, onEnterPassword: () -> Unit, onDownload: () -> Unit) {
     FileMessage(file, Icons.Filled.Lock, Txt.preview.passwordProtected) {

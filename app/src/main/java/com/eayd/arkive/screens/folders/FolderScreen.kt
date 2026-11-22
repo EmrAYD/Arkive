@@ -22,10 +22,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.viewmodel.BrowserViewModel
 
-/**
- * Bir klasörün içi: üst çubukta geri düğmesi ve klasör adı; altında klasör/dosya listesi ve sağ üstte "+" düğmesi (yeni klasör / dosya yükle).
- * Klasör adı rotadan değil sunucudan alınır (adda "%", "+" gibi karakterler olabilir).
- */
+/** Bir klasörün içi. Klasör adı adresten değil sunucudan alınır. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun FolderScreen(
@@ -34,7 +31,6 @@ fun FolderScreen(
     onOpenFolder: (folderId: String) -> Unit,
     onOpenFile: (fileId: String) -> Unit,
 ) {
-    // key: her klasörün kendi ViewModel'i olsun (bir klasörden diğerine geçince liste karışmasın).
     val viewModel: BrowserViewModel = viewModel(
         key = "folder-$folderId",
         factory = BrowserViewModel.factory(parentId = folderId, location = null),

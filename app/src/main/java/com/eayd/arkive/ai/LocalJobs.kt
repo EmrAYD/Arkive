@@ -7,16 +7,10 @@ import com.google.firebase.auth.FirebaseAuth
 import java.io.File
 import org.json.JSONObject
 
-/** Telefonda özetlenmeye başlanmış, henüz bitmemiş bir dosya. [attempts]: telefonda kaç kez başlatıldı. */
+/** Telefonda özetlenmeye başlanmış, henüz bitmemiş bir dosya. */
 data class LocalJob(val file: FileDto, val startedAtMs: Long, val attempts: Int)
 
-/**
- * Telefonda süren özetlemelerin telefondaki listesi. Özetleme telefonda başlarken kaydedilir, nasıl biterse bitsin
- * (özet çıktı, hata, durduruldu, buluta geçildi) silinir. Kayıt kaldıysa uygulama özetleme sürerken kapanmış demektir;
- * uygulama yeniden açılınca bu listeye bakılır ([AiSummarizer.start], kurallar [LocalJobPolicy]'de). Dosyanın bilgileri de
- * saklanır: internet yokken de (dosyanın telefonda kopyası varsa) yeniden başlatılabilsin. Kayıtlar oturum açmış
- * kullanıcıya aittir (`files/ai_local_jobs.json`).
- */
+/** Telefonda süren özetlerin kaydı. Özetleme bitince silinir; kayıt kaldıysa uygulama o sırada kapanmıştır. */
 object LocalJobs {
 
     private lateinit var store: File
@@ -28,7 +22,7 @@ object LocalJobs {
 
     private fun uid(): String? = FirebaseAuth.getInstance().currentUser?.uid
 
-    /** [file] telefonda özetlenmeye başlıyor. Önceden yarıda kalmış kaydı varsa deneme sayısı bir artar. */
+    /** Dosya telefonda özetlenmeye başlıyor; eski kaydı varsa deneme sayısı artar. */
     @Synchronized
     fun begin(file: FileDto, nowMs: Long = System.currentTimeMillis()) {
         val owner = uid() ?: return
@@ -89,7 +83,7 @@ object LocalJobs {
         return try {
             JSONObject(store.readText())
         } catch (e: Exception) {
-            JSONObject() // bozuk dosya yok sayılır
+            JSONObject()
         }
     }
 
@@ -97,8 +91,6 @@ object LocalJobs {
         if (!::store.isInitialized) return
         try {
             store.writeTextAtomically(root.toString())
-        } catch (e: Exception) {
-            // Yazılamazsa yalnızca "uygulama kapanırsa sürdür" eksik kalır; özetleme yine sürer.
-        }
+        } catch (e: Exception) {}
     }
 }

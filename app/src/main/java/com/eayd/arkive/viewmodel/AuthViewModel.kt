@@ -31,7 +31,7 @@ sealed interface AuthUiState {
     data object Unauthenticated : AuthUiState
     data object Success : AuthUiState
 
-    /** Google ile yeni hesap açıldı; Kullanıcı Sözleşmesi onaylanana kadar ana ekrana geçilmez. */
+    /** Google ile yeni hesap açıldı; sözleşme onaylanana kadar beklenir. */
     data object EulaRequired : AuthUiState
     data class Error(val message: String) : AuthUiState
 }
@@ -43,10 +43,10 @@ sealed interface PasswordResetUiState {
     data class Error(val message: String) : PasswordResetUiState
 }
 
-/** E-posta alanının denetim sonucu. Kullanıcı yazmayı bıraktıktan yarım saniye sonra hesaplanır. */
+/** E-posta alanının denetim sonucu. */
 enum class EmailCheck { Empty, Valid, Invalid }
 
-/** Kayıt şifresinin kuralları; ekran her kuralı ayrı ayrı gösterir. */
+/** Kayıt şifresinin kuralları. */
 data class PasswordRules(
     val longEnough: Boolean,
     val hasSpecialChar: Boolean,
@@ -67,15 +67,11 @@ data class PasswordRules(
     }
 }
 
-/**
- * Giriş, kayıt, Google ile giriş, şifre sıfırlama ve çıkış. Giriş ve kayıt ekranları aynı ViewModel sınıfını
- * kullanır; e-posta/şifre alanlarının metni ve doğrulaması burada tutulur, ekran yalnızca çizer.
- */
+/** Giriş, kayıt, Google ile giriş, şifre sıfırlama ve çıkış. */
 class AuthViewModel : ViewModel() {
 
     private val auth = FirebaseAuth.getInstance()
 
-    // Alan metinleri Compose durumu olarak tutulur: yazarken imleç zıplamaz.
     var email by mutableStateOf("")
         private set
     var password by mutableStateOf("")
@@ -89,13 +85,10 @@ class AuthViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<AuthUiState>(AuthUiState.Idle)
     val uiState: StateFlow<AuthUiState> = _uiState.asStateFlow()
 
-    // Şifre sıfırlama kendi state'ini taşır; giriş/kayıt state'iyle karışmaz.
     private val _passwordResetState = MutableStateFlow<PasswordResetUiState>(PasswordResetUiState.Idle)
     val passwordResetState: StateFlow<PasswordResetUiState> = _passwordResetState.asStateFlow()
 
     private var emailJob: Job? = null
-
-    // --- Form ---------------------------------------------------------------------------------------
 
     fun onEmailChange(value: String) {
         email = value.trim()
@@ -105,7 +98,6 @@ class AuthViewModel : ViewModel() {
             _emailCheck.value = EmailCheck.Empty
             return
         }
-        // Debounce: kullanıcı yazarken hata göstermemek için yarım saniye beklenir.
         emailJob = viewModelScope.launch {
             delay(500.milliseconds)
             _emailCheck.value =
@@ -117,12 +109,9 @@ class AuthViewModel : ViewModel() {
         password = value
     }
 
-    // --- Oturum -------------------------------------------------------------------------------------
-
     fun checkAuthStatus() {
         val user = auth.currentUser
         if (user != null && AppSettings.pendingEulaUid == user.uid) {
-            // Sözleşme penceresi açıkken uygulama kapanmış: onaylanmamış hesap kullanıma açılmaz.
             viewModelScope.launch {
                 discardUnacceptedAccount()
                 _uiState.value = AuthUiState.Unauthenticated
@@ -162,13 +151,7 @@ class AuthViewModel : ViewModel() {
         ) { auth.signInWithEmailAndPassword(email, password).await() }
     }
 
-    /**
-     * [idToken] null ise Google penceresi iptal edilmiş ya da başarısız olmuş demektir.
-     *
-     * Bu giriş yeni bir hesap açarsa ve [eulaAlreadyAccepted] false ise durum [AuthUiState.EulaRequired] olur;
-     * ekran sözleşmeyi gösterir, sonucu [acceptEula] ya da [declineEula] ile bildirir. Kayıt ekranı sözleşmeyi
-     * zaten onaylattığı için true gönderir.
-     */
+    /** Google ile giriş. [idToken] null ise pencere iptal edilmiş ya da başarısız olmuştur. */
     fun loginWithGoogle(idToken: String?, eulaAlreadyAccepted: Boolean = false) {
         if (idToken == null) {
             _uiState.value = AuthUiState.Error(Txt.auth.googleCancelledOrFailed)
@@ -181,11 +164,7 @@ class AuthViewModel : ViewModel() {
         ) { auth.signInWithCredential(GoogleAuthProvider.getCredential(idToken, null)).await() }
     }
 
-    /**
-     * Üç giriş yolunun ortak akışı: yükleniyor → sonuç (başarı ya da Türkçe hata mesajı).
-     * [eulaRequiredForNewUser] true iken yeni açılan (ya da önceden onaysız kalmış) hesap için başarı yerine
-     * [AuthUiState.EulaRequired] döner.
-     */
+    /** Giriş yollarının ortak akışı. */
     private fun authenticate(
         failure: String,
         noUser: String,
@@ -214,13 +193,13 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    /** Kullanıcı Sözleşmesi onaylandı: Google ile açılan yeni hesap kullanıma açılır. */
+    /** Sözleşme onaylandı; yeni hesap kullanıma açılır. */
     fun acceptEula() {
         AppSettings.pendingEulaUid = null
         _uiState.value = AuthUiState.Success
     }
 
-    /** Kullanıcı Sözleşmesi reddedildi: az önce açılan hesap silinir, oturum kapatılır, giriş ekranında kalınır. */
+    /** Sözleşme reddedildi; yeni hesap silinir ve oturum kapanır. */
     fun declineEula(context: Context) {
         val appContext = context.applicationContext
         _uiState.value = AuthUiState.Loading
@@ -232,9 +211,7 @@ class AuthViewModel : ViewModel() {
     }
 
     /**
-     * Sözleşmeyi onaylamamış hesabı Firebase'den siler ve oturumu kapatır. Silme başarısız olursa (ör. bağlantı yok)
-     * oturum yine kapatılır ama [AppSettings.pendingEulaUid] işareti kalır; aynı hesapla tekrar girilince sözleşme
-     * yeniden sorulur.
+     * Sözleşmeyi onaylamamış hesabı siler. Silinemezse işaret kalır ve aynı hesapla girilince sözleşme yeniden sorulur.
      */
     private suspend fun discardUnacceptedAccount() {
         var deleted = true
@@ -250,12 +227,7 @@ class AuthViewModel : ViewModel() {
         if (deleted) AppSettings.pendingEulaUid = null
     }
 
-    /**
-     * Firebase oturumunu kapatır ve Credential Manager'daki Google durumunu temizler.
-     * Navigasyon, temizlik bittikten sonra [onDone] ile yapılmalı: navigasyon bu
-     * ViewModel'in ekranını back stack'ten attığı için ViewModel iptal olur ve
-     * devam eden temizlik yarım kalabilir.
-     */
+    /** Oturumu kapatır. Ekran geçişini [onDone] içinde yapın; yoksa temizlik yarım kalabilir. */
     fun logout(context: Context, onDone: () -> Unit) {
         val appContext = context.applicationContext
         auth.signOut()
@@ -265,8 +237,6 @@ class AuthViewModel : ViewModel() {
         }
     }
 
-    // --- Şifre sıfırlama ----------------------------------------------------------------------------
-
     fun sendPasswordReset() {
         if (email.isBlank()) {
             _passwordResetState.value = PasswordResetUiState.Error(Txt.auth.enterEmailFirst)
@@ -275,8 +245,6 @@ class AuthViewModel : ViewModel() {
 
         _passwordResetState.value = PasswordResetUiState.Loading
         viewModelScope.launch {
-            // E-posta kayıtlı olmasa bile aynı mesajı gösteriyoruz; böylece bir
-            // e-postanın sistemde olup olmadığı dışarıdan öğrenilemez.
             val successMessage = Txt.auth.resetLinkSent
             try {
                 auth.sendPasswordResetEmail(email).await()

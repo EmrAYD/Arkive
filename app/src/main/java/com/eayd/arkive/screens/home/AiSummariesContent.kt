@@ -45,11 +45,7 @@ import com.eayd.arkive.ui.components.SummaryActionsMenu
 import com.eayd.arkive.ui.components.rememberNoticeHostState
 import com.eayd.arkive.viewmodel.AiSummariesViewModel
 
-/**
- * "AI Sonuçlarım" sayfası: dosyaların yapay zeka özetleri, ana sayfadaki öğeler gibi alt alta. Her öğenin adı neyin
- * özeti olduğunu söyler ("rapor.pdf özeti"), altında özetin başı görünür. Dokununca özet penceresi açılır; 3 nokta
- * menüsünden kaynak dosya açılır ya da özet silinir. Özetler dosya değildir: taşınmaz, çöp kutusuna gitmez.
- */
+/** "AI Sonuçlarım" sayfası: özetlerin listesi. Dokununca özet açılır. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiSummariesContent(
@@ -60,11 +56,9 @@ fun AiSummariesContent(
     val state by viewModel.state.collectAsState()
     val notices = rememberNoticeHostState()
 
-    // Sayfa her görününce liste tazelenir; bir dosya özetlenince ya da özet silinince sessizce yenilenir.
     LaunchedEffect(viewModel) { viewModel.load() }
     LaunchedEffect(viewModel) { AiSummarizer.completed.collect { viewModel.reloadQuietly() } }
     LaunchedEffect(viewModel) { AiSummarizer.notices.collect(viewModel::showNotice) }
-    // İnternet geri gelince, liste telefondaki görüntüden gösteriliyorsa sunucudan tazelenir.
     val offlineNow by rememberUpdatedState(state.offline)
     LaunchedEffect(viewModel) { AiSummarizer.networkBack.collect { if (offlineNow) viewModel.reloadQuietly() } }
     NoticeEffect(state.notice, notices, viewModel::clearNotice)
@@ -119,7 +113,7 @@ fun AiSummariesContent(
     }
 }
 
-/** Bir özetin satırı: ana sayfadaki dosya satırıyla aynı kart; adı "<dosya adı> özeti", alt yazısı özetin başı. */
+/** Bir özetin satırı: adı "<dosya adı> özeti", altında özetin başı. */
 @Composable
 private fun SummaryRow(
     item: SummaryItemDto,
@@ -150,7 +144,7 @@ private fun SummaryRow(
     )
 }
 
-/** Özetin simgesi: uygulamanın yapay zeka simgesi, dosya simgeleriyle aynı genişlikte (satırlar hizalı görünsün). */
+/** Özetin simgesi; dosya simgeleriyle aynı genişlikte. */
 @Composable
 private fun SummaryGlyph() {
     Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {
@@ -163,7 +157,7 @@ private fun SummaryGlyph() {
     }
 }
 
-/** Ortalanmış bir içerik; kaydırılabilir olduğu için aşağı çekerek yenileme boş durumlarda da çalışır. */
+/** Ortalanmış içerik; boş listede de aşağı çekerek yenilemeye izin verir. */
 @Composable
 private fun PullableCenter(content: @Composable () -> Unit) {
     LazyColumn(Modifier.fillMaxSize()) {

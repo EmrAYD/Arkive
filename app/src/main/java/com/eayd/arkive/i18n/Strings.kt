@@ -1,9 +1,6 @@
 package com.eayd.arkive.i18n
 
-// Uygulamanın metinleri üç dosyadadır: Strings.kt (hangi metinler var), StringsTr.kt (Türkçe), StringsEn.kt
-// (İngilizce). Yeni bir metin eklerken üçüne de aynı üyeyi ekle; bir dilde eksik kalan metin derleme hatası verir.
-
-/** Uygulamanın tüm kullanıcı metinleri. Her dil bu arayüzü eksiksiz uygular ([TrStrings], [EnStrings]). */
+/** Uygulamanın bütün metinleri. Yeni bir metin eklerken bu arayüze ve StringsTr ile StringsEn'e aynı üyeyi ekleyin. */
 interface Strings {
     val ai: AiStrings
     val docs: DocsStrings
@@ -24,7 +21,7 @@ interface Strings {
     val aiMode: AiModeStrings
 }
 
-/** Yapay zeka özetleme: pencereler, durum ve bildirim metinleri. */
+/** Yapay zeka özetleme metinleri. */
 interface AiStrings {
     val rejectTooBig: String
     val rejectTooManyPages: String
@@ -100,7 +97,7 @@ interface AiStrings {
     fun passwordNeededText(name: Any?): String
 }
 
-/** Belge okuyucuların (PDF, Word, OLE, XML) hata mesajları. */
+/** Belge okuyucuların hata mesajları. */
 interface DocsStrings {
     val wrongPassword: String
     val passwordProtected: String
@@ -147,7 +144,7 @@ interface DocsStrings {
     val xmlTooDeep: String
 }
 
-/** Birçok ekranda geçen kısa metinler (düğmeler, ortak eylemler). */
+/** Birçok ekranda geçen kısa metinler. */
 interface CommonStrings {
     val download: String
     val move: String
@@ -173,7 +170,7 @@ interface CommonStrings {
     val open: String
 }
 
-/** Dosya türleri, bilgiler, adlandırma ve indirme. */
+/** Dosya türleri, bilgileri, adlandırma ve indirme. */
 interface FilesStrings {
     val nameTooLong: String
     val nameInvalidChars: String
@@ -255,7 +252,7 @@ interface ErrorsStrings {
     val unexpected: String
 }
 
-/** Klasör/dosya listeleri, araç çubuğu, yükleme ve taşıma. */
+/** Klasör ve dosya listeleri, yükleme ve taşıma. */
 interface BrowserStrings {
     val parentFolder: String
     val noSubfolders: String
@@ -311,7 +308,7 @@ interface BrowserStrings {
     val selectAll: String
 }
 
-/** Giriş, kayıt ve Firebase kimlik doğrulama mesajları. */
+/** Giriş ve kayıt. */
 interface AuthStrings {
     val hidePassword: String
     val showPassword: String
@@ -361,7 +358,7 @@ interface AuthStrings {
     val email: String
 }
 
-/** Plus/Free planları ve tanıtım ekranı. */
+/** Planlar ve Plus tanıtımı. */
 interface PlanStrings {
     val offerTagline: String
     fun offerStorage(storageText: Any?): String
@@ -386,7 +383,7 @@ interface PlanStrings {
     val localAiUnsupported: String
 }
 
-/** Profil, ayarlar ve şifre değiştirme. */
+/** Profil ve ayarlar. */
 interface ProfileStrings {
     val themeSystem: String
     val themeLight: String
@@ -431,7 +428,7 @@ interface ProfileStrings {
     fun plusAi(freeSummaryLimit: Any?): String
 }
 
-/** Ana sayfa ve yan menü (çekmece). */
+/** Ana sayfa ve yan menü. */
 interface HomeStrings {
     val aiResults: String
     val home: String
@@ -446,7 +443,7 @@ interface HomeStrings {
     val openMenu: String
 }
 
-/** Dosya ön izleme ekranları. */
+/** Dosya ön izleme. */
 interface PreviewStrings {
     val offlineNotSaved: String
     val unsupportedType: String
@@ -511,7 +508,7 @@ interface TrashStrings {
     fun emptyNote(retentionDays: Any?): String
 }
 
-/** Kullanıcı Sözleşmesi penceresi (sözleşmenin metni EulaContent'tedir). */
+/** Kullanıcı Sözleşmesi penceresi; sözleşmenin metni EulaContent'tedir. */
 interface EulaStrings {
     val scrollToAccept: String
     val accept: String
@@ -531,7 +528,7 @@ interface LanguageStrings {
     fun mixed(app: Any?, summary: Any?): String
 }
 
-/** Telefondaki yapay zeka modeli (telefonda özetleme): indirme, durum ve hata metinleri. Metinler yapay zeka işlem yerine göre değişir. */
+/** Telefondaki yapay zeka modeli: indirme, durum ve hata metinleri. */
 interface LocalAiStrings {
     val title: String
     fun notDownloaded(size: Any?): String
@@ -570,7 +567,7 @@ interface LocalAiStrings {
     val runFailed: String
 }
 
-/** Yapay zeka işlem yeri ayarı (Yerel / Bulut / Yerel + Bulut): seçenekler, açıklamaları ve ilgili uyarılar. */
+/** Yapay zeka işlem yeri ayarı. */
 interface AiModeStrings {
     val title: String
     val local: String

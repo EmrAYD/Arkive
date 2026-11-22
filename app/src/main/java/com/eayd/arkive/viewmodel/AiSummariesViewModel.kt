@@ -23,21 +23,15 @@ data class AiSummariesUiState(
     /** Özetler, en yenisi önce. */
     val items: List<SummaryItemDto> = emptyList(),
     val isLoading: Boolean = true,
-    /** Aşağı çekerek yenileme sürüyor. */
     val refreshing: Boolean = false,
-    /** Sunucuya ulaşılamadı; liste telefondaki son görüntüden gösteriliyor. */
+    /** Sunucuya ulaşılamadı; telefondaki son liste gösteriliyor. */
     val offline: Boolean = false,
-    /** Liste hiç yüklenemedi: ekranın ortasında "Tekrar dene" ile gösterilir. */
+    /** Liste hiç yüklenemedi. */
     val errorMessage: String? = null,
-    /** Kısa bildirim. */
     val notice: String? = null,
 )
 
-/**
- * "AI Sonuçlarım" sayfası: kullanıcının yapay zeka özetleri (GET /summaries). Her öğe kaynak dosyasının adıyla
- * ("rapor.pdf özeti") gösterilir; dokununca özet penceresi açılır. Özetler ve kaynak dosyaların bilgisi telefonda da
- * tutulur ([SummaryStore], [ListCache]): internet yokken son görülen liste gösterilir ve özetler açılır.
- */
+/** "AI Sonuçlarım" sayfasının listesi. Özetler internetsiz de görünsün diye telefonda da tutulur. */
 class AiSummariesViewModel : ViewModel() {
 
     private val _state = MutableStateFlow(AiSummariesUiState())
@@ -45,13 +39,13 @@ class AiSummariesViewModel : ViewModel() {
 
     private var job: Job? = null
 
-    /** Listeyi yükler (sayfa her görününce ve "Tekrar dene"de). Liste ekranda varsa yükleme çarkı çıkmaz. */
+    /** Listeyi yükler; liste zaten ekrandaysa yükleme çarkı çıkmaz. */
     fun load() = fetch(refresh = false)
 
-    /** Sessizce yeniler: ör. bir dosya özetlenince ya da özet silinince. */
+    /** Listeyi sessizce yeniler. */
     fun reloadQuietly() = fetch(refresh = false)
 
-    /** Aşağı çekerek yenileme. Zaten yenileniyorsa ikinci bir istek başlatılmaz. */
+    /** Aşağı çekerek yenileme. */
     fun refresh() {
         if (_state.value.refreshing) return
         fetch(refresh = true)
@@ -86,16 +80,16 @@ class AiSummariesViewModel : ViewModel() {
         }
     }
 
-    /** Özetlerin metni ve kaynak dosyaların bilgisi telefona yazılır (internetsiz görünüm ve ön izleme için). */
+    /** Özetleri ve kaynak dosyaları telefona yazar. */
     private fun keepOnPhone(items: List<SummaryItemDto>) {
         for (item in items) {
-            if (SummaryStore.get(item.file.id)?.summary == item.summary) continue // zaten telefonda
+            if (SummaryStore.get(item.file.id)?.summary == item.summary) continue
             SummaryStore.put(StoredSummary(item.file.id, item.file.name, item.summary, pending = false))
         }
         ListCache.save(CACHE_KEY, ListCache.Snapshot(folder = null, folders = emptyList(), files = items.map { it.file }))
     }
 
-    /** İnternetsiz: son görülen liste (yalnızca metni telefonda olan özetler); hiç kaydedilmemişse null. */
+    /** İnternet yokken son görülen liste; hiç yoksa null. */
     private fun fromPhone(): List<SummaryItemDto>? {
         val snapshot = ListCache.load(CACHE_KEY) ?: return null
         return snapshot.files.mapNotNull { file ->

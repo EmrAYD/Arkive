@@ -2,18 +2,18 @@ package com.eayd.arkive.ai
 
 import kotlin.math.exp
 
-/** Özetlemenin aşaması; dosya satırındaki yüzde buna göre ilerler ([SummaryProgress]). */
+/** Özetlemenin aşaması. */
 sealed interface SummaryPhase {
-    /** Hazırlık ve dosyanın okunması (gerekirse indirilmesi). */
+    /** Dosya okunuyor ya da indiriliyor. */
     data object Reading : SummaryPhase
 
-    /** Telefondaki yapay zeka modeli belleğe yükleniyor (yalnızca ilk özetlemede birkaç saniye). */
+    /** Model belleğe yükleniyor. */
     data object LoadingModel : SummaryPhase
 
-    /** Telefonda özetleniyor: toplam [total] adımın [step]. adımı (uzun belgede bölümler + birleştirme; kısada 1/1). */
+    /** Telefonda özetleniyor: [total] adımın [step]. adımı. */
     data class OnPhone(val step: Int, val total: Int) : SummaryPhase
 
-    /** Sunucuda özetleniyor. [sizeBytes]: dosyanın boyutu (büyük dosya daha uzun sürer); bilinmiyorsa 0. */
+    /** Sunucuda özetleniyor; büyük dosya daha uzun sürer. */
     data class InCloud(val sizeBytes: Long) : SummaryPhase
 }
 
@@ -21,17 +21,14 @@ sealed interface SummaryPhase {
 data class PhaseRun(val phase: SummaryPhase, val startPercent: Int, val startedAtMs: Long)
 
 /**
- * Özetlemenin yüzdesi. Ne telefondaki model ne sunucu bir isteğin içinde ne kadar ilerlediğini söyler; bu yüzden yüzde,
- * aşamalardan (okuma, model yükleme, telefondaki adımlar, bulut) ve her aşamanın beklenen süresinden tahmin edilir:
- * her aşamanın bir yüzde aralığı vardır, aşama sürdükçe yüzde aralığın sonuna yaklaşır ama varmaz (aşama beklenenden
- * uzun sürerse yavaşlar, durmaz gibi görünmez). Aşama bitince sonraki aşamanın aralığına geçilir. Yüzde hiç geri gitmez
- * (ör. telefonda özetlenemeyen dosya buluta geçerken) ve özetleme bitene kadar [MAX]'ı aşmaz.
+ * Özetlemenin tahmini yüzdesi.
  *
- * Android sınıfı kullanmaz; tek başına test edilir.
+ * Model de sunucu da ilerleme bildirmez; yüzde aşamalardan ve beklenen sürelerden hesaplanır. Hiç geri gitmez, iş
+ * bitmeden [MAX]'ı geçmez.
  */
 object SummaryProgress {
 
-    /** Özetleme bitmeden gösterilebilecek en yüksek yüzde. */
+    /** İş bitmeden gösterilebilecek en yüksek yüzde. */
     const val MAX = 98
 
     private const val PHONE_FROM = 15
@@ -49,21 +46,19 @@ object SummaryProgress {
         is SummaryPhase.InCloud -> 6..MAX
     }
 
-    /** Aşamanın beklenen süresi (ms): yüzde bu sürede aralığın ~%85'ine gelir. */
+    /** Aşamanın beklenen süresi; yüzde bu sürede aralığın çoğunu geçer. */
     fun expectedMs(phase: SummaryPhase): Long = when (phase) {
         SummaryPhase.Reading -> 3_000
         SummaryPhase.LoadingModel -> 10_000
-        // Telefonda bir bölüm (~7000 karakter) ya da birleştirme: GPU'da ~10 sn, CPU'da daha uzun.
         is SummaryPhase.OnPhone -> 20_000
-        // Sunucu: büyük dosyada daha uzun (sayfa görüntüleri, çok bölüm); 15 sn ile 3 dk arası.
         is SummaryPhase.InCloud -> (15_000 + phase.sizeBytes / (1024 * 1024) * 10_000).coerceIn(15_000, 180_000)
     }
 
-    /** [phase] başlıyor: o anki yüzde [currentPercent] (ilk aşamada 0). Yüzde geri gitmesin diye başlangıç ikisinin büyüğüdür. */
+    /** Yeni aşamayı başlatır; yüzde geri gitmesin diye o anki yüzdeden devam eder. */
     fun start(phase: SummaryPhase, currentPercent: Int, nowMs: Long): PhaseRun =
         PhaseRun(phase, maxOf(currentPercent, range(phase).first).coerceIn(0, MAX), nowMs)
 
-    /** [run] aşaması [nowMs] anında yüzde kaçta. */
+    /** Aşamanın şu anki yüzdesi. */
     fun percent(run: PhaseRun, nowMs: Long): Int {
         val to = range(run.phase).last
         if (run.startPercent >= to) return run.startPercent

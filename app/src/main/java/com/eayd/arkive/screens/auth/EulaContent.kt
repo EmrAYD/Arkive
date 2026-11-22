@@ -3,25 +3,21 @@ package com.eayd.arkive.screens.auth
 import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.i18n.Lang
 
-/**
- * Son Kullanıcı Lisans Sözleşmesi (EULA) metni.
- *
- * Metin, kayıt ekranındaki onay penceresinde ([EulaDialog]) bölüm bölüm gösterilir. Paragraflarda `**kalın**`
- * işareti desteklenir. Metin Türkçe ve İngilizce olarak tutulur; birini değiştirirsen ötekini ve tarihleri de güncelle.
- */
+/** Sözleşme metninin bir parçası. */
 sealed interface EulaBlock {
-    /** Bölüm başlığı (ör. "1. LİSANS VERİLMESİ VE KULLANIM KAPSAMI"). */
+    /** Bölüm başlığı. */
     data class Heading(val text: String) : EulaBlock
 
-    /** Düz paragraf ya da numaralı madde; `**...**` arası kalın yazılır. */
+    /** Paragraf; `**...**` arası kalın yazılır. */
     data class Paragraph(val text: String) : EulaBlock
 }
 
+/** Kullanıcı Sözleşmesi'nin metni. Türkçe asıldır; birini değiştirince ötekini ve tarihi de güncelleyin. */
 object EulaContent {
     /** Seçili dildeki başlık. */
     val TITLE: String get() = forLanguage(Lang.app).title
 
-    /** Seçili dildeki metin. Türkçe metin asıldır; İngilizce metin onun çevirisidir. */
+    /** Seçili dildeki metin. */
     val blocks: List<EulaBlock> get() = forLanguage(Lang.app).blocks
 
     /** Bir dildeki sözleşme metni. */

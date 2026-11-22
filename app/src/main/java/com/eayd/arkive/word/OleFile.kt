@@ -2,11 +2,7 @@ package com.eayd.arkive.word
 
 import com.eayd.arkive.i18n.Txt
 
-/**
- * Eski Office dosyalarının (.doc) kapsayıcısı olan OLE "Compound File" biçimini (MS-CFB) okur: adıyla akış verir.
- * Dosya baytları bellektedir; bozuk/uydurma yapılar [WordFormatException] ile reddedilir (sonsuz döngü ve dev
- * bellek isteği yok).
- */
+/** Eski Office dosyalarının OLE kapsayıcısını okur. Bozuk yapılar [WordFormatException] ile reddedilir. */
 internal class OleFile(private val data: ByteArray) {
     private val sectorSize: Int
     private val miniSectorSize: Int
@@ -76,7 +72,7 @@ internal class OleFile(private val data: ByteArray) {
 
     fun hasStream(name: String): Boolean = entries.any { it.type == 2 && it.name == name }
 
-    /** Adı [name] olan akışın baytları; yoksa null. */
+    /** [name] adlı akışın baytları; yoksa null. */
     fun stream(name: String): ByteArray? {
         val entry = entries.firstOrNull { it.type == 2 && it.name == name } ?: return null
         if (entry.size > MAX_STREAM_BYTES) throw WordFormatException(Txt.docs.oleStreamTooBig)

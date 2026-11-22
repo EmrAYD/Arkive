@@ -7,14 +7,9 @@ import java.util.Calendar
 import java.util.Date
 import java.util.TimeZone
 
-// Sunucunun tarih biçimi: "2026-10-12T09:15:30.123456Z", "...+00:00" ya da saat dilimsiz "2026-10-12T09:15:30".
 private val isoDateTime = Regex("""(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.\d+)?(Z|[+-]\d{2}(?::?\d{2})?)?""")
 
-/**
- * Sunucudan gelen tarihi, telefonun saat diliminde "12 Ekim 2026, 14:35" biçiminde yazar.
- * (java.time yerine Calendar kullanılır: java.time eski Android sürümlerinde yoktur.)
- * Saat dilimi belirtilmemişse UTC kabul edilir (backend tarihleri UTC saklar). Okunamazsa metin olduğu gibi döner.
- */
+/** Sunucudan gelen tarihi telefonun saat diliminde "12 Ekim 2026, 14:35" gibi yazar. */
 fun formatServerDateTime(iso: String): String {
     val match = isoDateTime.matchEntire(iso.trim()) ?: return iso
     val (year, month, day, hour, minute, second, zone) = match.destructured
@@ -25,7 +20,6 @@ fun formatServerDateTime(iso: String): String {
     }
     var millis = calendar.timeInMillis
 
-    // "+03:00" gibi bir kayma varsa UTC'ye çevir (ör. 12:00+03:00 = 09:00 UTC)
     if (zone.isNotEmpty() && zone != "Z") {
         val sign = if (zone[0] == '-') -1 else 1
         val digits = zone.substring(1).replace(":", "")

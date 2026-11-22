@@ -85,7 +85,7 @@ private const val WORD_MAX_IMAGE_PX = 2000
 private val PAPER = Color.White
 private val INK = Color(0xFF1B1B1F)
 
-/** Belgedeki sayfa sonlarıyla bölünmüş bloklardan, listede tek tek çizilecek öğeler. */
+/** Listede çizilecek tek bir blok. */
 private class WordItem(val block: WordBlock, val firstOnPage: Boolean, val lastOnPage: Boolean)
 
 private fun layoutItems(blocks: List<WordBlock>): List<WordItem> {
@@ -105,26 +105,18 @@ private fun layoutItems(blocks: List<WordBlock>): List<WordItem> {
     return out
 }
 
-/**
- * Word belgesi (.docx / .doc): sayfa sonlarıyla ayrılmış beyaz "kağıt" üzerinde, biçimi korunarak (başlıklar, kalın/
- * italik, renkler, listeler, tablolar, görseller, bağlantılar) çizilir. PDF'in aksine sayfa düzeni ekran genişliğine
- * göre akar, böylece telefonda yazılar okunur boyutta kalır. İki parmakla yazı boyutu büyütülüp küçültülür; metin
- * seçilip kopyalanabilir.
- */
+/** Word belgesini biçimiyle gösterir; sayfa düzeni ekran genişliğine göre akar. */
 @Composable
 internal fun WordViewer(doc: WordDoc) {
     var scale by remember(doc) { mutableStateOf(1f) }
     val items = remember(doc) { layoutItems(doc.blocks) }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
-        // Listenin yan boşlukları (8 dp + 8 dp) ve kağıdın iç boşluğu (16 dp + 16 dp) düşülmüş yazı genişliği.
         val contentWidth = maxWidth - 16.dp - 32.dp
 
         SelectionContainer(
             Modifier
                 .fillMaxSize()
-                // İki parmakla yakınlaştırma: "Initial" geçişinde dinlenir, böylece iki parmak listenin kendi
-                // kaydırmasından önce yakalanır. Tek parmak olduğu gibi listeye gider (PdfViewer ile aynı yöntem).
                 .pointerInput(doc) {
                     awaitEachGesture {
                         awaitFirstDown(requireUnconsumed = false, pass = PointerEventPass.Initial)
@@ -185,8 +177,6 @@ private fun BlockView(block: WordBlock, doc: WordDoc, scale: Float, width: Dp, b
     }
 }
 
-// --- Paragraf -------------------------------------------------------------------------------------------
-
 private fun familyOf(font: WordFont): FontFamily? = when (font) {
     WordFont.Serif -> FontFamily.Serif
     WordFont.Mono -> FontFamily.Monospace
@@ -230,7 +220,6 @@ private fun buildText(p: WordParagraph, scale: Float): AnnotatedString = buildAn
 private fun ParagraphView(p: WordParagraph, scale: Float, backdrop: Color?) {
     val background = p.background?.let { Color(it) }
     val ground = background ?: backdrop
-    // Word'de "otomatik" renk, koyu zeminde beyaza döner.
     val ink = if (ground != null && ground.luminance() < 0.35f) Color.White else INK
 
     val maxSize = p.runs.maxOfOrNull { it.sizePt } ?: p.emptyPt
@@ -257,7 +246,6 @@ private fun ParagraphView(p: WordParagraph, scale: Float, backdrop: Color?) {
 
     Box(decoration) {
         if (p.runs.isEmpty() && p.label == null) {
-            // Boş paragraf: yalnızca bir satırlık boşluk
             Spacer(Modifier.fillMaxWidth().height((p.emptyPt * 1.25f * p.lineSpacing * scale).dp))
         } else if (p.label != null) {
             val indent = p.indentPt.coerceIn(0f, 400f)
@@ -304,8 +292,6 @@ private fun ParagraphView(p: WordParagraph, scale: Float, backdrop: Color?) {
     }
 }
 
-// --- Görsel ---------------------------------------------------------------------------------------------
-
 private class DecodedImage(val image: ImageBitmap, val width: Int, val height: Int)
 
 private fun decodeImage(bytes: ByteArray, targetPx: Int): DecodedImage? {
@@ -328,7 +314,6 @@ private fun ImageView(block: WordImage, doc: WordDoc, scale: Float, availableWid
     val bytes = doc.images[block.key]
     val density = LocalDensity.current
     val wantedPx = with(density) { (availableWidth * scale).roundToPx() }
-    // Yakınlaştırma sırasında her karede yeniden çözmemek için genişlik 256 pikselin katlarına yuvarlanır.
     val decodePx = ((wantedPx + 255) / 256 * 256).coerceIn(256, WORD_MAX_IMAGE_PX)
 
     var decoded by remember(block.key) { mutableStateOf<DecodedImage?>(null) }
@@ -378,13 +363,9 @@ private fun ImageView(block: WordImage, doc: WordDoc, scale: Float, availableWid
     }
 }
 
-// --- Tablo ----------------------------------------------------------------------------------------------
-
 @Composable
 private fun TableView(table: WordTable, doc: WordDoc, scale: Float, availableWidth: Dp, nested: Boolean) {
     val sumPt = table.columnsPt.sum().coerceAtLeast(1f)
-    // Tablo ekrana sığmıyorsa orantılı küçülür; yakınlaştırınca ekrandan taşabilir ve yatay kaydırılır.
-    // İç içe tabloda verilen genişlik zaten yakınlaştırılmış olduğundan karşılaştırma yakınlaştırmasız yapılır.
     val availablePt = if (nested) availableWidth.value / scale else availableWidth.value
     val fit = if (sumPt > availablePt) availablePt / sumPt else 1f
     val columns = table.columnsPt.map { (it * fit * scale).coerceAtLeast(36f).dp }

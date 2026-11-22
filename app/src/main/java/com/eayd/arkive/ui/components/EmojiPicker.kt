@@ -60,8 +60,6 @@ import java.util.concurrent.ConcurrentHashMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-// Klasör için emoji seçimi: pencerede sık kullanılan birkaç emoji + "+" tuşu; "+" tam listeyi açar.
-
 /** Hızlı seçim satırındaki bir kutu. */
 private sealed interface EmojiSlot {
     data object None : EmojiSlot
@@ -71,10 +69,7 @@ private sealed interface EmojiSlot {
 
 private const val SLOTS_PER_ROW = 6
 
-/**
- * Hangi emojilerin cihazda çizilebildiği (Paint.hasGlyph). Her bölüm için bir kez, arka planda hesaplanıp saklanır;
- * böylece "+" tuşuna basınca liste çoğunlukla hazırdır. Hazır değilse seçici iskelet (skeleton) gösterir.
- */
+/** Cihazda çizilebilen emojiler; her bölüm bir kez, arka planda hesaplanır. */
 internal object EmojiAvailability {
     private val cache = ConcurrentHashMap<Int, List<String>>()
 
@@ -86,21 +81,16 @@ internal object EmojiAvailability {
             EmojiCategories[category].emojis.filter { paint.hasGlyph(it) }.also { cache[category] = it }
         }
 
-    /** Tüm bölümleri sırayla hazırlar (ilk bölüm önce). */
+    /** Tüm bölümleri sırayla hazırlar. */
     suspend fun preloadAll() {
         for (i in EmojiCategories.indices) load(i)
     }
 }
 
-/**
- * Emoji seçimi satırları: "yok" kutusu, temel emojiler ve "+" (tüm emojiler). [current], temel listede olmayan
- * (tam listeden seçilmiş) bir emojiyse hızlı satırda da görünür. Seçili emojiye tekrar basmak seçimi kaldırır.
- * [onSelect]: seçilen emoji; null = emoji yok.
- */
+/** Emoji seçimi: "yok", temel emojiler ve tam liste. Seçili emojiye yeniden basmak seçimi kaldırır. */
 @Composable
 fun EmojiChoices(current: String?, enabled: Boolean, onSelect: (String?) -> Unit) {
     var showAll by remember { mutableStateOf(false) }
-    // Pencere görünür olur olmaz emoji listesini arka planda hazırla; "+" tuşuna basılınca bekleme olmasın.
     LaunchedEffect(Unit) { EmojiAvailability.preloadAll() }
 
     val extra = current?.takeIf { it !in BasicFolderEmojis }
@@ -180,10 +170,7 @@ private fun EmojiBox(
     ) { content() }
 }
 
-/**
- * Tüm emojilerin bölümlere ayrılmış listesi (tam ekrana yakın pencere). Bir emojiye basınca [onPick] çağrılır.
- * Cihazın yazı tipinin çizemediği (daha yeni sürümlerin) emojiler gösterilmez; yoksa kutu kutu görünürlerdi.
- */
+/** Tüm emojilerin listesi. Cihazın çizemediği emojiler gösterilmez. */
 @Composable
 private fun EmojiPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -193,7 +180,6 @@ private fun EmojiPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
             modifier = Modifier.fillMaxWidth(0.94f).fillMaxHeight(0.78f),
         ) {
             var category by rememberSaveable { mutableStateOf(0) }
-            // Süzülmüş liste arka planda hazırlanır; hazır değilken null (iskelet gösterilir), hazırsa anında gelir.
             val emojis by produceState<List<String>?>(EmojiAvailability.cached(category), category) {
                 value = EmojiAvailability.cached(category)
                 value = EmojiAvailability.load(category)
@@ -267,7 +253,7 @@ private fun EmojiPickerDialog(onPick: (String) -> Unit, onDismiss: () -> Unit) {
     }
 }
 
-/** Liste hazırlanırken gösterilen yer tutucu ızgara: yumuşakça yanıp sönen daireler. */
+/** Liste hazırlanırken gösterilen yer tutucu. */
 @Composable
 private fun EmojiSkeletonGrid(modifier: Modifier = Modifier) {
     val pulse by rememberInfiniteTransition(label = "emojiSkeleton").animateFloat(

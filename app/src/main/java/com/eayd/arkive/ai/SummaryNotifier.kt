@@ -12,15 +12,7 @@ import com.eayd.arkive.MainActivity
 import com.eayd.arkive.R
 import com.eayd.arkive.i18n.Txt
 
-/**
- * Uygulama arka plandayken ya da kapalıyken özetleme bitince ([notifyDone]) ya da başarısız olunca ([notifyFailed])
- * gösterilen sistem bildirimleri. "Bitti" bildirimine dokununca uygulama açılır ve doğrudan o dosyanın özeti gösterilir
- * ([MainActivity] isteği [AiSummarizer.requestOpenSummary] ile iletir); "tamamlanamadı" bildirimine dokununca uygulama
- * açılır (dosya parola istiyorsa parola penceresi görünür). Bir dosyanın bildirimi tektir: sonra gelen öncekinin yerini alır.
- *
- * Özetleme sürerken gösterilen ilerleme bildirimi ([SummaryService]) ayrıdır ve iş bitince kalkar; bu bildirim kalıcıdır
- * (dokununca ya da kaydırılınca kapanır) ve her dosya için ayrı görünür.
- */
+/** Özet bittiğinde ya da tamamlanamadığında gösterilen sistem bildirimleri. Her dosyanın tek bildirimi olur. */
 object SummaryNotifier {
 
     private const val CHANNEL_ID = "ai_summary_done"
@@ -28,7 +20,7 @@ object SummaryNotifier {
     private const val ACTION_FAILED = "com.eayd.arkive.action.SUMMARY_FAILED"
     private const val ID_BASE = 5000
 
-    /** [savedOnPhoneOnly]: özet telefonda saklandı, sunucuya henüz yüklenemedi. Bildirim izni yoksa sessizce bir şey yapmaz. */
+    /** Özet hazır bildirimi; dokununca özet açılır. Bildirim izni yoksa bir şey yapmaz. */
     fun notifyDone(context: Context, request: SummaryOpenRequest, savedOnPhoneOnly: Boolean) {
         try {
             val manager = NotificationManagerCompat.from(context)
@@ -41,7 +33,7 @@ object SummaryNotifier {
             val key = request.fileId.hashCode()
             val open = PendingIntent.getActivity(
                 context,
-                key, // dosya başına ayrı istek kodu: her bildirim kendi dosyasını açar
+                key,
                 Intent(context, MainActivity::class.java)
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK)
                     .putExtra(SummaryOpenRequest.EXTRA_FILE_ID, request.fileId)
@@ -59,15 +51,10 @@ object SummaryNotifier {
                 .setCategory(NotificationCompat.CATEGORY_STATUS)
                 .build()
             manager.notify(ID_BASE + (key and 0xFFFF), notification)
-        } catch (e: SecurityException) {
-            // Bildirim izni sonradan geri alınmış olabilir; özet zaten kaydedildi, yalnızca haber verilemedi.
-        }
+        } catch (e: SecurityException) {}
     }
 
-    /**
-     * Özetleme tamamlanamadı (ya da dosya parola istiyor): [title] ve [text] ile bildirim. Dokununca uygulama açılır.
-     * Bildirim izni yoksa sessizce bir şey yapmaz.
-     */
+    /** Özet tamamlanamadı bildirimi; dokununca uygulama açılır. */
     fun notifyFailed(context: Context, fileId: String, title: String, text: String) {
         try {
             val manager = NotificationManagerCompat.from(context)
@@ -81,7 +68,6 @@ object SummaryNotifier {
             val open = PendingIntent.getActivity(
                 context,
                 key,
-                // Ayrı eylem: "bitti" bildiriminin isteğiyle (aynı istek kodu) karışıp onun dosya bilgisini silmesin.
                 Intent(context, MainActivity::class.java)
                     .setAction(ACTION_FAILED)
                     .addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP or Intent.FLAG_ACTIVITY_NEW_TASK),
@@ -97,8 +83,6 @@ object SummaryNotifier {
                 .setCategory(NotificationCompat.CATEGORY_ERROR)
                 .build()
             manager.notify(ID_BASE + (key and 0xFFFF), notification)
-        } catch (e: SecurityException) {
-            // Bildirim izni sonradan geri alınmış olabilir.
-        }
+        } catch (e: SecurityException) {}
     }
 }

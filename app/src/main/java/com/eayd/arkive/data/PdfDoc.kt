@@ -13,16 +13,13 @@ import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 
 /**
- * Yerel bir PDF dosyasını Android'in yerleşik [PdfRenderer]'ı ile açar ve sayfaları görüntü olarak çizer.
- *
- * PdfRenderer aynı anda yalnızca tek sayfanın açık olmasına izin verir ve iş parçacığı güvenli değildir;
- * bu yüzden tüm erişim bir kilit ([Mutex]) arkasındadır. Sayfalar liste kaydırıldıkça tek tek çizilir,
- * böylece yüzlerce sayfalık PDF bile belleği doldurmaz.
+ * PDF'i Android'in PdfRenderer'ıyla açar ve sayfaları çizer. PdfRenderer aynı anda tek sayfa açabildiği için erişim
+ * kilitlidir.
  */
 class PdfDoc private constructor(
     private val descriptor: ParcelFileDescriptor,
     private val renderer: PdfRenderer,
-    /** Her sayfanın (genişlik, yükseklik) değeri; yalnızca oranı kullanılır. Liste yüksekliklerini önceden ayırmak için. */
+    /** Sayfaların genişlik ve yükseklikleri. */
     val pageSizes: List<Pair<Int, Int>>,
 ) {
     private val lock = Mutex()
@@ -30,14 +27,14 @@ class PdfDoc private constructor(
 
     val pageCount: Int get() = pageSizes.size
 
-    /** Sayfayı [widthPx] genişliğinde, beyaz zeminli bir görüntüye çizer. Belge kapatıldıysa null. */
+    /** Sayfayı [widthPx] genişliğinde çizer; belge kapandıysa null. */
     suspend fun render(index: Int, widthPx: Int): Bitmap? = withContext(Dispatchers.IO) {
         lock.withLock {
             if (closed) return@withLock null
             val (w, h) = pageSizes[index]
             val heightPx = (widthPx.toFloat() * h / w).toInt().coerceAtLeast(1)
             val bitmap = Bitmap.createBitmap(widthPx, heightPx, Bitmap.Config.ARGB_8888)
-            bitmap.eraseColor(Color.WHITE)   // PdfRenderer saydam zemine çizer; beyaz olmazsa karanlık temada siyah görünür
+            bitmap.eraseColor(Color.WHITE)
             val page = renderer.openPage(index)
             try {
                 page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
@@ -48,7 +45,7 @@ class PdfDoc private constructor(
         }
     }
 
-    /** Devam eden bir çizim bitince belgeyi kapatır (ViewModel temizlenirken çağrılır, beklemez). */
+    /** Süren çizim bitince belgeyi kapatır. */
     fun closeAsync() {
         CoroutineScope(Dispatchers.IO).launch {
             lock.withLock {
@@ -61,7 +58,7 @@ class PdfDoc private constructor(
     }
 
     companion object {
-        /** Dosyayı açar. Şifreli PDF'te [SecurityException], bozuk dosyada [java.io.IOException] fırlatır. */
+        /** Dosyayı açar. Şifreli PDF'te [SecurityException] atar. */
         suspend fun open(file: File): PdfDoc = withContext(Dispatchers.IO) {
             val descriptor = ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
             try {

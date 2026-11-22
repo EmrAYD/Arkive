@@ -7,15 +7,7 @@ import com.eayd.arkive.ai.UnreadableDocumentException
 import com.eayd.arkive.ai.WrongPasswordException
 import com.eayd.arkive.i18n.Txt
 
-/**
- * Word belgesini açar (ön izleme ve özetleme): .docx, eski .doc ve her ikisinin parolalısı. Dosya türü uzantıya/mime
- * türüne değil içeriğe bakılarak anlaşılır (zip → .docx; OLE → .doc ya da şifreli .docx).
- *
- * Ağır iş yapar; arka plan iş parçacığında çağrılmalıdır. Hatalar:
- *  - [PasswordException]: parolalı belge; parola yok (wrong = false) ya da yanlış (wrong = true),
- *  - [UnreadableDocumentException]: dosya Word belgesi değil, bozuk ya da desteklenmeyen bir yöntemle şifreli
- *    (.doc için yalnızca RC4 ve RC4 CryptoAPI desteklenir; XOR gizleme ve Word 6/95 desteklenmez).
- */
+/** Word belgesini açar: .docx, .doc ve parolalıları. Türü içerikten anlar. Ağır iştir, arka planda çağrılmalı. */
 object WordLoader {
 
     fun load(bytes: ByteArray, password: String? = null): WordDoc {
@@ -30,7 +22,6 @@ object WordLoader {
         } catch (e: OutOfMemoryError) {
             throw UnreadableDocumentException(Txt.docs.tooBigForPreview)
         } catch (e: RuntimeException) {
-            // Bozuk dosyada yapı okuyucularının fırlattığı her çalışma zamanı hatası (dizin taşması, geçersiz zip adı...)
             throw UnreadableDocumentException(Txt.docs.wordUnreadableMaybeCorrupt, e)
         }
     }

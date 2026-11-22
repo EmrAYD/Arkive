@@ -60,17 +60,14 @@ import com.eayd.arkive.viewmodel.AuthUiState
 import com.eayd.arkive.viewmodel.EmailCheck
 import kotlinx.coroutines.launch
 
-// Giriş ve kayıt ekranlarının ortak parçaları.
-
-/** Gradyan arka plan, logo, karşılama metni ve [title] başlığı; altına formun içeriği gelir. */
+/** Giriş ve kayıt ekranlarının ortak düzeni: arka plan, logo ve başlık. */
 @Composable
 fun AuthScreenLayout(title: String, content: @Composable ColumnScope.() -> Unit) {
-    // İçerik kısa ekranlarda ve klavye açıkken kaydırılabilir; yeterli yer varsa eskisi gibi ortalanır.
     BoxWithConstraints(
         modifier = Modifier
             .fillMaxSize()
-            .arkiveGradientBackground() // status bar / nav bar arkasına kadar uzanır
-            .safeDrawingPadding(),      // içerik sistem çubuklarının ve klavyenin altında kalmaz
+            .arkiveGradientBackground()
+            .safeDrawingPadding(),
     ) {
         val minHeight = maxHeight
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState())) {
@@ -96,12 +93,11 @@ fun AuthScreenLayout(title: String, content: @Composable ColumnScope.() -> Unit)
                 content()
             }
         }
-        // Giriş ve kayıt ekranında dil değiştirilebilir (hesap açmadan önce de): sağ üstte öteki dilin adı yazar.
         LanguageSwitch(Modifier.align(Alignment.TopEnd).padding(8.dp))
     }
 }
 
-/** Türkçe ⇄ English düğmesi. Seçim kaydedilir; Activity yeniden kurulur ve ekran yeni dilde açılır. */
+/** Türkçe ve İngilizce arasında geçiş düğmesi. */
 @Composable
 private fun LanguageSwitch(modifier: Modifier = Modifier) {
     val other = if (Lang.app == AppLanguage.Turkish) AppLanguage.English else AppLanguage.Turkish
@@ -112,7 +108,7 @@ private fun LanguageSwitch(modifier: Modifier = Modifier) {
     }
 }
 
-/** Giriş başarılı olunca [onSuccess] bir kez çağrılır; ardından durum sıfırlanır (geri dönülünce tekrar tetiklenmesin). */
+/** Giriş başarılı olunca [onSuccess]'i bir kez çağırır. */
 @Composable
 fun NavigateOnSuccess(uiState: AuthUiState, onSuccess: () -> Unit, onConsumed: () -> Unit) {
     LaunchedEffect(uiState) {
@@ -162,7 +158,7 @@ fun PasswordField(value: String, onValueChange: (String) -> Unit, modifier: Modi
     )
 }
 
-/** Giriş/kayıt hatası varsa kırmızı mesaj. */
+/** Varsa giriş ya da kayıt hatası. */
 @Composable
 fun AuthErrorText(uiState: AuthUiState) {
     if (uiState is AuthUiState.Error) {
@@ -174,7 +170,7 @@ fun AuthErrorText(uiState: AuthUiState) {
     }
 }
 
-/** Ana düğme; işlem sürerken yazı yerine dönen gösterge çıkar. */
+/** Ana düğme; işlem sürerken yükleme göstergesi çıkar. */
 @Composable
 fun AuthSubmitButton(label: String, loading: Boolean, enabled: Boolean, onClick: () -> Unit) {
     Button(onClick = onClick, modifier = Modifier.fillMaxWidth(), enabled = !loading && enabled) {
@@ -186,10 +182,7 @@ fun AuthSubmitButton(label: String, loading: Boolean, enabled: Boolean, onClick:
     }
 }
 
-/**
- * "Google ile …" düğmesi. Google hesap penceresi ekranın bağlamıyla açılır; sonuç ([idToken], iptal/hata ise null)
- * ViewModel'e verilir.
- */
+/** "Google ile" düğmesi. Sonuç token, iptal ya da hata olursa null. */
 @Composable
 fun GoogleSignInButton(label: String, enabled: Boolean, onResult: (idToken: String?) -> Unit) {
     val scope = rememberCoroutineScope()
@@ -210,7 +203,7 @@ fun GoogleSignInButton(label: String, enabled: Boolean, onResult: (idToken: Stri
     }
 }
 
-/** Kayıt şifresinin tek bir kural satırı: karşılanıyorsa yeşil tik, değilse kırmızı çarpı. */
+/** Şifre kuralının tek satırı: sağlanıyorsa yeşil tik, değilse kırmızı çarpı. */
 @Composable
 fun PasswordRuleItem(text: String, isMet: Boolean) {
     val color = if (isMet) MaterialTheme.arkiveColors.success else MaterialTheme.colorScheme.error

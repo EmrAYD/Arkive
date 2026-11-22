@@ -55,23 +55,16 @@ import androidx.compose.ui.unit.dp
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.theme.arkiveColors
 
-/**
- * Kısa bildirimlerin (işlem sonucu, hata) durumu. Eskiden Snackbar kullanılıyordu; yerini uygulamanın temasına uyan
- * [NoticeHost] kartı aldı. Bildirimler sırayla gösterilir ([NoticeQueue]).
- *
- * [show] bildirimi hemen kaydeder (askıya almaz). Kart ve süresi [NoticeHost]'a aittir; bu yüzden bildirimi gönderen
- * ViewModel durumunu hemen temizleyebilir, kullanıcı ekrandan çıksa bile bildirim ViewModel'de kalıp ekrana sonra
- * yeniden gelmez.
- */
+/** Kısa bildirimlerin durumu. Bildirimler sırayla gösterilir. */
 @Stable
 class NoticeHostState {
     private val queue = NoticeQueue()
 
-    /** Şu an gösterilen bildirim; yoksa null. */
+    /** Şu an gösterilen bildirim. */
     var current: Notice? by mutableStateOf(null)
         private set
 
-    /** [kind] verilmezse bildirimin türü metninden çıkarılır ([NoticeKind.classify]). */
+    /** Bildirim gösterir. [kind] verilmezse metinden çıkarılır. */
     fun show(message: String, kind: NoticeKind? = null) {
         queue.add(message, kind)
         current = queue.current
@@ -86,10 +79,7 @@ class NoticeHostState {
 @Composable
 fun rememberNoticeHostState(): NoticeHostState = remember { NoticeHostState() }
 
-/**
- * [state]'teki bildirimi alttan kayan, temaya uyumlu bir kart olarak gösterir. Karta dokunmak ya da X kapatır; süre
- * dolunca ([NoticeQueue.durationMillis]) kendiliğinden kapanır. Çağıran, bunu ekranın altına yerleştirir.
- */
+/** Bildirimi alttan kayan bir kart olarak gösterir; dokununca ya da süre dolunca kapanır. */
 @Composable
 fun NoticeHost(state: NoticeHostState, modifier: Modifier = Modifier) {
     AnimatedContent(
@@ -110,7 +100,7 @@ fun NoticeHost(state: NoticeHostState, modifier: Modifier = Modifier) {
     }
 }
 
-/** Bildirim türüne göre kartın simgesi ve renkleri (hepsi temadan; açık/koyu temada uyumlu). */
+/** Bildirim türüne göre simge ve renkler. */
 private class KindStyle(val icon: ImageVector, val badge: Color, val tint: Color, val accent: Color)
 
 @Composable
@@ -175,7 +165,7 @@ private fun NoticeCard(notice: Notice, onDismiss: () -> Unit) {
                 modifier = Modifier.fillMaxWidth().height(3.dp),
                 color = style.accent,
                 trackColor = Color.Transparent,
-                drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
+                drawStopIndicator = {},
             )
         }
     }

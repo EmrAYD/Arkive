@@ -4,21 +4,11 @@ import com.eayd.arkive.i18n.Txt
 import java.nio.charset.Charset
 import java.util.Locale
 
-/**
- * Eski (Word 97-2003) .doc dosyasını [WordDoc]'a çevirir. Biçim [MS-DOC] belirtimindedir: metin "parça tablosu"ndan
- * (piece table) okunur; karakter ve paragraf biçimleri 512 baytlık FKP sayfalarındaki "sprm" listelerinden gelir.
- * Desteklenenler: kalın/italik/altı çizili/üstü çizili, renk, boyut, üst/alt simge, yazı tipi ailesi, hizalama,
- * girinti, boşluk, başlık stilleri, numaralı/madde işaretli listeler, tablolar, satır içi JPEG/PNG görseller,
- * köprüler. Biçim katmanı beklenmedik bir yapıyla karşılaşırsa belge düz metin olarak yine de açılır.
- * Kayan (sayfaya bağlı) çizimler, üst/alt bilgi, dipnot ve metin kutuları gösterilmez.
- */
+/** Eski .doc (Word 97-2003) dosyasını [WordDoc]'a çevirir. */
 internal object DocReader {
     private val CP1252: Charset = Charset.forName("windows-1252")
 
-    /**
-     * [password]: parolalı belge için kullanıcının girdiği parola. Parola gerekiyorsa ve verilmediyse ya da yanlışsa
-     * [com.eayd.arkive.ai.PasswordException] atılır.
-     */
+    /** [password] parolalı belge içindir; gerekiyorsa ya da yanlışsa [com.eayd.arkive.ai.PasswordException] atılır. */
     fun read(ole: OleFile, password: String? = null): WordDoc {
         var wd = ole.stream("WordDocument") ?: throw WordFormatException(Txt.docs.wordUnreadable)
         if (wd.size < 0x100 || u16(wd, 0) != 0xA5EC) throw WordFormatException(Txt.docs.wordUnreadableCorrupt)
@@ -26,7 +16,6 @@ internal object DocReader {
         val flags = u16(wd, 0x0A)
         val encrypted = flags and 0x0100 != 0
         if (encrypted && (nFib < 0xC1 || flags and 0x8000 != 0)) {
-            // Word 6/95 ve XOR ile gizlenmiş belgeler: yöntem belgelenmiş ama bu uygulamada desteklenmiyor.
             throw WordFormatException(Txt.docs.docEncryptionUnsupported)
         }
         if (!encrypted && nFib < 0xC1) return readWord6(wd)
@@ -53,18 +42,14 @@ internal object DocReader {
         }
     }
 
-    // --- Düşük düzey okuma yardımcıları ---------------------------------------------------------------
-
     private fun u16(b: ByteArray, o: Int): Int = OleFile.u16(b, o)
     private fun u32(b: ByteArray, o: Int): Long = OleFile.u32(b, o)
     private fun i16(b: ByteArray, o: Int): Int = u16(b, o).toShort().toInt()
     private fun i32(b: ByteArray, o: Int): Int = u32(b, o).toInt()
     private fun u8(b: ByteArray, o: Int): Int = b[o].toInt() and 0xFF
 
-    // --- FIB ------------------------------------------------------------------------------------------
-
     private class Fib(val ccpText: Int, private val base: Int, private val pairCount: Int, private val wd: ByteArray) {
-        /** FibRgFcLcb97 içindeki [index]. (fc, lcb) çifti; yoksa null. */
+        /** FIB içindeki [index]. (fc, lcb) çifti; yoksa null. */
         fun pair(index: Int): Pair<Int, Int>? {
             if (index >= pairCount) return null
             val o = base + index * 8
@@ -98,8 +83,6 @@ internal object DocReader {
             }
         }
     }
-
-    // --- Parça tablosu ve metin ----------------------------------------------------------------------
 
     private class Piece(val cpStart: Int, val cpEnd: Int, val fcByte: Int, val compressed: Boolean) {
         val byteLen: Int get() = if (compressed) cpEnd - cpStart else (cpEnd - cpStart) * 2
@@ -173,9 +156,7 @@ internal object DocReader {
         return WordDoc(blocks, emptyMap(), truncated, "doc")
     }
 
-    // --- Sprm ayrıştırma ------------------------------------------------------------------------------
-
-    /** Bir sprm listesindeki her sprm için [action](sprm, işlenenin başlangıcı, işlenenin uzunluğu) çağırır. */
+    /** Sprm listesindeki her sprm için [action]'ı çağırır. */
     private fun forEachSprm(g: ByteArray, action: (Int, Int, Int) -> Unit) {
         var pos = 0
         while (pos + 2 <= g.size) {
@@ -246,7 +227,7 @@ internal object DocReader {
         var pageBreakBefore = false
         var centers: IntArray? = null
         var cellFlags: IntArray? = null
-        var cellShades: IntArray? = null   // ARGB, 0: gölge yok
+        var cellShades: IntArray? = null
         var anyBorder = false
     }
 
@@ -260,10 +241,8 @@ internal object DocReader {
         0 -> false
         1 -> true
         0x81 -> !current
-        else -> current // 0x80: stildeki gibi
+        else -> current
     }
-
-    // --- Stil sayfası --------------------------------------------------------------------------------
 
     private class StyleInfo(val sti: Int, val name: String, val type: Int, val basedOn: Int, val pap: ByteArray, val chp: ByteArray)
 
@@ -314,9 +293,7 @@ internal object DocReader {
         return out
     }
 
-    // --- FKP aralıkları ------------------------------------------------------------------------------
-
-    /** [start, end) karakter konumu aralığı ve o aralığın sprm listesi. */
+    /** Bir karakter aralığı ve biçimi. */
     private class Range(val start: Int, val end: Int, val grpprl: ByteArray, val istd: Int) {
         val chpCache = HashMap<Int, Chp>(2)
         var papCache: Pap? = null
@@ -332,7 +309,6 @@ internal object DocReader {
 
         fun addFcRange(a: Int, b: Int, grpprl: ByteArray, istd: Int) {
             if (b <= a) return
-            // a'dan sonra biten ilk parçayı ikili aramayla bul
             var lo = 0
             var hi = sorted.size
             while (lo < hi) {
@@ -387,7 +363,7 @@ internal object DocReader {
         return out
     }
 
-    /** [ranges] içinde [cp]'yi kapsayan aralık (yoksa null). */
+    /** [cp]'yi kapsayan aralık. */
     private fun rangeAt(ranges: List<Range>, cp: Int): Range? {
         var lo = 0
         var hi = ranges.size
@@ -408,8 +384,6 @@ internal object DocReader {
         }
         return ranges.getOrNull(lo)?.start
     }
-
-    // --- Listeler ------------------------------------------------------------------------------------
 
     private class ListLevel(val nfc: Int, val start: Int, val text: String, val left: Float, val firstLine: Float)
 
@@ -494,8 +468,6 @@ internal object DocReader {
         return names
     }
 
-    // --- Belgeyi kurma -------------------------------------------------------------------------------
-
     private class RawCell(val blocks: List<WordBlock>, val flags: Int, val shade: Int = 0)
 
     private class RawRow(val cells: List<RawCell>, val bounds: IntArray?)
@@ -528,7 +500,6 @@ internal object DocReader {
         private val fields = ArrayList<DocField>()
         private val counters = HashMap<Long, IntArray>()
 
-        // tablo durumu
         private var rows = ArrayList<RawRow>()
         private var cells = ArrayList<RawCell>()
         private var cellBlocks = ArrayList<WordBlock>()
@@ -536,9 +507,7 @@ internal object DocReader {
         private var tableBorders = false
 
         private val defaultChp = HashMap<Int, Chp>()
-        private val papCache = HashMap<Int, Pap>()   // PAPX aralığı olmayan paragraflar için varsayılan
-
-        // --- stil çözümleme ---
+        private val papCache = HashMap<Int, Pap>()
 
         private fun chpChain(istd: Int): List<ByteArray> {
             val out = ArrayList<ByteArray>()
@@ -634,7 +603,6 @@ internal object DocReader {
                     0x2407 -> p.pageBreakBefore = op != 0
                     0xD608 -> parseTableDef(p, g, o, len)
                     0xD609 -> {
-                        // hücre gölgeleri: Shd80 dizisi (her biri 2 bayt: önplan rengi, arka plan rengi, desen)
                         val count = op / 2
                         p.cellShades = IntArray(count) { k ->
                             val v = u16(g, o + 1 + 2 * k)
@@ -646,7 +614,6 @@ internal object DocReader {
                         }
                     }
                     0x6646 -> {
-                        // büyük PAPX: sprm listesi Data akışındadır
                         val d = data
                         val loc = i32(g, o)
                         if (d != null && loc >= 0 && loc + 2 <= d.size) {
@@ -659,7 +626,6 @@ internal object DocReader {
         }
 
         private fun parseTableDef(p: Pap, g: ByteArray, o: Int, len: Int) {
-            // işlenen: cb(2) itcMac(1) rgdxaCenter[itcMac+1](2 bayt) rgtc80[itcMac](20 bayt)
             if (len < 5) return
             val itc = u8(g, o + 2)
             if (itc <= 0 || itc > 63) return
@@ -692,8 +658,6 @@ internal object DocReader {
             range.papCache = p
             return p
         }
-
-        // --- liste imi ---
 
         private fun labelFor(p: Pap): Pair<String?, ListLevel?> {
             if (p.ilfo <= 0 || p.ilfo > listInfo.second.size) return null to null
@@ -730,8 +694,6 @@ internal object DocReader {
             else -> "decimal"
         }
 
-        // --- ana döngü ---
-
         fun build(): WordDoc {
             var cp = 0
             while (cp < text.length && !truncated) {
@@ -753,7 +715,7 @@ internal object DocReader {
                         }
                     }
                 } else if (pap.inTable) {
-                    cellBlocks.addAll(paragraph(cp, e, pap)) // iç içe tablo: düz paragraf olarak
+                    cellBlocks.addAll(paragraph(cp, e, pap))
                 } else {
                     flushTable()
                     blocks.addAll(paragraph(cp, e, pap))
@@ -766,7 +728,6 @@ internal object DocReader {
         }
 
         private fun closeRow(pap: Pap) {
-            // satır sonu: bekleyen hücre içeriği kalmışsa son hücre sayılır
             if (cellBlocks.isNotEmpty()) { cells.add(RawCell(cellBlocks, 0)); cellBlocks = ArrayList() }
             val flags = pap.cellFlags
             val shades = pap.cellShades
@@ -789,7 +750,6 @@ internal object DocReader {
         }
 
         private fun buildTable(raw: List<RawRow>, bordered: Boolean): WordTable {
-            // Tüm satırların hücre sınırlarının birleşimi ızgarayı verir; böylece düzensiz tablolar da doğru çizilir.
             val grid = java.util.TreeSet<Int>()
             fun snap(v: Int) = Math.round(v / 20f) * 20
             for (r in raw) r.bounds?.forEach { grid.add(snap(it)) }
@@ -805,7 +765,6 @@ internal object DocReader {
                 while (k < r.cells.size) {
                     val cell = r.cells[k]
                     var last = k
-                    // yatay birleşik hücreler (fFirstMerged, ardından fMerged'ler)
                     if (cell.flags and 1 != 0) {
                         while (last + 1 < r.cells.size && r.cells[last + 1].flags and 2 != 0) last++
                     }
@@ -825,8 +784,6 @@ internal object DocReader {
             while (cols.size < maxCols) cols.add(80f)
             return WordTable(cols, outRows, if (bordered) 0xFF000000.toInt() else 0xFFBDBDBD.toInt())
         }
-
-        // --- paragraf ---
 
         private fun styleOf(istd: Int): StyleInfo? = styles.getOrNull(istd)
 
@@ -865,9 +822,7 @@ internal object DocReader {
             for ((i, seg) in segments.withIndex()) {
                 val firstSeg = i == 0
                 val lastSeg = i == segments.lastIndex
-                if (seg.isEmpty() && (segments.size > 1 || extras.isNotEmpty())) {
-                    // boş parça
-                } else {
+                if (seg.isEmpty() && (segments.size > 1 || extras.isNotEmpty())) {} else {
                     val maxSize = seg.maxOfOrNull { it.sizePt } ?: emptyPt
                     val spacing = pap.lineMult ?: pap.lineExactPt?.let { (it / (maxSize * 1.2f)).coerceIn(0.8f, 3f) } ?: 1f
                     out.add(
@@ -998,8 +953,6 @@ internal object DocReader {
             flush()
         }
 
-        // --- görseller ---
-
         private var pictureCount = 0
 
         private fun inlinePicture(loc: Int): WordImage? {
@@ -1011,7 +964,7 @@ internal object DocReader {
             if (lcb < cbHeader || cbHeader < 68) return null
             val end = minOf(d.size.toLong(), loc.toLong() + lcb).toInt()
             var from = loc + cbHeader
-            if (u16(d, loc + 6) == 0x66 && from < end) from += 1 + u8(d, from) // MM_SHAPEFILE: dosya adı
+            if (u16(d, loc + 6) == 0x66 && from < end) from += 1 + u8(d, from)
             val blip = findBlip(d, from, end, 0) ?: return null
             if (imageBytes + blip.size > MAX_IMAGES_BYTES) return null
             imageBytes += blip.size
@@ -1026,7 +979,7 @@ internal object DocReader {
             return WordImage(key, w, h)
         }
 
-        /** OfficeArt kayıtları arasında ilk JPEG/PNG görselin baytlarını bulur. */
+        /** OfficeArt kayıtlarında ilk JPEG ya da PNG görseli bulur. */
         private fun findBlip(d: ByteArray, start: Int, end: Int, depth: Int): ByteArray? {
             var pos = start
             while (pos + 8 <= end) {

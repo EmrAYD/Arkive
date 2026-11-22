@@ -1,9 +1,6 @@
 package com.eayd.arkive.i18n
 
-// Uygulamanın metinleri üç dosyadadır: Strings.kt (hangi metinler var), StringsTr.kt (Türkçe), StringsEn.kt
-// (İngilizce). Yeni bir metin eklerken üçüne de aynı üyeyi ekle; bir dilde eksik kalan metin derleme hatası verir.
-
-/** English texts. */
+/** İngilizce metinler. */
 object EnStrings : Strings {
     override val ai: AiStrings = object : AiStrings {
         override val rejectTooBig: String = "The file is too large to summarize on the phone."

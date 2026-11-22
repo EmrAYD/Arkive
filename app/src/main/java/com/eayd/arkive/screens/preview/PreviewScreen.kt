@@ -52,16 +52,11 @@ import com.eayd.arkive.viewmodel.PreviewDialog
 import com.eayd.arkive.viewmodel.PreviewState
 import com.eayd.arkive.viewmodel.PreviewViewModel
 
-/**
- * Dosya ön izleme ekranı. Üstte geri düğmesi, dosya adı ve 3 nokta menüsü; altta dosyanın türüne uygun
- * görüntüleyici (resim, PDF, metin, video, ses) durur. Dosya adı ve içerik rotadan değil sunucudan alınır;
- * rotada yalnızca dosyanın id'si taşınır. [readOnly]: çöpteki dosya; değiştirilemez, yalnızca indirilir/incelenir.
- */
+/** Dosya ön izleme ekranı. [readOnly] true ise dosya değiştirilemez (çöpteki dosyalar). */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false) {
     val context = LocalContext.current
-    // key: her dosyanın kendi ViewModel'i olsun.
     val viewModel: PreviewViewModel = viewModel(
         key = "preview-$fileId",
         factory = PreviewViewModel.factory(fileId, context.applicationContext.cacheDir),
@@ -74,10 +69,8 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
     var menuOpen by remember { mutableStateOf(false) }
 
     NoticeEffect(notice, notices, viewModel::clearNotice)
-    // Dosya silinince ön izlenecek bir şey kalmaz: listeye dön.
     LaunchedEffect(deleted) { if (deleted) onBack() }
 
-    // Uygulama içinden İndirilenler klasörüne kaydeder (tarayıcı açılmaz); ön izleme desteklenmeyen dosyalar için de bu.
     val startDownload = rememberFileDownloader(viewModel::showNotice)
     val download = {
         (state as? PreviewState.Ready)?.file?.let { f -> startDownload(f.id, f.name, f.mimeType) }
@@ -99,7 +92,6 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
                             Icon(Icons.Filled.MoreVert, contentDescription = Txt.common.more)
                         }
                         if (readOnly) {
-                            // Çöpteki dosya değiştirilemez: taşı / yeniden adlandır / sil menüde yok.
                             TrashedFileActionsMenu(
                                 expanded = menuOpen,
                                 onDismiss = { menuOpen = false },
@@ -140,11 +132,10 @@ fun PreviewScreen(fileId: String, onBack: () -> Unit, readOnly: Boolean = false)
         }
     }
 
-    // Pencerelerin gösterdiği dosya, ekrandaki güncel kayıttır (yeniden adlandırınca ad kendiliğinden değişir).
     (state as? PreviewState.Ready)?.file?.let { PreviewDialogs(viewModel, it) }
 }
 
-/** Dosyanın türüne uygun görüntüleyiciyi seçer. */
+/** Dosya türüne uygun görüntüleyiciyi seçer. */
 @Composable
 private fun PreviewContentView(file: FileDto, content: PreviewContent, download: () -> Unit, onEnterPassword: () -> Unit) {
     when (content) {
@@ -160,7 +151,7 @@ private fun PreviewContentView(file: FileDto, content: PreviewContent, download:
     }
 }
 
-/** 3 nokta menüsünden açılan pencereler. Açık/kapalı durumu ve işlemler ViewModel'dedir ([PreviewViewModel.dialogs]). */
+/** 3 nokta menüsünden açılan pencereler. */
 @Composable
 private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
     val host by viewModel.dialogs.state.collectAsState()
@@ -217,7 +208,7 @@ private fun PreviewDialogs(viewModel: PreviewViewModel, file: FileDto) {
     }
 }
 
-/** Ön izleme hazırlanırken: sayfa şeklinde iskelet; dosya iniyorsa ortasında yüzde görünür. */
+/** Ön izleme hazırlanırken gösterilen iskelet; dosya iniyorsa yüzde görünür. */
 @Composable
 private fun PreviewSkeleton(progress: Float?) {
     Box(Modifier.fillMaxSize().padding(16.dp), contentAlignment = Alignment.Center) {

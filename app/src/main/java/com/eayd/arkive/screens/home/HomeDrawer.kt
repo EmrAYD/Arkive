@@ -51,16 +51,14 @@ import com.eayd.arkive.ui.components.StorageSkeleton
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.viewmodel.StorageInfo
 
-/** Yan menüden seçilen bölümler. [AiResults]: yapay zeka özetlerinin listesi (klasör ve dosya değil). */
+/** Yan menüdeki bölümler. */
 internal enum class HomeSection(val icon: ImageVector) {
     Files(Icons.Filled.Home),
     Favorites(Icons.Filled.Star),
-    // Uygulamanın yapay zeka simgesi (elmas ve parıltı); dosya satırlarındaki AI düğmesiyle aynı.
     AiResults(AiIcons.Filled),
     Trash(Icons.Filled.Delete),
     ;
 
-    /** Seçili dilde başlığı. */
     val title: String
         get() = when (this) {
             Files -> Txt.home.home
@@ -80,9 +78,7 @@ internal fun ArkiveDrawerSheet(
     onSelect: (HomeSection) -> Unit,
 ) {
     ModalDrawerSheet {
-        // Küçük ekranlarda ya da yatay modda içerik sığmazsa kaydırılabilsin.
         Column(Modifier.verticalScroll(rememberScrollState()).padding(vertical = 16.dp)) {
-            // Başlık: solda logo, yanında uygulama adı; altında ayırıcı çizgi.
             Row(
                 modifier = Modifier.padding(horizontal = 28.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -91,7 +87,7 @@ internal fun ArkiveDrawerSheet(
                     painter = painterResource(id = R.drawable.logo),
                     contentDescription = Txt.auth.logoA11y,
                     modifier = Modifier.size(36.dp),
-                    tint = Color.Unspecified, // logo kendi renklerinde kalsın
+                    tint = Color.Unspecified,
                 )
                 Spacer(Modifier.width(12.dp))
                 Text(text = "Arkive", style = MaterialTheme.typography.titleLarge)
@@ -115,10 +111,7 @@ internal fun ArkiveDrawerSheet(
     }
 }
 
-/**
- * "Depolama alanı" bölümü: bulut simgesi + başlık, kalın kullanım çubuğu, "X toplam depolama alanından Y kadarı
- * kullanılıyor" metni ve "Daha fazla depolama alanı alın" düğmesi (tam ekran Plus tanıtımını açar).
- */
+/** Yan menüdeki depolama kullanımı ve "Daha fazla alan" düğmesi. */
 @Composable
 private fun StorageSection(
     storage: StorageInfo?,
@@ -140,7 +133,7 @@ private fun StorageSection(
                     progress = { storage.fraction },
                     modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
                     trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-                    drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
+                    drawStopIndicator = {},
                 )
                 Spacer(Modifier.height(12.dp))
                 Text(
@@ -161,7 +154,7 @@ private fun StorageSection(
                 }
                 Spacer(Modifier.height(16.dp))
                 OutlinedButton(
-                    onClick = { PlusOffer.show() }, // tam ekran Plus tanıtımı
+                    onClick = { PlusOffer.show() },
                     modifier = Modifier.fillMaxWidth(),
                     shape = CircleShape,
                     border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)),
@@ -189,7 +182,7 @@ private fun StorageSection(
     }
 }
 
-/** E-postanın ilk harfini gösteren yuvarlak simge (üst çubuktaki profil düğmesi ve profil sayfasının başlığı). */
+/** E-postanın ilk harfini gösteren yuvarlak simge. */
 @Composable
 internal fun ProfileAvatar(email: String, size: Dp = 42.dp) {
     val initial = email.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
@@ -209,7 +202,7 @@ internal fun ProfileAvatar(email: String, size: Dp = 42.dp) {
     }
 }
 
-/** Üst çubuktaki profil düğmesi; basınca profil sayfası açılır. */
+/** Üst çubuktaki profil düğmesi. */
 @Composable
 internal fun ProfileButton(email: String, onClick: () -> Unit) {
     IconButton(onClick = onClick) { ProfileAvatar(email) }

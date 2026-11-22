@@ -6,15 +6,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 
-/**
- * Splash, Login ve Register ekranlarının ortak, TEMA DUYARLI gradient arka planı.
- * Açık temada gökyüzü mavisi, koyu temada gece laciverti. Renkler Theme.kt'deki
- * ArkiveExtraColors'tan gelir.
- *
- * Gradient'i ekranın tamamına (status bar ve navigation bar arkası dahil) çizer.
- * İçeriğin sistem çubuklarının altında kalmaması için bu modifier'dan SONRA
- * safeDrawingPadding() kullanın.
- */
+/** Giriş ekranlarının temaya uyan gradyan arka planı. */
 @Composable
 fun Modifier.arkiveGradientBackground(): Modifier {
     val colors = MaterialTheme.arkiveColors

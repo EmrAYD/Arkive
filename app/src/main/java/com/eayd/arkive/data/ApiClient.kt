@@ -19,13 +19,11 @@ import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
 
 object ApiConfig {
-    // Adres, projenin kök klasöründeki local.properties dosyasındaki `api.base.url` satırından gelir
-    // (app/build.gradle.kts bunu BuildConfig.API_BASE_URL'e çevirir). Satır yoksa emülatör adresi
-    // kullanılır. local.properties git'e girmez; herkes kendi adresini yazar.
+    /** Sunucu adresi. local.properties'teki api.base.url satırından gelir; satır yoksa emülatör adresi kullanılır. */
     val BASE_URL: String = BuildConfig.API_BASE_URL.trimEnd('/')
 }
 
-/** Firebase kimlik token'ını (ID token) alır. Ağ iş parçacığında çağrılır, bu yüzden bloklayıcıdır. */
+/** Firebase kimlik token'ını alır. Ağ iş parçacığında çağrılır, bloklar. */
 private fun currentIdToken(forceRefresh: Boolean): String {
     val user = FirebaseAuth.getInstance().currentUser
         ?: throw IOException(Txt.errors.notSignedIn)
@@ -40,10 +38,7 @@ private fun currentIdToken(forceRefresh: Boolean): String {
     }
 }
 
-/**
- * Her isteğe `Authorization: Bearer <Firebase token>` başlığını ve uygulamanın dilini (`Accept-Language: tr` / `en`)
- * ekler. Sunucu hata ve bilgi mesajlarını bu dilde döndürür.
- */
+/** Her isteğe Firebase token'ını ve uygulamanın dilini ekler; sunucu mesajları bu dilde döner. */
 private class AuthInterceptor : Interceptor {
     override fun intercept(chain: Interceptor.Chain): Response {
         val token = currentIdToken(forceRefresh = false)
@@ -55,10 +50,9 @@ private class AuthInterceptor : Interceptor {
     }
 }
 
-/** Sunucu 401 dönerse token'ı zorla yenileyip isteği bir kez daha dener. */
+/** Sunucu 401 dönerse token'ı yenileyip isteği bir kez daha dener. */
 private class TokenRefreshAuthenticator : Authenticator {
     override fun authenticate(route: Route?, response: Response): Request? {
-        // Zaten bir kez yeniden denendiyse döngüye girmemek için vazgeç.
         if (response.priorResponse != null) return null
         val token = try {
             currentIdToken(forceRefresh = true)
@@ -81,12 +75,9 @@ object ApiClient {
         .build()
 
     /**
-     * Dosya YÜKLEMEK ve İNDİRMEK (ön izleme) için ayrı istemci. İki nedenle `http`'ten farklıdır:
-     *  1. Bu adresler backend'e değil RustFS'e gider ve adresin kendi imzası vardır. Buraya
-     *     `Authorization: Bearer ...` başlığı eklenirse imza bozulur / depolama isteği reddeder,
-     *     bu yüzden AuthInterceptor kullanılmaz.
-     *  2. Büyük dosya uzun sürer: toplam süre sınırı yok (callTimeout 0); yalnızca "hiç veri akmıyor" durumu
-     *     (write/read timeout) hata sayılır.
+     * Depolamaya (RustFS) giden yükleme ve indirmeler için ayrı istemci.
+     *
+     * Bu adresler kendi imzasını taşır; Authorization başlığı eklenmez.
      */
     val storageHttp: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(10, TimeUnit.SECONDS)
@@ -97,20 +88,15 @@ object ApiClient {
 
     private fun retrofit(client: OkHttpClient): ArkiveApi =
         Retrofit.Builder()
-            .baseUrl("${ApiConfig.BASE_URL}/")   // Retrofit taban adresin "/" ile bitmesini ister
+            .baseUrl("${ApiConfig.BASE_URL}/")
             .client(client)
-            // serializeNulls: Map içindeki null değerler de JSON'a yazılsın ("color": null = rengi sil).
             .addConverterFactory(GsonConverterFactory.create(GsonBuilder().serializeNulls().create()))
             .build()
             .create(ArkiveApi::class.java)
 
-    /** Kullanım: `ApiClient.api.getMe()` (bir coroutine içinden). */
     val api: ArkiveApi by lazy { retrofit(http) }
 
-    /**
-     * Yapay zeka (bulut özetleme) çağrıları için: aynı oturum/kimlik doğrulama, ama sunucudaki dil modelinin yanıtı
-     * dakikalar sürebildiği için okuma süresi uzundur. Yalnızca `summarizeFile` bunu kullanır.
-     */
+    /** Bulut özetleme için istemci; yanıt dakikalar sürebildiğinden okuma süresi uzun. */
     val aiApi: ArkiveApi by lazy {
         retrofit(http.newBuilder().readTimeout(180, TimeUnit.SECONDS).build())
     }

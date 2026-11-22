@@ -9,7 +9,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import org.json.JSONObject
 
-/** Telefonda saklanan bir özet (tek paragraf). [pending]: henüz sunucuya yüklenmedi (internet gelince yüklenecek). */
+/** Telefonda saklanan özet. [pending] henüz sunucuya yüklenmediğini söyler. */
 data class StoredSummary(
     val fileId: String,
     val fileName: String,
@@ -18,26 +18,21 @@ data class StoredSummary(
 )
 
 /**
- * Özetlerin telefondaki kopyası. İki işe yarar:
- *  1. Telefonda üretilen özet sunucuya yüklenemezse (internet yok) burada bekler ([StoredSummary.pending]) ve internet
- *     gelince yüklenir; o zamana kadar AI düğmesi dolu görünür ve özet okunabilir.
- *  2. Yüklenmiş ya da sunucudan okunmuş özetlerin kopyası kalır: internet yokken de özet penceresi açılır.
+ * Özetlerin telefondaki kopyası.
  *
- * Her özet `files/summaries/<dosya kimliği>.json` dosyasındadır. Kayıtlar oturum açmış kullanıcıya aittir: başka bir
- * hesapla girilince önceki hesabın kayıtları görünmez ve yüklenmez.
+ * Sunucuya yüklenemeyen özet burada bekler; yüklenmiş özetler de internetsiz açılabilsin diye burada tutulur.
  */
 object SummaryStore {
 
     private lateinit var dir: File
     private val _pendingIds = MutableStateFlow<Set<String>>(emptySet())
 
-    /** Yüklenmeyi bekleyen özetlerin dosya kimlikleri; liste bu dosyalarda AI düğmesini dolu gösterir. */
+    /** Yüklenmeyi bekleyen özetlerin dosya kimlikleri. */
     val pendingIds: StateFlow<Set<String>> = _pendingIds.asStateFlow()
 
     fun init(context: Context) {
         if (::dir.isInitialized) return
         val files = context.applicationContext.filesDir
-        // Önceki sürümün kopyaları (özet PDF'leri ve eski biçimdeki özetler) artık kullanılmaz.
         File(files, "ai_summaries").deleteRecursively()
         dir = File(files, "summaries").also { it.mkdirs() }
         publish()
@@ -63,7 +58,7 @@ object SummaryStore {
     @Synchronized
     fun get(fileId: String): StoredSummary? = read(fileOf(fileId))
 
-    /** Yüklenmeyi bekleyen kayıtlar (şu anki kullanıcıya ait olanlar). */
+    /** Yüklenmeyi bekleyen kayıtlar. */
     @Synchronized
     fun pending(): List<StoredSummary> = all().filter { it.pending }
 
@@ -93,11 +88,11 @@ object SummaryStore {
                 pending = json.optBoolean("pending", false),
             )
         } catch (e: Exception) {
-            null // bozuk dosya yok sayılır
+            null
         }
     }
 
-    /** Hesap değişince de çağrılır: yayılan küme şu anki kullanıcıya göre yeniden hesaplanır. */
+    /** Bekleyen kümeyi şu anki kullanıcıya göre yeniden hesaplar; hesap değişince de çağrılır. */
     @Synchronized
     fun publish() {
         _pendingIds.value = all().filter { it.pending }.map { it.fileId }.toSet()

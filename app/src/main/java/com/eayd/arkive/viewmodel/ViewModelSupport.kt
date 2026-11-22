@@ -17,13 +17,7 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
 
-// Birden fazla ViewModel'in paylaştığı küçük parçalar. Burada ağ çağrısı yazılmaz; yalnızca
-// "hata olursa kullanıcıya Türkçe mesaj ver" gibi tekrar eden kalıplar durur.
-
-/**
- * Bir ağ işini ViewModel'in kapsamında başlatır. Hata olursa [onError] Türkçe mesajla çağrılır;
- * iptal (CancellationException) hata sayılmaz ve olduğu gibi yukarı verilir.
- */
+/** Bir işi ViewModel'in kapsamında başlatır; hata olursa [onError]'a mesajı verir. İptal hata sayılmaz. */
 fun ViewModel.launchCatching(onError: (String) -> Unit = {}, block: suspend () -> Unit): Job =
     viewModelScope.launch {
         try {
@@ -35,18 +29,13 @@ fun ViewModel.launchCatching(onError: (String) -> Unit = {}, block: suspend () -
         }
     }
 
-// İndirmeler ekrandan bağımsız sürsün diye uygulama genelinde bir kapsamda çalışır: kullanıcı indirme sürerken
-// başka ekrana geçse de (ViewModel yok olsa da) dosya kaydedilmeye devam eder. Uygulama kapanınca zaten biter.
 private val downloadScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-/**
- * Dosyayı uygulama içinden indirip cihazın İndirilenler klasörüne kaydeder (tarayıcı açılmaz).
- * İlerleme ve sonuç [notify] ile kısa bildirim olarak iletilir.
- */
+/** Dosyayı İndirilenler klasörüne kaydeder; ilerleme ve sonuç [notify] ile bildirilir. */
 fun saveFileToDevice(fileId: String, fileName: String, mimeType: String?, notify: (String) -> Unit) {
     downloadScope.launch {
         try {
-            NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa indirme başlatılmaz
+            NetworkPolicy.requireAllowed()
             notify(Txt.files.downloading(fileName))
             val url = ApiClient.api.getDownloadUrl(fileId).url
             val where = FileSaver.saveToDownloads(url, fileName, mimeType)
@@ -59,13 +48,10 @@ fun saveFileToDevice(fileId: String, fileName: String, mimeType: String?, notify
     }
 }
 
-/** Birden çok öğeye yapılan işlemin bir kısmı başarısız oldu. Mesajı doğrudan kullanıcıya gösterilir. */
+/** Toplu işlemin bir kısmı başarısız oldu. */
 class BatchFailure(message: String) : Exception(message)
 
-/**
- * Hesabın toplam depolama kotası. "Bilgi" penceresi dosyanın kotanın ne kadarını kapladığını göstermek için
- * bunu kullanır. Pencere ilk açıldığında bir kez yüklenir; yüklenemezse oran gösterilmez (kritik değil).
- */
+/** Hesabın toplam kotası; "Bilgi" penceresi ilk açıldığında bir kez yüklenir. */
 class StorageLimitLoader(private val scope: CoroutineScope) {
     private val _limit = MutableStateFlow<Long?>(null)
     val limit: StateFlow<Long?> = _limit.asStateFlow()
@@ -79,9 +65,7 @@ class StorageLimitLoader(private val scope: CoroutineScope) {
                 _limit.value = ApiClient.api.getMe().storageLimit
             } catch (e: CancellationException) {
                 throw e
-            } catch (e: Exception) {
-                // Oran gösterilmeden devam edilir.
-            } finally {
+            } catch (e: Exception) {} finally {
                 loading = false
             }
         }

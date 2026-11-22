@@ -16,10 +16,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.vector.ImageVector
 import com.eayd.arkive.i18n.Txt
 
-/**
- * Bir dosyanın 3 nokta menüsü. Dosya listesinde ve ön izleme ekranında aynı menü kullanılır:
- * İndir, Taşı, Yeniden adlandır, Bilgi, Sil (kırmızı). [onMove] null ise "Taşı" gösterilmez (Favorilerim).
- */
+/** Dosyanın 3 nokta menüsü; listede ve ön izlemede aynı. [onMove] null ise "Taşı" yok. */
 @Composable
 fun FileActionsMenu(
     expanded: Boolean,
@@ -39,7 +36,7 @@ fun FileActionsMenu(
     }
 }
 
-/** Çöpteki bir dosyanın ön izleme menüsü: yalnızca İndir ve Bilgi (çöpteki dosya değiştirilemez). */
+/** Çöpteki dosyanın menüsü: yalnızca İndir ve Bilgi. */
 @Composable
 fun TrashedFileActionsMenu(
     expanded: Boolean,
@@ -53,7 +50,7 @@ fun TrashedFileActionsMenu(
     }
 }
 
-/** Bir klasörün 3 nokta menüsü: Düzenle, Taşı ([canMove] ise), Sil (kırmızı). */
+/** Klasörün 3 nokta menüsü. */
 @Composable
 fun FolderActionsMenu(
     expanded: Boolean,
@@ -70,7 +67,7 @@ fun FolderActionsMenu(
     }
 }
 
-/** AI Sonuçlarım'daki bir özetin 3 nokta menüsü: Dosyayı aç (özetin kaynak dosyası), Özeti sil (kırmızı). */
+/** AI Sonuçlarım'daki özetin menüsü: dosyayı aç ve özeti sil. */
 @Composable
 fun SummaryActionsMenu(
     expanded: Boolean,

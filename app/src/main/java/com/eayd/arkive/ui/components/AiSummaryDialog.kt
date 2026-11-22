@@ -46,11 +46,7 @@ import com.eayd.arkive.data.PlanPolicy
 import com.eayd.arkive.data.PlanStatus
 import com.eayd.arkive.i18n.Txt
 
-/**
- * Özetlemeyi başlatan işlev ([AiSummarizer.confirm]). Android 13 ve sonrasında bildirim izni yoksa önce izin istenir:
- * özetleme sürerken ilerleme bildirimi, uygulama arka plandayken bitince "özet hazır" bildirimi bununla gösterilir.
- * İzin verilmese de özetleme başlar (yalnızca bildirimler görünmez).
- */
+/** Özetlemeyi başlatır. Android 13+'te bildirim izni yoksa önce izin ister; izin verilmese de özetleme başlar. */
 @Composable
 private fun rememberSummaryStarter(): (FileDto) -> Unit {
     val context = LocalContext.current
@@ -72,10 +68,7 @@ private fun rememberSummaryStarter(): (FileDto) -> Unit {
     }
 }
 
-/**
- * [file]'ın nerede özetleneceği ([AiPolicy.route]): yapay zeka işlem yerine (ücretsiz planda her zaman Yerel), modelin
- * telefonda hazır olup olmadığına ve dosyanın boyutuna göre. Ayar, plan ya da model durumu değişince yeniden hesaplanır.
- */
+/** Dosyanın nerede özetleneceği. */
 @Composable
 private fun summaryRoute(file: FileDto): SummaryRoute {
     val cloud = PlanStatus.quota.collectAsState().value?.cloud == true
@@ -84,17 +77,10 @@ private fun summaryRoute(file: FileDto): SummaryRoute {
     return AiPolicy.route(PlanPolicy.effectiveMode(aiMode, cloud), modelReady, file.size)
 }
 
-/**
- * AI düğmesine basılınca açılan pencereler: onay ("Bu dosyayı özetlemek istiyor musunuz?"), özetleme sürerken durdurma
- * sorusu, özet penceresi (belgenin ne olduğunu ve neleri içerdiğini anlatan paragraf), özeti silme onayı ve (dosya
- * telefonda özetlenecekken model telefonda yoksa) yapay zeka modelini indirme penceresi. Özetleme
- * başladıktan sonra pencere kapanır; ilerleme satırdaki yükleme simgesinde ve yüzdede görünür, bitince özet penceresi
- * açılır. Onay penceresi dosyanın nerede (telefonda / bulutta) özetleneceğini söyler.
- */
+/** AI düğmesinin pencereleri: onay, parola, durdurma, özet, silme ve model indirme. */
 @Composable
 fun AiSummaryDialogHost() {
     val ui by AiSummarizer.ui.collectAsState()
-    // Pencerelerin dışında tutulur: izin penceresi açıkken özet penceresi değişse de izin sonucu kaybolmasın.
     val startSummary = rememberSummaryStarter()
     when (val state = ui) {
         null -> Unit
@@ -107,7 +93,6 @@ fun AiSummaryDialogHost() {
                 text = {
                     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                         Text(Txt.ai.confirmBody(state.file.name))
-                        // Dosyanın nerede özetleneceği: telefonda / önce telefonda, olmazsa bulutta / bulutta.
                         Text(
                             when (summaryRoute(state.file)) {
                                 SummaryRoute.PhoneOnly -> Txt.ai.confirmOnPhone
@@ -125,7 +110,6 @@ fun AiSummaryDialogHost() {
         }
 
         is SummaryUi.Password -> {
-            // Parolanın nereye gittiği, dosyanın nerede özetleneceğine göre söylenir.
             val note = when (summaryRoute(state.file)) {
                 SummaryRoute.PhoneOnly -> Txt.ai.passwordLocalNote
                 SummaryRoute.PhoneThenCloud -> Txt.ai.passwordHybridNote
@@ -168,8 +152,6 @@ fun AiSummaryDialogHost() {
                             Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.tertiary)
                             Spacer(Modifier.size(8.dp))
                         }
-                        // Özet kısa bir paragraftır; yine de sığmazsa kaydırılır ve sağda kaydırma çubuğu görünür (sığıyorsa
-                        // çubuk yoktur). Metin seçilip kopyalanabilir.
                         SelectionContainer {
                             Text(
                                 state.text,
@@ -179,7 +161,7 @@ fun AiSummaryDialogHost() {
                                     .heightIn(max = 360.dp)
                                     .verticalScrollbar(scroll, thumbColor = MaterialTheme.colorScheme.primary)
                                     .verticalScroll(scroll)
-                                    .padding(end = 12.dp), // yazı çubuğun altında kalmasın
+                                    .padding(end = 12.dp),
                             )
                         }
                     }
@@ -200,8 +182,6 @@ fun AiSummaryDialogHost() {
             onCancelDownload = LocalModel::cancelDownload,
             onDelete = { LocalModel.delete(); AiSummarizer.dismiss() },
             onDismiss = AiSummarizer::dismiss,
-            // "Yerel + Bulut": model inmeden bu dosya hemen bulutta özetlenebilir (model hazır olmadığı için yol buluttur).
-            // Onay penceresi atlandığından bildirim izni burada da istenir.
             onSummarizeInCloud = state.cloudAlternative?.let { file -> { startSummary(file) } },
         )
 

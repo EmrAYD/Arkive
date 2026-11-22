@@ -2,7 +2,6 @@ package com.eayd.arkive.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// ---------- Açık tema ----------
 val LightPrimary = Color(0xFF0A5C8A)
 val LightOnPrimary = Color(0xFFFFFFFF)
 val LightPrimaryContainer = Color(0xFFCFE8F7)
@@ -40,7 +39,6 @@ val LightSuccess = Color(0xFF17692A)
 val LightGradientTop = Color(0xFFE4F1FA)
 val LightGradientBottom = Color(0xFF7EC4EE)
 
-// ---------- Koyu tema ----------
 val DarkPrimary = Color(0xFF8FD0F5)
 val DarkOnPrimary = Color(0xFF00334D)
 val DarkPrimaryContainer = Color(0xFF0F4C6E)

@@ -27,11 +27,11 @@ import com.eayd.arkive.ui.components.PlusOfferHost
 import com.eayd.arkive.viewmodel.AuthViewModel
 import com.eayd.arkive.viewmodel.TrashViewModel
 
-/** Uygulamanın tüm ekranları ve aralarındaki geçişler. */
+/** Uygulamanın ekranları ve aralarındaki geçişler. */
 @Composable
 fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
     SummaryNavigation(navController)
-    PlusOfferHost() // tam ekran Plus tanıtımı (AI düğmesi, yan menü ve profil açar)
+    PlusOfferHost()
     NavHost(navController = navController, startDestination = Routes.SPLASH) {
 
         composable(Routes.SPLASH) { entry ->
@@ -50,7 +50,6 @@ fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
 
         composable(Routes.REGISTER) { entry ->
             RegisterScreen(
-                // Kayıttan sonra hem kayıt hem giriş ekranı geri yığınından kalkar.
                 onRegisterSuccess = { navController.navigateClearing(entry, Routes.HOME, popUpTo = Routes.LOGIN) },
                 onNavigateToLogin = { navController.popFrom(entry) },
             )
@@ -64,7 +63,6 @@ fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
                 onOpenFile = { navController.goFrom(entry, Routes.preview(it)) },
                 onOpenTrashFolder = { navController.goFrom(entry, Routes.trashFolder(it)) },
                 onOpenTrashFile = { navController.goFrom(entry, Routes.preview(it, readOnly = true)) },
-                // Firebase + Google oturumu temizlenir, bitince login'e geçilir.
                 onLogout = {
                     authViewModel.logout(context) {
                         navController.navigateClearing(entry, Routes.LOGIN, popUpTo = Routes.HOME)
@@ -73,7 +71,6 @@ fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
 
-        // Klasör içi: yalnızca klasörün id'si rotada taşınır (id bir UUID'dir, özel karakter içermez).
         composable(
             route = Routes.FOLDER,
             arguments = listOf(navArgument(Routes.ARG_FOLDER_ID) { type = NavType.StringType }),
@@ -86,8 +83,6 @@ fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
 
-        // Dosya ön izlemesi: rotada yalnızca dosyanın id'si taşınır; ad ve içerik sunucudan alınır.
-        // readOnly = true: çöpteki dosya ön izlenir ama değiştirilemez.
         composable(
             route = Routes.PREVIEW,
             arguments = listOf(
@@ -102,8 +97,6 @@ fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
             )
         }
 
-        // Çöpteki klasörün içi. Kökle aynı ekran ve aynı ViewModel; folderId verilince klasörün içini gösterir.
-        // İçindeki klasörler aynı rotayla üst üste açılır.
         composable(
             route = Routes.TRASH_FOLDER,
             arguments = listOf(navArgument(Routes.ARG_FOLDER_ID) { type = NavType.StringType }),
@@ -122,13 +115,7 @@ fun ArkiveNavHost(navController: NavHostController = rememberNavController()) {
     }
 }
 
-/**
- * Özet pencereleri; hangi ekranda olunursa olunsun çalışır:
- *  - Özet penceresi ([AiSummaryDialogHost]) burada durur: AI düğmesine basınca, özetleme bitince ve AI Sonuçlarım'da bir
- *    özete dokununca hangi ekranda olunursa olunsun açılır.
- *  - Bildirime dokunularak gelen istek ([AiSummarizer.pendingOpen]) oturum açılmış bir ekrandayken yerine getirilir; uygulama
- *    kapalıyken açılış/giriş ekranları bitene kadar bekler.
- */
+/** Her ekranda çalışan özet pencereleri ve bildirimden gelen "özeti aç" isteği. */
 @Composable
 private fun SummaryNavigation(navController: NavHostController) {
     val route = navController.currentBackStackEntryAsState().value?.destination?.route
@@ -143,33 +130,20 @@ private fun SummaryNavigation(navController: NavHostController) {
     AiSummaryDialogHost()
 }
 
-// --- Geçiş sırasındaki dokunuşlar ---------------------------------------------------------------
-//
-// Ekran geçişi sürerken (varsayılan solma animasyonu yaklaşık 0,7 sn) çıkan ekran hala çizilir ve dokunuşları alır; geri
-// dönerken çıkan ekran giren ekranın ÜSTÜNDE durur. Klasörden çıkıp hemen sol üstteki menü düğmesine basınca dokunuş
-// aslında çıkmakta olan klasör ekranının geri okuna düşer ve ikinci kez "geri" çalışır: ana sayfa da yığından silinir,
-// geriye gösterilecek ekran kalmaz (ekran bomboş olur). Aynı şekilde çift dokunuş aynı ekranı iki kez açar.
-//
-// Bu yüzden her ekranın gezinme çağrıları yalnızca o ekran şu an yığının EN ÜSTÜNDEYSE işlenir: geri dönülürken
-// çıkan ekran artık üstte değildir (yok sayılır), giren ekran hemen kullanılabilir (beklemez).
-
-/** [entry] şu an yığının en üstündeki ekran mı? */
+/** [entry] yığının en üstündeki ekran mı. */
 private fun NavHostController.isTop(entry: NavBackStackEntry): Boolean = currentBackStackEntry?.id == entry.id
 
-/** [entry] ekranından [route]'a gider; ekran artık üstte değilse (geçiş sürüyor, çift dokunuş) yok sayılır. */
+/** [entry] ekranından [route]'a gider; ekran artık üstte değilse (çift dokunuş) bir şey yapmaz. */
 private fun NavHostController.goFrom(entry: NavBackStackEntry, route: String) {
     if (isTop(entry)) navigate(route)
 }
 
-/** [entry] ekranından geri döner; ekran üstte değilse yok sayılır. Yığındaki son ekran hiçbir zaman silinmez. */
+/** [entry] ekranından geri döner; yığındaki son ekran silinmez. */
 private fun NavHostController.popFrom(entry: NavBackStackEntry) {
     if (isTop(entry) && previousBackStackEntry != null) popBackStack()
 }
 
-/**
- * [entry] ekranından [route]'a gider ve geri yığınından [popUpTo] ile birlikte ona kadar olan her şeyi siler (geri tuşu
- * eski ekrana dönmesin). Ekran üstte değilse yok sayılır.
- */
+/** [route]'a gider ve [popUpTo]'ya kadar olan ekranları yığından siler. */
 private fun NavHostController.navigateClearing(entry: NavBackStackEntry, route: String, popUpTo: String) {
     if (!isTop(entry)) return
     navigate(route) { popUpTo(popUpTo) { inclusive = true } }

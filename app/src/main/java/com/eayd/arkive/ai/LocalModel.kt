@@ -25,34 +25,28 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
- * Telefondaki yapay zeka modeli: Google'ın Gemma 4 E2B modeli, LiteRT-LM biçiminde (Apache 2.0 lisanslı; Hugging Face'te
- * litert-community/gemma-4-E2B-it-litert-lm). Model uygulamanın içinde gelmez (2,6 GB); kullanıcı ilk kez telefonda
- * özetlemek istediğinde ya da Profil > Ayarlar'dan bir kez indirir.
+ * Telefondaki yapay zeka modeli (Gemma 4 E2B, LiteRT-LM).
  *
- * İndirmeyi Android'in indirme yöneticisi (DownloadManager) yapar: uygulama kapansa da sürer, bağlantı koparsa kaldığı
- * yerden devam eder ve bildirimde ilerlemesi görünür. "Yalnızca Wi-Fi" açıksa yalnızca Wi-Fi'da iner. Dosya önce
- * `.part` adıyla iner; boyutu doğrulanınca asıl adını alır. Dosya, uygulamaya ait dış depolama klasöründedir
- * (Android/data/<paket>/files/models); uygulama kaldırılınca silinir.
- *
- * Başka bir model kullanmak için [DISPLAY_NAME], [FILE_NAME], [URL] ve [SIZE_BYTES] değiştirilir (model LiteRT-LM
- * biçiminde, `.litertlm` olmalı).
+ * Uygulamayla gelmez; kullanıcı bir kez indirir. İndirmeyi Android'in indirme yöneticisi yapar, uygulama kapansa da
+ * sürer.
  */
 object LocalModel {
 
-    /** Kullanıcıya gösterilen adı. */
+    /** Kullanıcıya gösterilen ad. */
     const val DISPLAY_NAME = "Gemma 4 E2B"
 
     private const val FILE_NAME = "gemma-4-E2B-it.litertlm"
 
     /**
-     * Modelin adresi. Belirli bir sürüme (commit) bağlıdır: depo güncellense de hep doğrulanmış aynı dosya iner.
+     * Modelin adresi; hep aynı dosya insin diye belirli bir sürüme bağlı.
+     *
      * SHA-256: 181938105e0eefd105961417e8da75903eacda102c4fce9ce90f50b97139a63c
      */
     private const val URL =
         "https://huggingface.co/litert-community/gemma-4-E2B-it-litert-lm/resolve/" +
             "2e12bfd869b2962984f97a1f2a26807316d534cc/gemma-4-E2B-it.litertlm"
 
-    /** Dosyanın bayt olarak boyutu (indirmenin eksiksiz olduğu buna bakılarak anlaşılır). */
+    /** Dosyanın boyutu; indirmenin tamamlandığı buna bakılarak anlaşılır. */
     const val SIZE_BYTES: Long = 2_588_147_712L
 
     private const val DIR = "models"
@@ -65,15 +59,15 @@ object LocalModel {
 
     private val _state = MutableStateFlow<LocalModelState>(LocalModelState.NotDownloaded)
 
-    /** Modelin durumu: indirilmedi / iniyor / hazır / bu telefonda çalışmaz. */
+    /** Modelin durumu. */
     val state: StateFlow<LocalModelState> = _state.asStateFlow()
 
     private val _messages = MutableSharedFlow<String>(extraBufferCapacity = 4)
 
-    /** Kısa bildirimler: model indirildi / indirilemedi. */
+    /** "Model indirildi" gibi kısa mesajlar. */
     val messages: SharedFlow<String> = _messages.asSharedFlow()
 
-    /** Uygulama açılırken bir kez ([AiSummarizer.start]): durumu belirler, süren bir indirme varsa izler. */
+    /** Uygulama açılırken bir kez çağrılır; süren bir indirme varsa izlemeye devam eder. */
     fun init(context: Context) {
         if (::context.isInitialized) return
         this.context = context.applicationContext
@@ -83,7 +77,6 @@ object LocalModel {
     /** Model dosyası; telefonda eksiksiz yoksa null. */
     fun file(): File? = modelFile()?.takeIf { LocalModelPolicy.isComplete(it.length(), SIZE_BYTES) }
 
-    /** Durumu yeniden belirler (indirme yöneticisine de sorar). */
     @Synchronized
     fun refresh() {
         _state.value = when {
@@ -95,17 +88,13 @@ object LocalModel {
                     watch(id)
                     _state.value
                 } else {
-                    // poll indirmeyi bitirmiş (hazır) ya da kaydı silmiş olabilir.
                     if (file() != null) LocalModelState.Ready else LocalModelState.NotDownloaded
                 }
             }
         }
     }
 
-    /**
-     * Modeli indirmeye başlar. Başlayamazsa nedenini (kullanıcıya gösterilecek metin) döndürür, başladıysa null.
-     * Zaten iniyorsa ya da hazırsa bir şey yapmaz.
-     */
+    /** İndirmeyi başlatır. Başlayamazsa nedenini, başladıysa null döner. */
     @Synchronized
     fun startDownload(): String? {
         when (_state.value) {
@@ -124,7 +113,6 @@ object LocalModel {
         val request = DownloadManager.Request(Uri.parse(URL))
             .setTitle(Txt.localAi.downloadTitle)
             .setDescription(DISPLAY_NAME)
-            // Bildirim yalnızca inerken: bitince dosya yeniden adlandırılır, "aç" bildirimi bir işe yaramaz.
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setDestinationInExternalFilesDir(context, DIR, "$FILE_NAME.part")
             .setAllowedOverMetered(!AppSettings.wifiOnly.value)
@@ -140,7 +128,7 @@ object LocalModel {
         return null
     }
 
-    /** Süren indirmeyi durdurur ve yarım dosyayı siler. */
+    /** İndirmeyi durdurur ve yarım dosyayı siler. */
     @Synchronized
     fun cancelDownload() {
         watcher?.cancel()
@@ -150,7 +138,7 @@ object LocalModel {
         refresh()
     }
 
-    /** Modeli telefondan siler (yer açmak için); yeniden indirilebilir. */
+    /** Modeli telefondan siler. */
     @Synchronized
     fun delete() {
         LocalSummarizer.release()
@@ -159,7 +147,7 @@ object LocalModel {
         refresh()
     }
 
-    /** Model ve indirme için kullanılan boyutun okunur hali ("2,4 GB"). */
+    /** Modelin boyutu, okunur halde. */
     val sizeText: String
         get() = formatBytes(SIZE_BYTES)
 
@@ -175,7 +163,6 @@ object LocalModel {
 
     private fun partFile(): File? = dir()?.let { File(it, "$FILE_NAME.part") }
 
-    /** Android'in indirme yöneticisi; yoksa (çok nadir) hata fırlatır, çağıranlar yakalar. */
     private fun manager(): DownloadManager = requireNotNull(context.getSystemService(DownloadManager::class.java))
 
     private fun prefs() = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -184,7 +171,6 @@ object LocalModel {
 
     private fun forgetDownload() = prefs().edit().remove(KEY_DOWNLOAD_ID).apply()
 
-    /** İndirme sürdükçe saniyede bir durumu sorar (uygulama açıkken). */
     private fun watch(id: Long) {
         watcher?.cancel()
         watcher = scope.launch {
@@ -196,7 +182,7 @@ object LocalModel {
         }
     }
 
-    /** İndirme yöneticisine indirmenin durumunu sorar ve [state]'i günceller. İndirme sürüyorsa true. */
+    /** İndirmenin durumunu sorar; indirme sürüyorsa true. */
     private fun poll(id: Long): Boolean {
         val cursor = try {
             manager().query(DownloadManager.Query().setFilterById(id))
@@ -205,7 +191,6 @@ object LocalModel {
         } ?: return false
         cursor.use { c ->
             if (!c.moveToFirst()) {
-                // Kayıt yok: kullanıcı indirmeyi bildirimden ya da İndirilenler'den iptal etmiş.
                 forgetDownload()
                 partFile()?.delete()
                 _state.value = LocalModelState.NotDownloaded
@@ -243,7 +228,6 @@ object LocalModel {
         val target = modelFile()
         val ok = part != null && target != null && LocalModelPolicy.isComplete(part.length(), SIZE_BYTES) &&
             part.renameTo(target)
-        // İndirme yöneticisindeki kaydı kaldırır; dosya yeni adıyla kaldığı için ona dokunulmaz.
         runCatching { manager().remove(id) }
         if (ok) {
             _state.value = LocalModelState.Ready

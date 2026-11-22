@@ -15,7 +15,7 @@ class StringsTest {
         Lang.app = AppLanguage.Turkish
     }
 
-    /** Her grup ([AiStrings], [TrashStrings]…) ve onun metin üyeleri; (grup adı, üye adı, metot). */
+    /** Her grubun metin üyeleri: (grup adı, üye adı, metot). */
     private fun members(): List<Triple<String, String, Method>> =
         Strings::class.java.methods.filter { it.name.startsWith("get") && it.parameterCount == 0 }.flatMap { group ->
             group.returnType.methods.filter { it.returnType == String::class.java }.map { Triple(group.name, it.name, it) }
@@ -34,7 +34,6 @@ class StringsTest {
             val args = Array<Any?>(method.parameterCount) { "‹$it›" }
             for (table in listOf(TrStrings, EnStrings)) {
                 val text = textOf(table, group, method, args)
-                // Boş olabilen tek metin: Türkçede bağlantıdan önce bir şey yazmaz ("Kullanıcı Sözleşmesi'ni…").
                 if (!(table === TrStrings && name == "getConsentPrefix")) {
                     assertTrue("$group.$name boş (${table.javaClass.simpleName})", text.isNotBlank())
                 }
@@ -76,7 +75,6 @@ class StringsTest {
         Lang.app = AppLanguage.English
         assertEquals("Save", Txt.common.save)
         assertEquals(Locale.forLanguageTag("en"), Lang.locale)
-        // Belirli bir dilin tablosu, seçili dilden bağımsız okunabilir.
         assertEquals("Kaydet", Lang.stringsFor(AppLanguage.Turkish).common.save)
     }
 

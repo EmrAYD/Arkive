@@ -3,30 +3,21 @@ package com.eayd.arkive.ai
 import com.eayd.arkive.i18n.AppLanguage
 
 /**
- * Telefondaki yapay zekanın özetleme adımları; sunucudaki özetleme (backend: app/summarize.py) ile aynı yol ve aynı
- * biçim: belgenin ne olduğunu ve neleri içerdiğini anlatan tek paragraf ("Bu belge …").
+ * Telefondaki özetlemenin adımları; sunucudaki özetlemeyle aynı biçim.
  *
- *  - Kısa belge tek istekte özetlenir.
- *  - Uzun belge [CHUNK_CHARS]'lık bölümlere ayrılır; her bölümde neler anlatıldığı kısa bir not olarak çıkarılır, sonra
- *    notlardan belgenin tamamını anlatan paragraf yazdırılır. Telefondaki modelin bağlamı küçük olduğu için
- *    ([LocalSummarizer.MAX_TOKENS] belirteç: istem + yanıt) bölümler buna göre küçük tutulur.
- *
- * Modele gidecek istem dışarıdan verilen [ask] ile gönderilir; böylece adımlar modelsiz test edilir. Sistem mesajı
- * ([systemPrompt]) her istekte aynıdır, onu [ask]'ı sağlayan taraf ekler.
- *
- * İstemler özetin dilinde yazılır: küçük modeller yanıtı istemin dilinde yazmaya yatkındır. (İstemler modele gider,
- * kullanıcıya gösterilmez; bu yüzden metin tablolarında değil buradadır.)
+ * Kısa belge tek istekte özetlenir. Uzun belge bölümlere ayrılır, her bölümün notu çıkarılır ve notlar tek paragrafta
+ * birleştirilir.
  */
 class LocalSummaryPipeline(
     private val language: AppLanguage,
-    /** İstemi modele gönderir ve yanıtını döndürür; [maxTokens]: yanıtın en çok belirteç sayısı. */
+    /** İstemi modele gönderir ve yanıtını döner. */
     private val ask: suspend (prompt: String, maxTokens: Int) -> String,
-    /** İlerleme: [done]. adım başlıyor, toplam [total] adım (uzun belgede bölümler + birleştirme; kısa belgede 1/1). */
+    /** İlerleme: kaçıncı adımın başladığı ve toplam adım sayısı. */
     private val onStep: (done: Int, total: Int) -> Unit = { _, _ -> },
 ) {
     private val p = prompts(language)
 
-    /** [text]'in tek paragraflık özeti. Model anlamlı bir şey yazmazsa boş metin döner. */
+    /** Metnin tek paragraflık özeti. Model anlamlı bir şey yazmazsa boş metin döner. */
     suspend fun summarize(text: String): String {
         val parts = chunks(text)
         if (parts.isEmpty()) return ""
@@ -43,10 +34,7 @@ class LocalSummaryPipeline(
         return paragraph(merge(notes.filter { it.isNotBlank() }))
     }
 
-    /**
-     * Bölüm notlarından belgenin tamamını anlatan paragraf. Notlar [MERGE_CHARS]'ı aşıyorsa yan yana gelenler önce
-     * gruplanıp kendi içinde kısaltılır; tek isteğe sığana dek tekrarlanır.
-     */
+    /** Bölüm notlarını tek paragrafta birleştirir; notlar çok uzunsa önce gruplar halinde kısaltır. */
     private suspend fun merge(notes: List<String>): String {
         var items = notes
         while (items.size > 2 && items.sumOf { it.length } > MERGE_CHARS) {
@@ -61,7 +49,7 @@ class LocalSummaryPipeline(
                     size = note.length
                 }
             }
-            if (groups.size == items.size) break // hiçbir şey birleşmedi: daha fazla küçültülemez
+            if (groups.size == items.size) break
             items = groups.map { group -> if (group.size == 1) group[0] else ask(p.group(group), PART_MAX_TOKENS).trim() }
         }
         return ask(p.merge(items), FINAL_MAX_TOKENS)
@@ -86,16 +74,16 @@ class LocalSummaryPipeline(
     }
 
     companion object {
-        /** Bir bölümün en çok karakteri (Türkçe metinde yaklaşık 2 bin belirteç). */
+        /** Bir bölümün en çok karakteri. */
         const val CHUNK_CHARS = 7_000
 
-        /** Bölüm notlarının tek birleştirme isteğine sığacak en çok toplam karakteri. */
+        /** Notların tek birleştirme isteğine sığacak en çok uzunluğu. */
         const val MERGE_CHARS = 6_000
 
-        /** Bir bölümün notu (en çok 3 cümle). */
+        /** Bir bölüm notunun en çok belirteci. */
         const val PART_MAX_TOKENS = 200
 
-        /** Özet paragrafı (3-5 cümle, ~100 kelime). */
+        /** Özet paragrafının en çok belirteci. */
         const val FINAL_MAX_TOKENS = 320
 
         /** Her istekte gönderilen sistem mesajı. */
@@ -148,10 +136,7 @@ class LocalSummaryPipeline(
             )
         }
 
-        /**
-         * Metni en çok [size] karakterlik bölümlere ayırır. Bölüm mümkünse bir paragrafın, satırın ya da cümlenin
-         * sonunda biter (bölümün ikinci yarısında aranır); bulunamazsa tam [size]'da kesilir.
-         */
+        /** Metni bölümlere ayırır; bölümler mümkünse paragraf ya da cümle sonunda biter. */
         fun chunks(text: String, size: Int = CHUNK_CHARS): List<String> {
             val clean = text.trim()
             if (clean.isEmpty()) return emptyList()
@@ -178,11 +163,7 @@ class LocalSummaryPipeline(
         private val LEADING_LABEL = Regex("^(?:özet|summary)\\s*:\\s*", RegexOption.IGNORE_CASE)
         private val SPACES = Regex("\\s+")
 
-        /**
-         * Modelin yanıtını tek paragrafa çevirir (sunucudakiyle aynı kurallar): başlık/madde işaretleri ve kalın yazı
-         * atılır, satırlar birleşir, "Özet:" gibi bir etiketle başlıyorsa etiket atılır, yarıda kesilmiş son cümle
-         * düşer. Harf ya da rakam yoksa boş metin döner.
-         */
+        /** Modelin yanıtını tek paragrafa çevirir; başlıkları, maddeleri ve yarım kalan son cümleyi atar. */
         fun paragraph(text: String): String {
             val lines = text.replace("**", "").lines()
                 .map { LIST_MARK.replace(it.trim(), "") }
@@ -192,7 +173,7 @@ class LocalSummaryPipeline(
             return trimToSentence(joined)
         }
 
-        /** Belirteç sınırında yarıda kesilmiş son cümleyi atar (en az bir tam cümle varsa). */
+        /** Yarıda kesilmiş son cümleyi atar. */
         fun trimToSentence(text: String): String {
             val t = text.trim()
             if (t.endsWith('.') || t.endsWith('!') || t.endsWith('?') || t.endsWith('…') || t.endsWith('"') ||

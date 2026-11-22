@@ -9,19 +9,10 @@ import okhttp3.Callback
 import okhttp3.Request
 import okhttp3.Response
 
-/**
- * Depolama sunucusuyla (RustFS) konuşan yükleme/indirme kodunun ortak parçaları.
- * Bu adresler backend'e değil RustFS'e gider ve kendi imzaları vardır; bu yüzden [ApiClient.storageHttp] kullanılır.
- */
-
-/** Depolama sunucusuyla ilgili hata; mesajı kullanıcıya olduğu gibi gösterilir. */
+/** Depolama hatası; mesajı kullanıcıya olduğu gibi gösterilir. */
 class StorageException(message: String, cause: Throwable? = null) : IOException(message, cause)
 
-/**
- * OkHttp çağrısını coroutine'e çevirir; coroutine iptal edilirse (ör. kullanıcı yüklemeyi iptal etti ya da
- * ön izleme ekranından çıktı) ağ isteği de iptal edilir. Dönen [Response] kullanıcı tarafından kapatılmalıdır
- * (`.use { }`).
- */
+/** OkHttp çağrısını coroutine'e çevirir; iptal edilirse istek de iptal olur. Dönen yanıtı çağıran kapatmalı. */
 internal suspend fun Call.await(): Response = suspendCancellableCoroutine { continuation ->
     continuation.invokeOnCancellation { cancel() }
     enqueue(object : Callback {
@@ -35,12 +26,7 @@ internal suspend fun Call.await(): Response = suspendCancellableCoroutine { cont
     })
 }
 
-/**
- * [request]'i depolamaya gönderir; başarılıysa yanıtı [onSuccess]'e verir ve sonra kapatır.
- *  - Sunucu reddederse (2xx değilse) [rejected] ile üretilen mesajla [StorageException] fırlatılır.
- *  - Ağ hatasında, nereye gidilemediği mesaja eklenir: "localhost" görünüyorsa backend'de S3_PUBLIC_ENDPOINT
- *    ayarlanmamıştır, "10.0.2.2" görünüp bağlanamıyorsa RustFS'e emülatörden ulaşılamıyordur.
- */
+/** İsteği depolamaya gönderir ve başarılı yanıtı [onSuccess]'e verir; hatayı anlaşılır bir mesajla atar. */
 internal suspend fun <T> executeOnStorage(
     request: Request,
     failureMessage: String,

@@ -4,7 +4,7 @@ import com.eayd.arkive.i18n.AppLanguage
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Kullanıcı Sözleşmesi'nin iki dili aynı yapıda (aynı sayıda ve türde blok). */
+/** Sözleşmenin iki dili aynı yapıda mı. */
 class EulaLanguageTest {
 
     @Test

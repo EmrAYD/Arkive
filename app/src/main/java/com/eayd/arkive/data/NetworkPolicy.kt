@@ -5,23 +5,21 @@ import android.net.NetworkCapabilities
 import com.eayd.arkive.i18n.Txt
 import java.io.IOException
 
-/** "Yalnızca Wi-Fi" açıkken kablosuz ağda olunmadığını anlatır. Mesajı doğrudan kullanıcıya gösterilir. */
+/** "Yalnızca Wi-Fi" açıkken Wi-Fi'da olunmadığını söyler. */
 class WifiRequiredException :
     IOException(Txt.errors.wifiOnly)
 
-/**
- * Dosya aktarımı (yükleme, indirme, ön izleme) başlamadan önce çağrılır. Ayar açıksa ve cihaz Wi-Fi (ya da
- * ethernet) üzerinde değilse [WifiRequiredException] fırlatır; ayar kapalıysa hiçbir şey yapmaz.
- */
+/** Dosya aktarımından önce çağrılır; "Yalnızca Wi-Fi" açıksa ve Wi-Fi yoksa [WifiRequiredException] atar. */
 object NetworkPolicy {
 
-    /** Aktarım şu an yapılabilir mi? (Ayar kapalıysa ya da Wi-Fi/ethernet varsa evet.) */
+    /** Aktarım şu an yapılabilir mi. */
     fun isAllowed(): Boolean = !AppSettings.wifiOnly.value || isOnWifi()
 
     fun requireAllowed() {
         if (!isAllowed()) throw WifiRequiredException()
     }
 
+    /** Wi-Fi ya da kablolu ağda mı. Manifest'te ACCESS_NETWORK_STATE izni yoksa engellememek için true döner. */
     private fun isOnWifi(): Boolean {
         val manager = AppSettings.appContext.getSystemService(ConnectivityManager::class.java) ?: return true
         return try {
@@ -29,7 +27,6 @@ object NetworkPolicy {
             caps.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) ||
                 caps.hasTransport(NetworkCapabilities.TRANSPORT_ETHERNET)
         } catch (e: SecurityException) {
-            // AndroidManifest'te ACCESS_NETWORK_STATE izni yoksa ağ türü okunamaz; kullanıcıyı kilitlememek için izin verilir.
             true
         }
     }

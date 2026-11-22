@@ -52,18 +52,11 @@ import kotlin.math.roundToInt
 
 private const val TAG = "ArkiveDrag"
 
-/**
- * Bir öğeye basılı tutup bir klasörün üstüne sürükleme işleminin durumu.
- *
- * Satırların ve klasörlerin ekrandaki yerleri ([LayoutCoordinates]) burada tutulur; parmağın o an hangi
- * satırın üstünde olduğu bu yerlerle hesaplanır. Liste kaydırılırken satırlar yer değiştirdiği için
- * "hangi klasörün üstündeyim" bilgisi parmak kıpırdamasa bile yeniden hesaplanır ([updateHover]).
- */
+/** Bir öğeyi basılı tutup klasörün üstüne sürükleme durumu. */
 class FileDragState {
-    // Ekrandaki (oluşturulmuş) satırların yerleri. Ekrandan çıkan satır kendini listeden siler ([trackBounds]).
-    internal val itemCoords = HashMap<String, LayoutCoordinates>()     // tüm satırlar (uzun basış için)
-    internal val folderCoords = HashMap<String, LayoutCoordinates>()   // bırakılabilir klasörler (anahtar: klasör id)
-    internal val folderAreas = HashMap<String, String>()               // bırakılabilir klasörün sayfası (ana sayfa)
+    internal val itemCoords = HashMap<String, LayoutCoordinates>()
+    internal val folderCoords = HashMap<String, LayoutCoordinates>()
+    internal val folderAreas = HashMap<String, String>()
     internal var listCoords: LayoutCoordinates? = null
 
     /** Sürüklenenler; null ise sürükleme yok. */
@@ -74,7 +67,7 @@ class FileDragState {
     var position by mutableStateOf(Offset.Zero)
         private set
 
-    /** Parmağın şu an üstünde olduğu klasör (varsa). */
+    /** Parmağın üstünde olduğu klasör. */
     var hoverFolderId by mutableStateOf<String?>(null)
         private set
 
@@ -85,11 +78,9 @@ class FileDragState {
             k !in except && c.isAttached && c.boundsInRoot().contains(pos)
         }?.key
 
-    /** Sürüklenenlerin sayfası (ana sayfa); karışıksa null (hiçbir klasöre bırakılamaz). */
+    /** Sürüklenenlerin sayfası; karışıksa null. */
     private var draggedArea: String? = null
 
-    // Sürüklenen klasörler kendi üstlerine bırakılamaz. Öğeler yalnızca kendi sayfalarının klasörlerine bırakılır:
-    // ana sayfa öğeleri ana sayfa klasörlerine.
     private fun folderAt(pos: Offset): String? {
         val except = dragged?.folders?.map { it.id }?.toSet().orEmpty() +
             folderAreas.filterValues { it != draggedArea }.keys
@@ -113,7 +104,7 @@ class FileDragState {
         if (id != hoverFolderId) hoverFolderId = id
     }
 
-    /** Parmak kalktı: bırakılan klasörün kimliğini döner (klasör üstünde değilse null) ve durumu sıfırlar. */
+    /** Parmak kalkınca bırakılan klasörü döner ve durumu sıfırlar. */
     internal fun finish(): String? {
         val target = hoverFolderId
         cancel()
@@ -126,14 +117,10 @@ class FileDragState {
     }
 }
 
-/** Sürüklenen öğelerin hangi sayfaya ait olduğu (hepsi aynıysa); karışıksa null. */
 private fun areaOf(items: SelectedItems): String? =
     (items.files.map { FolderLocations.HOME } + items.folders.map { it.location }).toSet().singleOrNull()
 
-/**
- * Klasör satırını bırakma hedefi olarak kaydeder: ekrandaki yeri ve hangi sayfanın klasörü olduğu ([area]). Hangi
- * sürüklemenin bu klasöre bırakılabileceğine [FileDragState] karar verir. Satır ekrandan kalkınca kayıt silinir.
- */
+/** Klasör satırını bırakma hedefi olarak kaydeder. */
 @Composable
 internal fun Modifier.trackDropFolder(state: FileDragState, folderId: String, area: String): Modifier {
     DisposableEffect(state, folderId) {
@@ -148,27 +135,14 @@ internal fun Modifier.trackDropFolder(state: FileDragState, folderId: String, ar
     }
 }
 
-/** Bu bileşenin ekrandaki yerini [map] içinde [key] altında tutar; bileşen ekrandan kalkınca siler. */
+/** Bileşenin ekrandaki yerini [map]'te tutar. */
 @Composable
 internal fun Modifier.trackBounds(map: MutableMap<String, LayoutCoordinates>, key: String): Modifier {
     DisposableEffect(map, key) { onDispose { map.remove(key) } }
     return onGloballyPositioned { map[key] = it }
 }
 
-/**
- * Listenin üstüne konur. Bir satıra (dosya ya da klasör) basılı tutulursa (uzun basış) [onLongPress] çağrılır:
- * ekran öğeyi seçer. Seçili tek öğe varsa ve parmak kaymaya başlarsa öğe sürüklenir; parmak kalkınca bir
- * klasörün üstündeyse [onDrop] çağrılır. Birden fazla öğe seçiliyse sürükleme olmaz.
- *
- * Dokunuşlar "Initial" aşamasında izlenir: böylece kısa dokunuş, kaydırma ve satırdaki düğmeler olduğu gibi
- * çalışır; yalnızca uzun basış tamamlanınca bırakma olayı tüketilir (satır "tıklanmış" sayılmasın diye).
- * Uzun basış iptal koşulları: parmak kalktı, ikinci parmak değdi ya da parmak kaymaya başladı (kaydırma).
- *
- * Hareketi satırın kendisine değil listenin kabına koyduk: otomatik kaydırmada sürüklenen satır
- * ekrandan çıkıp yok olsa bile hareket kesilmesin diye.
- *
- * @param onLongPress satır anahtarını alır, öğeyi seçer; sürüklenecekleri (seçimin tamamı), sürükleme olamıyorsa null döner.
- */
+/** Listeye uzun basınca seçim ve sürükleme. Bırakılan yer bir klasörse [onDrop] çağrılır. */
 @Composable
 internal fun Modifier.itemDragSource(
     state: FileDragState,
@@ -187,7 +161,6 @@ internal fun Modifier.itemDragSource(
                 val origin = state.listCoords?.takeIf { it.isAttached }?.positionInRoot() ?: return@awaitEachGesture
                 val key = state.itemAt(origin + down.position) ?: return@awaitEachGesture
 
-                // 1) Uzun basışı bekle. Süre dolarsa blok null döner (= uzun basış); önce iptal olursa true.
                 val cancelled = withTimeoutOrNull(viewConfiguration.longPressTimeoutMillis) {
                     var gone = false
                     while (!gone) {
@@ -200,17 +173,12 @@ internal fun Modifier.itemDragSource(
                     }
                     true
                 }
-                if (cancelled != null) return@awaitEachGesture   // süre dolmadan bırakıldı/kaydırıldı: uzun basış değil
+                if (cancelled != null) return@awaitEachGesture
 
-                // 2) Seçime geç. Bundan sonra parmak kalkana kadar bütün olayları biz tüketiriz (liste kaymasın,
-                //    satır "tıklanmış" sayılmasın, kenar menüsü açılmasın).
                 haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                 val item = currentLongPress(key)
                 Log.d(TAG, "uzun basış: $key, sürüklenebilir=${item != null}")
 
-                // 3) Parmak kaymaya başlarsa sürükleme başlar; kaymadan kalkarsa yalnızca seçim kalır.
-                //    Mesafe pencere koordinatlarıyla ölçülür: seçime geçince liste birkaç dp oynasa bile
-                //    parmak "kaymış" sayılmasın.
                 val downRoot = origin + down.position
                 var dragging = false
                 try {
@@ -222,7 +190,7 @@ internal fun Modifier.itemDragSource(
                         val up = change.changedToUpIgnoreConsumed() || !change.pressed
 
                         if (!dragging && !up && (pos - downRoot).getDistance() > viewConfiguration.touchSlop) {
-                            if (item == null) break   // bu seçim sürüklenemiyor (ör. Favorilerim): hareketi liste alsın
+                            if (item == null) break
                             dragging = true
                             state.start(item, pos)
                             Log.d(TAG, "sürükleme başladı: ${item.label}")
@@ -241,16 +209,13 @@ internal fun Modifier.itemDragSource(
                         if (dragging) state.moveTo(pos)
                     }
                 } finally {
-                    state.cancel()   // bırakma sırasında zaten sıfırlandıysa zararsız
+                    state.cancel()
                 }
             }
         }
 }
 
-/**
- * Sürükleme sürerken parmak listenin üst ya da alt kenarına yaklaşırsa listeyi kaydırır, böylece ekranda
- * görünmeyen klasörlere de ulaşılır. Kaydırma hızı kenara yaklaştıkça artar.
- */
+/** Sürüklerken liste kenarına yaklaşılınca listeyi kaydırır. */
 @Composable
 internal fun AutoScrollWhileDragging(state: FileDragState, listState: LazyListState) {
     val active = state.dragged != null
@@ -272,7 +237,6 @@ internal fun AutoScrollWhileDragging(state: FileDragState, listState: LazyListSt
                     else -> 0f
                 }
                 if (delta != 0f) listState.scrollBy(delta)
-                // Liste kaydıysa parmağın altındaki klasör değişmiş olabilir.
                 state.updateHover()
             }
             withFrameNanos { }
@@ -280,7 +244,7 @@ internal fun AutoScrollWhileDragging(state: FileDragState, listState: LazyListSt
     }
 }
 
-/** Sürüklenen dosyayı temsil eden, parmağın altında süzülen küçük kart. Listenin kabı içinde çizilir. */
+/** Parmağın altında süzülen küçük kart. */
 @Composable
 internal fun DragGhost(state: FileDragState) {
     val item = state.dragged ?: return
@@ -305,7 +269,6 @@ internal fun DragGhost(state: FileDragState) {
             val single = item.files.singleOrNull()
             val singleFolder = item.folders.singleOrNull().takeIf { item.count == 1 }
             if (singleFolder != null && single == null) {
-                // Tek klasör sürükleniyor: klasörün rengi ve emojisiyle.
                 FolderIcon(folderAccent(singleFolder.color), singleFolder.emoji, 24.dp)
             } else {
                 Icon(

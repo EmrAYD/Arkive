@@ -9,33 +9,26 @@ import retrofit2.http.PUT
 import retrofit2.http.Path
 import retrofit2.http.Query
 
-/**
- * Backend uçları. Yeni bir uç eklemek = buraya bir satır eklemek.
- * Yollar başında "/" olmadan yazılır (taban adres ApiClient'ta tanımlı).
- * Hepsi suspend: coroutine içinden çağrılır, ağ işi ana iş parçacığını bloklamaz.
- */
+/** Backend uçları. */
 interface ArkiveApi {
 
     @GET("me")
     suspend fun getMe(): MeResponse
 
-    /** Çöp kutusunda saklama süresini değiştirir (1-365 gün). Ayarlar ekranı gelince buradan çağrılacak. */
+    /** Profil ayarlarını kısmen günceller (ör. çöp kutusu saklama süresi). */
     @PATCH("me")
     suspend fun updateMe(@Body fields: Map<String, @JvmSuppressWildcards Any?>): MeResponse
 
-    /** DENEME İÇİN ödeme almadan planı değiştirir ("Plus" / "Free"); bkz. [PlanSwitcher]. */
+    /** Deneme için ödemesiz plan değiştirme. */
     @POST("me/plan")
     suspend fun changePlan(@Body body: ChangePlanRequest): MeResponse
 
-    /**
-     * Bir seviyedeki klasörler. parentId verilirse o klasörün alt klasörleri,
-     * verilmezse `location` sayfasının kök klasörleri gelir. null parametreler isteğe eklenmez.
-     */
+    /** Bir klasörün alt klasörleri; [parentId] yoksa sayfanın kök klasörleri. */
     @GET("folders")
     suspend fun getFolders(
         @Query("parent_id") parentId: String? = null,
         @Query("location") location: String? = null,
-        /** true ise derinliğinden bağımsız tüm favori klasörler gelir (Favorilerim). */
+        /** true ise tüm favori klasörler gelir. */
         @Query("favorite") favorite: Boolean? = null,
     ): List<FolderDto>
 
@@ -46,9 +39,7 @@ interface ArkiveApi {
     suspend fun createFolder(@Body body: CreateFolderRequest): FolderDto
 
     /**
-     * Kısmi güncelleme: yalnızca map'e konan alanlar değişir ("name", "color", "favorite").
-     * Sınıf yerine Map kullanmamızın sebebi şu: "color" için `null` göndermek "rengi sil",
-     * hiç göndermemek "rengi değiştirme" demektir. Sınıfta bu iki durumu ayırt edemeyiz.
+     * Kısmi güncelleme. "color" için null göndermek rengi siler, hiç göndermemek değiştirmez; bu yüzden Map kullanılır.
      */
     @PATCH("folders/{id}")
     suspend fun updateFolder(
@@ -59,30 +50,27 @@ interface ArkiveApi {
     @DELETE("folders/{id}")
     suspend fun deleteFolder(@Path("id") id: String)
 
-    // --- Dosyalar ---------------------------------------------------------------------------------
-    // Yükleme 3 adımdır: initUpload → (istemci dosyayı RustFS'e PUT eder, bkz. FileUploader) → completeUpload.
-
     @POST("files/init")
     suspend fun initUpload(@Body body: InitUploadRequest): InitUploadResponse
 
     @POST("files/{id}/complete")
     suspend fun completeUpload(@Path("id") id: String): FileDto
 
-    /** Bir seviyedeki dosyalar (folderId yoksa klasörsüzler); favorite=true ise tüm favori dosyalar. */
+    /** Bir klasördeki dosyalar; [favorite] true ise tüm favori dosyalar. */
     @GET("files")
     suspend fun getFiles(
         @Query("folder_id") folderId: String? = null,
         @Query("favorite") favorite: Boolean? = null,
     ): List<FileDto>
 
-    /** Tek dosyanın bilgisi (ön izleme ekranı dosyayı yalnızca id'siyle açar). */
+    /** Tek dosyanın bilgisi. */
     @GET("files/{id}")
     suspend fun getFile(@Path("id") id: String): FileDto
 
     @GET("files/{id}/download")
     suspend fun getDownloadUrl(@Path("id") id: String): DownloadUrlResponse
 
-    /** Kısmi güncelleme: "name" ve/veya "favorite". */
+    /** Kısmi güncelleme: "name" ve "favorite". */
     @PATCH("files/{id}")
     suspend fun updateFile(
         @Path("id") id: String,
@@ -92,58 +80,45 @@ interface ArkiveApi {
     @DELETE("files/{id}")
     suspend fun deleteFile(@Path("id") id: String)
 
-    // --- Yapay zeka özeti -------------------------------------------------------------------------
-    // Özet, belgenin ne olduğunu ve neleri içerdiğini anlatan tek paragraftır; sunucuda (ai_results tablosunda) saklanır
-    // ve dosyanın içeriğine bağlıdır: aynı içerikli dosya tekrar yüklense de özeti hazır gelir.
-
-    /** AI Sonuçlarım sayfası: tamamlanmış özetler, en yenisi önce. */
+    /** Tamamlanmış özetler, en yenisi önce. */
     @GET("summaries")
     suspend fun getSummaries(): List<SummaryItemDto>
 
-    /** Kayıtlı özet; dosyanın özeti yoksa 404. */
+    /** Kayıtlı özet; yoksa 404. */
     @GET("files/{id}/summary")
     suspend fun getSummary(@Path("id") id: String): SummaryResponse
 
-    /**
-     * Dosyayı sunucudaki yapay zekayla özetler ve kaydeder (özet zaten varsa kayıtlı olanı döner). Yanıt uzun sürebilir;
-     * bu yüzden uygulama bu ucu uzun okuma süreli [ApiClient.aiApi] üzerinden çağırır.
-     */
+    /** Dosyayı sunucuda özetler. Uzun sürebildiği için [ApiClient.aiApi] ile çağrılır. */
     @POST("files/{id}/summary")
     suspend fun summarizeFile(@Path("id") id: String, @Body body: SummarizeRequest): SummaryResponse
 
-    /**
-     * Sunucuda süren bulut özetlemesini durdurur ("Durdur"). Özetleme uygulamanın bağlantısından bağımsızdır: uygulama
-     * kapanınca sürer, yalnızca bu uç onu durdurur.
-     */
+    /** Sunucuda süren bulut özetini durdurur. */
     @POST("files/{id}/summary/cancel")
     suspend fun cancelSummary(@Path("id") id: String)
 
-    /** Telefonda üretilen özeti kaydeder (özet zaten varsa mevcut olan korunur ve o döner). */
+    /** Telefonda çıkan özeti kaydeder; özet zaten varsa mevcut olan döner. */
     @PUT("files/{id}/summary")
     suspend fun saveSummary(@Path("id") id: String, @Body body: SaveSummaryRequest): SummaryResponse
 
-    /** Dosyanın (ve aynı içerikli kopyalarının) özetini siler; dosya yeniden özetlenebilir. Özet yoksa 404. */
+    /** Dosyanın ve aynı içerikli kopyalarının özetini siler. */
     @DELETE("files/{id}/summary")
     suspend fun deleteSummary(@Path("id") id: String)
-
-    // --- Çöp kutusu -------------------------------------------------------------------------------
-    // DELETE /files|folders öğeyi çöp kutusuna taşır; kalıcı silme aşağıdaki uçlarla yapılır.
 
     @GET("trash")
     suspend fun getTrash(): TrashResponse
 
-    /** Çöpteki klasörün içi: klasörle birlikte silinen alt klasörler ve dosyalar. */
+    /** Çöpteki klasörün içi. */
     @GET("trash/folders/{id}")
     suspend fun getTrashFolder(@Path("id") id: String): TrashFolderContents
 
     @POST("trash/restore")
     suspend fun restoreTrash(@Body body: TrashIdsRequest): TrashCountResponse
 
-    /** Seçilenleri KALICI siler (geri alınamaz). */
+    /** Seçilenleri kalıcı olarak siler. */
     @POST("trash/delete")
     suspend fun deleteTrash(@Body body: TrashIdsRequest): TrashCountResponse
 
-    /** Çöp kutusunu tamamen boşaltır: içindeki her şeyi KALICI siler (geri alınamaz). */
+    /** Çöp kutusunu boşaltır. */
     @DELETE("trash")
     suspend fun emptyTrash(): TrashCountResponse
 }

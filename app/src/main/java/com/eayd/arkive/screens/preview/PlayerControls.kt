@@ -16,18 +16,13 @@ import androidx.compose.ui.graphics.Color
 import java.util.Locale
 import kotlinx.coroutines.delay
 
-// Video ve ses oynatıcılarının ortak parçaları.
-
-/** Milisaniyeyi "dakika:saniye" olarak yazar (ör. 3:07). */
+/** Milisaniyeyi "dakika:saniye" olarak yazar. */
 internal fun formatMillis(ms: Int): String {
     val totalSeconds = ms / 1000
     return String.format(Locale.US, "%d:%02d", totalSeconds / 60, totalSeconds % 60)
 }
 
-/**
- * Oynatma sürerken ([playing]) ilerleme çubuğunu 4 kez/sn günceller: [current] oynatıcının şu anki konumunu
- * (alınamazsa null) verir, [onPosition] onu ekrana yazar. Kullanıcı çubuğu sürüklerken ([dragging]) güncellenmez.
- */
+/** Oynatma sürerken konumu saniyede 4 kez günceller; sürüklerken güncellemez. */
 @Composable
 internal fun TrackPosition(playing: Boolean, dragging: Boolean, current: () -> Int?, onPosition: (Int) -> Unit) {
     val isDragging by rememberUpdatedState(dragging)
@@ -40,10 +35,7 @@ internal fun TrackPosition(playing: Boolean, dragging: Boolean, current: () -> I
     }
 }
 
-/**
- * İlerleme çubuğu ve altında geçen/toplam süre. [light] true ise koyu (video) zemin için beyaz çizilir.
- * [onChange] sürüklerken, [onFinished] parmak kalkınca çağrılır.
- */
+/** İlerleme çubuğu ve süreler. [light] true ise koyu zemin için beyaz çizilir. */
 @Composable
 internal fun SeekBar(
     position: Int,

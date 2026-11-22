@@ -18,34 +18,21 @@ import java.util.zip.ZipInputStream
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Telefonda açılan belge: düz metni ve yönlendirme için gereken ölçüleri. */
+/** Telefonda açılan belgenin metni ve ölçüleri. */
 class ReadDocument(val text: String, val stats: DocumentStats)
 
-/**
- * Dosya telefonda açılamadı (bozuk, desteklenmeyen biçim…). Ağ hatası DEĞİLDİR, bu yüzden IOException değildir:
- * bulut izinliyse sunucuda denenebilir.
- */
+/** Dosya telefonda açılamadı (bozuk ya da desteklenmiyor). Ağ hatası değildir. */
 class UnreadableDocumentException(message: String, cause: Throwable? = null) : Exception(message, cause)
 
-/**
- * Dosya parolalı. [wrong] false ise parola henüz verilmemiştir; true ise verilen parola yanlıştır. Kullanıcıdan
- * parola istenir ([AiSummarizer], ön izleme).
- */
+/** Dosya parolalı. [wrong] verilen parolanın yanlış olduğunu söyler. */
 class PasswordException(val wrong: Boolean) : Exception(if (wrong) Txt.docs.wrongPassword else Txt.docs.passwordProtected)
 
-/**
- * Telefona inmiş küçük bir dosyadan (en çok [AiPolicy.LOCAL_MAX_BYTES]) metni ve ölçüleri çıkarır: kelime sayısı,
- * sayfa sayısı ve görsel sayısı. Yerel özetlemeye uygun olup olmadığına [AiPolicy] bu ölçülerle karar verir.
- */
+/** Küçük dosyalardan metni ve kelime, sayfa, görsel sayısını çıkarır. */
 object DocumentReader {
 
-    // DOCX içindeki document.xml'in açılmış halinin üst sınırı; küçük bir zip'in dev bir dosyaya açılmasına (zip bombası) karşı.
     private const val MAX_XML_BYTES = 8 * 1024 * 1024
 
-    /**
-     * [password]: parolalı PDF/Word için kullanıcının girdiği parola (yoksa null). Parola gerekiyorsa ya da yanlışsa
-     * [PasswordException] atılır; parola yalnızca bu telefonda, dosyayı açmak için kullanılır.
-     */
+    /** Dosyayı okur. Parola gerekiyorsa ya da yanlışsa [PasswordException] atar. */
     suspend fun read(context: Context, file: File, kind: SummarizableKind, password: String? = null): ReadDocument =
         withContext(Dispatchers.IO) {
             try {
@@ -59,7 +46,7 @@ object DocumentReader {
             }
         }
 
-    /** Context gerektirmeyen Word (DOCX ve DOC) okuma. Parola kuralları [read] ile aynıdır. */
+    /** Context gerektirmeyen Word okuma. */
     suspend fun readDocxFile(file: File, password: String? = null): ReadDocument = withContext(Dispatchers.IO) {
         try {
             readDocx(file, password)
@@ -68,10 +55,7 @@ object DocumentReader {
         }
     }
 
-    /**
-     * Parolalı PDF'in parolasız bir kopyasını [out]'a yazar (Android'in PDF çizicisi parolalı dosyayı açamaz). Parola
-     * yanlışsa [PasswordException]. Kopya çağıranın sorumluluğundadır: işi bitince silinmelidir.
-     */
+    /** Parolalı PDF'in parolasız kopyasını [out]'a yazar; kopyayı silmek çağıranın işidir. */
     suspend fun unlockPdf(context: Context, source: File, password: String, out: File) = withContext(Dispatchers.IO) {
         PDFBoxResourceLoader.init(context.applicationContext)
         try {
@@ -102,7 +86,7 @@ object DocumentReader {
         return ReadDocument(text, DocumentStats(words = countWords(text), pages = null, images = 0))
     }
 
-    /** UTF-8 olarak okunur; geçerli değilse eski Türkçe Windows kodlamasına (windows-1254) düşülür. */
+    /** UTF-8 değilse windows-1254 olarak okur. */
     private fun decode(bytes: ByteArray): String {
         val strictUtf8 = Charsets.UTF_8.newDecoder()
             .onMalformedInput(CodingErrorAction.REPORT)
@@ -115,7 +99,7 @@ object DocumentReader {
     }
 
     private fun readPdf(context: Context, file: File, password: String?): ReadDocument {
-        PDFBoxResourceLoader.init(context.applicationContext) // birden çok çağrı zararsız
+        PDFBoxResourceLoader.init(context.applicationContext)
         val document = try {
             loadPdf(file, password)
         } catch (e: IOException) {
@@ -123,7 +107,6 @@ object DocumentReader {
         }
         document.use { doc ->
             val pages = doc.numberOfPages
-            // Yerelde özetlenemeyecek kadar uzunsa metni okumak boşa emektir; [AiPolicy.localRejection] yalnızca sayfa sayısına bakar.
             if (pages > AiPolicy.LOCAL_MAX_PAGES) return ReadDocument("", DocumentStats(words = 0, pages = pages, images = 0))
             val text = PDFTextStripper().getText(doc).trim()
             var images = 0
@@ -137,23 +120,14 @@ object DocumentReader {
         }
     }
 
-    /**
-     * Eski .doc (Word 97-2003; parolalısı da): ayrıştırma ve şifre çözme [WordLoader]'dadır. Parola gerekiyorsa ya da
-     * yanlışsa [PasswordException], dosya bozuksa ya da desteklenmeyen bir yöntemle şifreliyse [UnreadableDocumentException].
-     * Metin .docx ile aynı biçimde çıkar (paragraf başına bir satır; tablo hücrelerindeki paragraflar da sırayla).
-     */
+    /** Eski .doc dosyasını okur. */
     internal fun readLegacyWord(bytes: ByteArray, password: String?): ReadDocument {
         val doc = WordLoader.load(bytes, password)
         val text = doc.summaryText()
         return ReadDocument(text, DocumentStats(words = countWords(text), pages = null, images = doc.imageCount))
     }
 
-    /**
-     * Word belgesi. İçeriğe bakılır, uzantıya değil (yeniden adlandırılmış dosyalar da açılır):
-     *  - eski .doc (OLE kapsayıcı): [readLegacyWord],
-     *  - DOCX bir zip'tir: metin word/document.xml içindedir, görseller word/media/ altındadır. Parolalı DOCX zip değil,
-     *    şifreli bir OLE kapsayıcısıdır ([OfficeCrypto]); önce parolayla çözülüp zip'e dönüştürülür.
-     */
+    /** Word belgesini okur; türü uzantıdan değil içerikten anlar. */
     private fun readDocx(file: File, password: String?): ReadDocument {
         var bytes = file.readBytes()
         if (AiPolicy.isLegacyOffice(bytes)) return readLegacyWord(bytes, password)
@@ -193,7 +167,7 @@ object DocumentReader {
         return ReadDocument(text, DocumentStats(words = countWords(text), pages = null, images = images))
     }
 
-    /** document.xml'den düz metin: paragraf sonları satır olur, sekmeler boşluk olur, etiketler atılır. */
+    /** document.xml'den düz metin çıkarır. */
     internal fun docxXmlToText(xml: String): String = xml
         .replace("</w:p>", "\n")
         .replace(Regex("<w:tab\\s*/>"), " ")

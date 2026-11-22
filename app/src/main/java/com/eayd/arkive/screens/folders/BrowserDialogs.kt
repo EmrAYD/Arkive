@@ -12,10 +12,7 @@ import com.eayd.arkive.ui.components.NameDialog
 import com.eayd.arkive.viewmodel.BrowserDialog
 import com.eayd.arkive.viewmodel.BrowserViewModel
 
-/**
- * Liste ekranında açık olan pencere. Hangi pencerenin açık olduğu, "kaydediliyor" ve sunucu hatası
- * [BrowserViewModel.dialogs] içindedir; işlemler de ViewModel'de çalışır. Burası yalnızca çizer.
- */
+/** Liste ekranında açık olan pencere; durum ve işlemler ViewModel'dedir. */
 @Composable
 internal fun BrowserDialogs(viewModel: BrowserViewModel) {
     val host by viewModel.dialogs.state.collectAsState()
@@ -107,7 +104,6 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         is BrowserDialog.MoveFolder -> MoveFolderDialog(
             summary = Txt.browser.quoted(dialog.folder.name),
             currentParentIds = listOf(dialog.folder.parentId),
-            // Klasör kendi içine taşınamaz: listede gösterilmez (alt klasörlerine de ancak içinden girilir).
             excludedFolderIds = setOf(dialog.folder.id),
             moving = host.saving,
             error = host.error,
@@ -118,7 +114,6 @@ internal fun BrowserDialogs(viewModel: BrowserViewModel) {
         BrowserDialog.MoveSelection -> MoveFolderDialog(
             summary = Txt.browser.itemCount(state.selection.count),
             currentParentIds = state.selectedFiles.map { it.folderId } + state.selectedFolders.map { it.parentId },
-            // Taşınan klasörler listede gösterilmez: bir klasör kendi içine taşınamaz.
             excludedFolderIds = state.selectedFolders.map { it.id }.toSet(),
             moving = host.saving,
             error = host.error,

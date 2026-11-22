@@ -63,12 +63,7 @@ import com.eayd.arkive.viewmodel.ProfileDialog
 import com.eayd.arkive.viewmodel.ProfileUiState
 import com.eayd.arkive.viewmodel.ProfileViewModel
 
-/**
- * Profil sayfası (ana ekrandaki profil düğmesinden açılır, sağdan kayarak gelir): hesap bilgileri ve şifre değiştirme,
- * ayarlar, mevcut plan ve limitler, ücretsiz plandaysa Plus tanıtımı; en altta kırmızı "Çıkış Yap" düğmesi.
- *
- * Bu bileşen yalnızca çizer; veriler ve işlemler [ProfileViewModel] içindedir.
- */
+/** Profil sayfası: hesap, ayarlar, plan ve çıkış. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProfileScreen(
@@ -81,7 +76,6 @@ fun ProfileScreen(
     val wifiOnly by viewModel.wifiOnly.collectAsState()
     val localModel by viewModel.localModel.collectAsState()
     val aiMode by viewModel.aiMode.collectAsState()
-    // Bulut özeti Plus'a özel; AI düğmesiyle aynı bilgiye bakılır ([PlanStatus]).
     val cloudAllowed = PlanStatus.quota.collectAsState().value?.cloud == true
     val appLanguage by viewModel.appLanguage.collectAsState()
     val summaryLanguage by viewModel.summaryLanguage.collectAsState()
@@ -89,16 +83,13 @@ fun ProfileScreen(
     val notices = rememberNoticeHostState()
     NoticeEffect(state.notice, notices, viewModel::clearNotice)
 
-    // Sayfa her açıldığında plan bilgisi tazelenir (ViewModel sayfa kapanınca da yaşar).
     LaunchedEffect(viewModel) { viewModel.load() }
-    // Plan başka yerden değişince (Plus tanıtımından Plus'a geçildi) plan bilgisi de tazelenir.
     val planName = PlanStatus.quota.collectAsState().value?.planName
     LaunchedEffect(planName) {
         val shown = state.storage?.planName
         if (planName != null && shown != null && planName != shown) viewModel.load()
     }
 
-    // Kendi arka planı var: sayfa ana ekranın üstüne kayarak gelirken alttaki ekran görünmesin.
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
         TopAppBar(
             title = { Text(Txt.profile.title) },
@@ -108,7 +99,6 @@ fun ProfileScreen(
                 }
             },
             colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-            // Sistem çubuğu boşluğunu yukarıdaki safeDrawingPadding zaten ayırdı; ikinci kez eklenmesin.
             windowInsets = WindowInsets(0, 0, 0, 0),
         )
         HorizontalDivider()
@@ -131,9 +121,7 @@ fun ProfileScreen(
                     wifiOnly = wifiOnly,
                     appLanguage = appLanguage,
                     summaryLanguage = summaryLanguage,
-                    // Ücretsiz planda bulut yok: ayar ne olursa olsun geçerli olan "Yerel" gösterilir.
                     aiMode = PlanPolicy.effectiveMode(aiMode, cloudAllowed),
-                    // Değer sunucudan gelene kadar satır pasif kalır.
                     trashRetentionDays = if (state.storage != null) state.trashRetentionDays else null,
                     onNotifications = {
                         if (!context.openNotificationSettings()) viewModel.showNotice(Txt.profile.notificationSettingsFailed)
@@ -142,7 +130,6 @@ fun ProfileScreen(
                     onWifiOnlyChange = viewModel::setWifiOnly,
                     onLanguage = { viewModel.openDialog(ProfileDialog.Language) },
                     onAiMode = { viewModel.openDialog(ProfileDialog.AiProcessing) },
-                    // Her planda: "Yerel" ve "Yerel + Bulut"ta dosyalar bu modelle telefonda özetlenir.
                     localModel = localModel,
                     onLocalModel = { viewModel.openDialog(ProfileDialog.LocalAi) },
                     onTrashRetention = { viewModel.openDialog(ProfileDialog.TrashRetention) },
@@ -150,11 +137,9 @@ fun ProfileScreen(
 
                 PlanSection(state.storage, state.isLoading, state.error, viewModel::load)
 
-                // Plus'taki kullanıcı yalnızca plan bilgisini görür; tanıtım ve düğme ücretsiz plana özel.
                 state.storage?.takeIf { it.isFree }?.let { storage ->
-                    PlusPromo(storage, onUpgrade = { PlusOffer.show() }) // tam ekran Plus tanıtımı
+                    PlusPromo(storage, onUpgrade = { PlusOffer.show() })
                 }
-                // DENEME İÇİN: ödeme sistemi yokken Plus'ı denedikten sonra ücretsiz plana dönülebilsin.
                 if (state.storage?.isFree == false) {
                     OutlinedButton(onClick = viewModel::switchToFree, modifier = Modifier.fillMaxWidth()) {
                         Text(Txt.plan.backToFreeTrial)
@@ -182,7 +167,7 @@ fun ProfileScreen(
     ProfileDialogs(viewModel, state)
 }
 
-/** Açık/kapalı durumu ve işlemler ViewModel'dedir ([ProfileViewModel.dialogs]). */
+/** Profil pencereleri; durum ve işlemler ViewModel'dedir. */
 @Composable
 private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
     val host by viewModel.dialogs.state.collectAsState()
@@ -241,7 +226,6 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
         ProfileDialog.TrashRetention -> ChoiceDialog(
             title = Txt.profile.trashRetention,
             description = Txt.profile.trashRetentionDetail,
-            // Sunucudaki değer listede yoksa (başka yoldan ayarlanmışsa) o da seçenek olarak gösterilir.
             options = (RetentionChoices + state.trashRetentionDays).distinct().sorted(),
             current = state.trashRetentionDays,
             optionLabel = { Txt.profile.days(it) },
@@ -253,10 +237,7 @@ private fun ProfileDialogs(viewModel: ProfileViewModel, state: ProfileUiState) {
     }
 }
 
-/**
- * "Dil" penceresi: uygulamanın dili ve özetin dili iki ayrı seçim olarak aynı yerde durur. Pencere açıldığında iki dil
- * aynıysa, kullanıcı özet dilini ayrıca değiştirmedikçe özet dili uygulama diliyle birlikte değişir.
- */
+/** Uygulamanın ve özetin dilini seçme penceresi. İki dil aynıysa özet dili uygulama diliyle birlikte değişir. */
 @Composable
 private fun LanguageDialog(
     appLanguage: AppLanguage,
@@ -299,7 +280,6 @@ private fun LanguageDialog(
     )
 }
 
-/** Başlık, açıklama ve dillerin radyo düğmeleri. */
 @Composable
 private fun LanguageChoices(
     title: String,
@@ -325,11 +305,7 @@ private fun LanguageChoices(
     }
 }
 
-/**
- * "Yapay zeka işlem yeri" penceresi: Yerel / Bulut / Yerel + Bulut, her birinin altında açıklaması. Ücretsiz planda bulut
- * içeren seçeneklerin altında "Plus planına özel" yazar; seçilip kaydedilince ayar değişmez, Plus tanıtılır
- * ([ProfileViewModel.setAiMode]).
- */
+/** Yapay zeka işlem yeri penceresi. Ücretsiz planda bulut seçenekleri seçilirse Plus tanıtılır. */
 @Composable
 private fun AiModeDialog(
     current: AiMode,
@@ -380,10 +356,10 @@ private fun AiModeDialog(
     )
 }
 
-/** Çöp kutusu için sık kullanılan süreler (gün). Sunucu 1-365 arasını kabul eder. */
+/** Çöp kutusu için sunulan süreler (gün). */
 private val RetentionChoices = listOf(7, 14, 30, 60, 90)
 
-/** Radyo düğmeli tek seçimli pencere (tema ve saklama süresi için ortak). */
+/** Radyo düğmeli tek seçimli pencere. */
 @Composable
 private fun <T> ChoiceDialog(
     title: String,

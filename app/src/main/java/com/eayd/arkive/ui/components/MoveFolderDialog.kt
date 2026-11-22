@@ -35,16 +35,7 @@ import com.eayd.arkive.data.FolderLocations
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.viewmodel.MoveFolderViewModel
 
-/**
- * "Taşı" penceresi (dosya ve klasörler için): klasör ağacında gezip hedef klasörü seçtirir. En üstte "Ana Sayfa"
- * (kök) vardır. Yalnızca "Ana Sayfa" altındaki klasörler listelenir (klasörler yalnızca ana sayfadadır).
- * Gezinti durumunu [MoveFolderViewModel] tutar; pencere her açıldığında en üstten başlar.
- *
- * @param summary taşınanları anlatan satır (ör. “rapor.pdf” ya da 3 öğe)
- * @param currentParentIds taşınanların şu anki klasörleri (null = ana sayfanın en üstü); hepsi hedefteyse taşıma anlamsız
- * @param excludedFolderIds listede gösterilmeyecek klasörler (taşınan klasörlerin kendisi)
- * @param onMove hedef klasörün kimliği (null = Ana Sayfa'nın en üstü) ve görünen adı.
- */
+/** "Taşı" penceresi: klasör ağacında gezip hedef klasörü seçtirir. */
 @Composable
 fun MoveFolderDialog(
     summary: String,
@@ -54,16 +45,14 @@ fun MoveFolderDialog(
     error: String?,
     onMove: (targetFolderId: String?, targetName: String) -> Unit,
     onDismiss: () -> Unit,
-    /** Hangi sayfanın klasörleri gösterilir (klasörler yalnızca ana sayfada: [FolderLocations.HOME]). */
+    /** Hangi sayfanın klasörleri gösterilir. */
     location: String = FolderLocations.HOME,
     viewModel: MoveFolderViewModel = viewModel(),
 ) {
     val state by viewModel.state.collectAsState()
     LaunchedEffect(viewModel, location) { viewModel.start(location) }
-    // Pencere kapanınca gezinti sıfırlanır: bir sonraki açılışta eski liste bir an görünmesin.
     DisposableEffect(viewModel) { onDispose { viewModel.clear() } }
 
-    // Seçilenler zaten bu klasördeyse "Buraya taşı" anlamsızdır.
     val alreadyHere = currentParentIds.all { it == state.currentId }
 
     AlertDialog(
@@ -118,7 +107,6 @@ fun MoveFolderDialog(
                         )
 
                         else -> LazyColumn {
-                            // Taşınan klasör kendi içine taşınamaz: listede hiç gösterilmez.
                             items(list.filter { it.id !in excludedFolderIds }, key = { it.id }) { folder ->
                                 PickerRow(
                                     enabled = !moving,

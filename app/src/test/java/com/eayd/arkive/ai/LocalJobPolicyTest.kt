@@ -3,7 +3,7 @@ package com.eayd.arkive.ai
 import org.junit.Assert.assertEquals
 import org.junit.Test
 
-/** Telefonda özetlenirken uygulama kapanan dosyanın, uygulama yeniden açılınca ne olacağı. */
+/** Yarıda kalan telefon özetinin uygulama açılınca ne olacağı. */
 class LocalJobPolicyTest {
 
     private val hour = 60L * 60 * 1000

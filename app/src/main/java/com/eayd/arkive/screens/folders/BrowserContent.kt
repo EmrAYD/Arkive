@@ -56,12 +56,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 /**
- * Bir seviyedeki klasörler ve dosyalar, üstlerinde işlem satırı ("+" düğmesi, filtreler) ve devam eden yüklemeler.
- * Ana sayfa, Favorilerim ve klasör içi ekranı aynı bileşeni kullanır; fark yalnızca verilen ViewModel'dir. (AI
- * Sonuçlarım sayfası klasör ve dosya değil, özetlerin listesidir: bkz. AiSummariesContent.)
+ * Klasör ve dosya listesi, üstündeki işlem satırı ve süren yüklemeler.
  *
- * Bu bileşen yalnızca çizer: liste, süzme/sıralama, seçim, pencereler ve sunucu işlemleri [BrowserViewModel]
- * içindedir; buradaki her etkileşim ViewModel'e bir çağrı olarak iletilir.
+ * Ana sayfa, Favorilerim ve klasör içi bu bileşeni kullanır.
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -70,7 +67,7 @@ fun BrowserContent(
     onOpenFolder: (FolderDto) -> Unit,
     onOpenFile: (FileDto) -> Unit,
     modifier: Modifier = Modifier,
-    /** false: sayfa şu an görünmüyor (üstünde profil sayfası açık); seçim modu kapatılır. */
+    /** false ise sayfa görünmüyor; seçim modu kapatılır. */
     active: Boolean = true,
 ) {
     val state by viewModel.state.collectAsState()
@@ -81,34 +78,21 @@ fun BrowserContent(
     val listState = rememberLazyListState()
     val dragState = remember { FileDragState() }
 
-    // Ekran her görününce liste tazelenir (başka ekranda değişmiş olabilir: ör. Favorilerim).
     LaunchedEffect(viewModel) { viewModel.onShown() }
-    // Sayfadan çıkılınca (menüden başka bölüme geçildi, bir klasöre girildi, geri dönüldü) seçim modu kapanır: ViewModel
-    // sayfadan uzun yaşadığı için seçim kapatılmazsa geri gelince olduğu gibi dururdu. Üstüne profil açılınca da kapanır.
-    // Ekran döndürülünce kapanmaz.
     LeaveEffect(viewModel) { viewModel.clearSelection() }
     LaunchedEffect(active) { if (!active) viewModel.clearSelection() }
-    // Özetleme arka planda sürer; olmazsa kısa bir bildirimle haber verilir. Bitince özet penceresi açılır (tüm ekranlar
-    // için ortak olarak ArkiveNavHost'ta).
     LaunchedEffect(viewModel) { AiSummarizer.notices.collect(viewModel::showNotice) }
-    // Özet bittiğinde o sırada başka bir pencere açıksa "Özetleme bitti" kartı çıkar: dokunulunca özet açılır. Aynı anda
-    // birkaç özet biterse sırayla gösterilir.
     val finished = remember { mutableStateListOf<SummaryDone>() }
     LaunchedEffect(viewModel) { AiSummarizer.done.collect { finished.add(it) } }
-    // Özet oluşunca ya da silinince liste sessizce yenilenir (AI düğmesi dolar/boşalır).
     LaunchedEffect(viewModel) { AiSummarizer.completed.collect { viewModel.reloadQuietly() } }
-    LaunchedEffect(viewModel) { AiSummarizer.flushPending() } // internetsizken üretilen özetler varsa yükle
-    // Liste her yenilendiğinde küçük dosyalar ve özetler arka planda telefona kopyalanır: internetsiz de açılabilsinler.
+    LaunchedEffect(viewModel) { AiSummarizer.flushPending() }
     LaunchedEffect(state.files, state.offline) { if (!state.offline) AiSummarizer.prefetch(state.files) }
-    // İnternet geri gelince, liste telefondaki görüntüden gösteriliyorsa sunucudan tazelenir.
     val offlineNow by rememberUpdatedState(state.offline)
     LaunchedEffect(viewModel) { AiSummarizer.networkBack.collect { if (offlineNow) viewModel.reloadQuietly() } }
     NoticeEffect(state.notice, notices, viewModel::clearNotice)
 
-    // Geri tuşu önce seçimi kapatır.
     BackHandler(enabled = selection.active, onBack = viewModel::clearSelection)
 
-    // Sistemin dosya seçicisi. Seçilen her dosya için geçici okuma izni verilir (içerik "content://" adresidir).
     val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { uris ->
         viewModel.uploadFiles(context.applicationContext.contentResolver, uris)
     }
@@ -118,7 +102,6 @@ fun BrowserContent(
             SelectionBar(
                 count = selection.count,
                 allFavorite = state.selectedItems.allFavorite,
-                // Favorilerim'de hiç taşıma yoktur (öğeler başka yerlerden yıldızlanmıştır; yerleri orada değiştirilir).
                 canMove = !viewModel.favoritesOnly && state.moveLocation != null,
                 onClose = viewModel::clearSelection,
                 onSelectAll = viewModel::selectAllVisible,
@@ -127,7 +110,6 @@ fun BrowserContent(
                 onDelete = { viewModel.openDialog(BrowserDialog.DeleteSelection) },
             )
         } else {
-            // Favorilerde "ekle" anlamsızdır (favori, başka yerdeki öğelere yıldız konarak oluşur).
             FolderActionRow(
                 canUpload = state.canUpload,
                 showAdd = !viewModel.favoritesOnly,
@@ -157,7 +139,6 @@ fun BrowserContent(
                 .fillMaxWidth()
                 .itemDragSource(
                     state = dragState,
-                    // Uzun basış öğeyi seçer; Favorilerim'de sürükleyip taşıma yoktur (null: sürükleme başlamaz).
                     onLongPress = { key -> viewModel.longPress(key).takeUnless { viewModel.favoritesOnly } },
                     onDrop = viewModel::dropItems,
                 )
@@ -165,8 +146,6 @@ fun BrowserContent(
             val nothingToShow = state.folders.isEmpty() && state.files.isEmpty() && state.uploads.isEmpty()
             val nothingVisible = state.visibleFolders.isEmpty() && state.visibleFiles.isEmpty() && state.uploads.isEmpty()
             val error = state.errorMessage
-            // Listeyi (ya da boş durum yazısını) aşağı çekmek sunucudan yeniler. Boş durumlar da kaydırılabilir bir
-            // kapta durur, yoksa çekme hareketini yakalayacak bir şey olmazdı.
             PullToRefreshBox(
                 isRefreshing = state.refreshing,
                 onRefresh = viewModel::refresh,
@@ -191,8 +170,6 @@ fun BrowserContent(
                     onOpenFolder = onOpenFolder,
                     onOpenFile = onOpenFile,
                     onDownload = { file ->
-                        // Dosyaya dokunmak ön izleme ekranını açar; bu yalnızca menüdeki "İndir" içindir.
-                        // Uygulama içinden İndirilenler klasörüne kaydedilir (tarayıcı açılmaz).
                         startDownload(file.id, file.name, file.mimeType)
                     },
                 )
@@ -202,7 +179,6 @@ fun BrowserContent(
             AutoScrollWhileDragging(dragState, listState)
             DragGhost(dragState)
 
-            // Ekranın en altında: "özetleme bitti" kartı ve (varsa) kısa bildirim üst üste durur, bildirim kartın üstünde.
             Column(Modifier.align(Alignment.BottomCenter).padding(bottom = 8.dp)) {
                 NoticeHost(notices)
                 SummaryDoneBanner(
@@ -221,7 +197,7 @@ fun BrowserContent(
     BrowserDialogs(viewModel)
 }
 
-/** Ortalanmış bir içerik; kaydırılabilir olduğu için aşağı çekerek yenileme boş durumlarda da çalışır. */
+/** Ortalanmış içerik; boş listede de aşağı çekerek yenilemeye izin verir. */
 @Composable
 private fun PullableCenter(content: @Composable () -> Unit) {
     LazyColumn(Modifier.fillMaxSize()) {
@@ -246,12 +222,10 @@ private fun BrowserList(
     onDownload: (FileDto) -> Unit,
 ) {
     val selection = state.selection
-    // AI düğmesi, özeti olan dosyalarda dolu görünür; özet hazırlanırken yerinde yükleme simgesi döner.
     val summarizing by AiSummarizer.running.collectAsState()
-    val waitingUpload by SummaryStore.pendingIds.collectAsState() // telefonda üretilmiş, yüklenmeyi bekleyen özetler
+    val waitingUpload by SummaryStore.pendingIds.collectAsState()
     val summaryStatus by AiSummarizer.status.collectAsState()
     val summaryProgress by AiSummarizer.progress.collectAsState()
-    // İnternetsizken yalnızca telefonda kopyası olan dosyalar açılabilir; diğerleri pasif görünür.
     val availableOffline by produceState(emptySet<String>(), state.files, state.offline) {
         value = if (!state.offline) emptySet() else withContext(Dispatchers.IO) {
             state.files.filter { InputCache.get(it.id, it.size) != null }.map { it.id }.toSet()
@@ -262,8 +236,6 @@ private fun BrowserList(
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // key: listede ekleme/silme olunca satırların kimliği korunsun (id'ler birbirine karışmasın diye
-        // klasör ve dosya anahtarları farklı ön ekle başlar).
         items(state.uploads, key = { "upload-${it.id}" }) { upload ->
             UploadRow(
                 item = upload,
@@ -273,7 +245,6 @@ private fun BrowserList(
         }
         items(state.visibleFolders, key = { folderKey(it.id) }) { folder ->
             val rowKey = folderKey(folder.id)
-            // Her klasör bırakma hedefidir. Seçim [FileDragState]'tedir.
             val rowModifier = Modifier
                 .trackBounds(dragState.itemCoords, rowKey)
                 .trackDropFolder(dragState, folder.id, folder.location)
@@ -283,7 +254,6 @@ private fun BrowserList(
                 actions = FolderRowActions(
                     onToggleFavorite = { viewModel.toggleFavorite(folder) },
                     onEdit = { viewModel.openDialog(BrowserDialog.EditFolder(folder)) },
-                    // Favorilerim'de "Taşı" yoktur.
                     onMove = if (viewModel.favoritesOnly) null else ({ viewModel.openDialog(BrowserDialog.MoveFolder(folder)) }),
                     onDelete = { viewModel.openDialog(BrowserDialog.DeleteFolder(folder)) },
                 ),
@@ -311,7 +281,6 @@ private fun BrowserList(
                 ),
                 ai = file.hasSummary || file.id in waitingUpload,
                 aiWorking = file.id in summarizing,
-                // Özetlenirken yüzdesi ("%40"); yüzdesi olmayan işte (özet açılıyor) adımın yazısı.
                 aiStatus = summaryProgress[file.id]?.let { Txt.ai.progressPercent(it) } ?: summaryStatus[file.id],
                 enabled = !state.offline || file.id in availableOffline,
                 menuEnabled = !state.offline,

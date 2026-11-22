@@ -24,10 +24,7 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.unit.IntSize
 
-/**
- * Resim: iki parmakla yakınlaştır/uzaklaştır, yakınlaşmışken sürükle, çift dokunarak 2,5 kat yakınlaştır/sıfırla.
- * Kaydırma sınırı, görüntü ekrandan taşmayacak kadar: kenarlar ekranın dışına sürüklenemez.
- */
+/** Yakınlaştırılabilen resim. Çift dokunuş 2,5 kat yakınlaştırır ya da sıfırlar. */
 @Composable
 internal fun ZoomableImage(bitmap: Bitmap, name: String) {
     var scale by remember { mutableStateOf(1f) }

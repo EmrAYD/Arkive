@@ -6,7 +6,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Telefondaki modelin kuralları: hangi telefonda çalışır, indirme için yer, inen dosyanın denetimi. */
+/** Telefondaki modelin kuralları. */
 class LocalModelPolicyTest {
 
     private val gb = 1_000_000_000L

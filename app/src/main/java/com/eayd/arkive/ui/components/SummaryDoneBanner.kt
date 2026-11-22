@@ -48,13 +48,10 @@ import com.eayd.arkive.ai.SummaryDoneMessage
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.theme.arkiveColors
 
-/** Kartın ekranda kalma süresi (ms). Alttaki ince çizgi kalan süreyi gösterir. */
+/** Kartın ekranda kalma süresi (ms). */
 private const val SHOW_MILLIS = 9_000
 
-/**
- * "Özetleme bitti" kartı: uygulamanın temasına uyan, ekranın altından kayarak gelen kısa bir bildirim. Kartın herhangi bir yerine
- * dokunmak özeti açar ([onOpen]); X ile ya da süre dolunca ([SHOW_MILLIS]) kapanır ([onDismiss]). [done] null ise kart yoktur.
- */
+/** "Özetleme bitti" kartı. Dokununca özet açılır; [done] null ise kart yoktur. */
 @Composable
 fun SummaryDoneBanner(
     done: SummaryDone?,
@@ -158,7 +155,7 @@ private fun BannerCard(done: SummaryDone, onOpen: (SummaryDone) -> Unit, onDismi
                 modifier = Modifier.fillMaxWidth().height(3.dp),
                 color = colors.primary,
                 trackColor = Color.Transparent,
-                drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
+                drawStopIndicator = {},
             )
         }
     }

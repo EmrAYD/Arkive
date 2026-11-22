@@ -83,8 +83,6 @@ fun LoginScreen(
         TextButton(onClick = onNavigateToRegister) { Text(Txt.auth.noAccount) }
     }
 
-    // Google ile ilk kez giren (yeni hesap açılan) kullanıcıya sözleşme gösterilir. Kapatmak = kabul etmemek:
-    // az önce açılan hesap silinir.
     if (eulaPending) {
         EulaDialog(
             onDismiss = { viewModel.declineEula(context) },

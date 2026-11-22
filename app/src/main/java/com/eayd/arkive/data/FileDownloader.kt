@@ -10,13 +10,10 @@ import kotlinx.coroutines.withContext
 import okhttp3.Request
 import okhttp3.ResponseBody
 
-/**
- * Ön izleme için dosyayı imzalı adresten (RustFS) alır. Yükleme gibi bu da backend'den geçmez ve
- * Authorization başlığı göndermez (bkz. [ApiClient.storageHttp]).
- */
+/** Dosyaları depolamadan indirir; backend'den geçmez. */
 object FileDownloader {
 
-    /** Adrese GET atar, başarılıysa gövdeyi [block]'a verir; ağ hatalarını anlaşılır bir mesaja çevirir. */
+    /** Adrese GET atar ve gövdeyi [block]'a verir; ağ hatalarını anlaşılır mesaja çevirir. */
     private suspend fun <T> get(url: String, block: suspend (ResponseBody) -> T): T =
         executeOnStorage(
             request = Request.Builder().url(url).build(),
@@ -27,10 +24,7 @@ object FileDownloader {
             block(body)
         }
 
-    /**
-     * Dosyayı [dest]'e indirir. [maxBytes]'tan büyükse yarıda keser ve hata verir.
-     * [onProgress]: 0f..1f (boyut bilinmiyorsa hiç çağrılmaz); yalnızca yüzde değişince.
-     */
+    /** Dosyayı [dest]'e indirir; [maxBytes]'ı aşarsa yarıda keser. */
     suspend fun downloadTo(url: String, dest: File, maxBytes: Long, onProgress: (Float) -> Unit) {
         get(url) { body ->
             val total = body.contentLength()
@@ -42,7 +36,7 @@ object FileDownloader {
                         var done = 0L
                         var lastPercent = -1
                         while (true) {
-                            ensureActive()   // ekrandan çıkıldıysa indirmeyi bırak
+                            ensureActive()
                             val n = input.read(buffer)
                             if (n < 0) break
                             output.write(buffer, 0, n)
@@ -62,7 +56,7 @@ object FileDownloader {
         }
     }
 
-    /** Dosyanın tamamını [output]'a yazar (kaydetmek için). [output]'u çağıran kapatır. İptal edilirse durur. */
+    /** Dosyayı [output]'a yazar; [output]'u çağıran kapatır. */
     suspend fun copyTo(url: String, output: OutputStream) {
         get(url) { body ->
             withContext(Dispatchers.IO) {
@@ -79,7 +73,7 @@ object FileDownloader {
         }
     }
 
-    /** Metin dosyasının en çok [maxBytes] baytını okur. Döner: (metin, dosyanın devamı kesildi mi). */
+    /** Metin dosyasının ilk [maxBytes] baytını okur; ikinci değer devamının kesilip kesilmediği. */
     suspend fun readText(url: String, maxBytes: Int): Pair<String, Boolean> = get(url) { body ->
         withContext(Dispatchers.IO) {
             val out = ByteArrayOutputStream()

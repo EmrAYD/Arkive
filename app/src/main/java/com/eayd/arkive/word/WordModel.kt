@@ -1,20 +1,12 @@
 package com.eayd.arkive.word
 
-/**
- * Word belgesinin ekranda çizilecek sade modeli. .docx ([DocxReader]) ve eski .doc ([DocReader]) aynı modele
- * çevrilir; görüntüleyici ([com.eayd.arkive.screens.preview.WordViewer]) dosya biçimini bilmez.
- * Bu paket Android'e bağlı değildir (yalnızca Java/Kotlin standart kütüphanesi), bu yüzden bilgisayarda test edilir.
- */
+/** Paragraf hizası. */
 
 enum class WordAlign { Left, Center, Right, Justify }
 
 enum class WordFont { Sans, Serif, Mono }
 
-/**
- * Aynı biçime sahip bir metin parçası. [color] ve [highlight] ARGB'dir (null: varsayılan renk / vurgu yok).
- * [script]: 1 üst simge, -1 alt simge. [link]: tıklanınca açılacak adres (yalnızca http/https/mailto).
- * Metinde '\n' satır sonu, '\t' sekme demektir.
- */
+/** Aynı biçimdeki metin parçası. [script] 1 ise üst, -1 ise alt simge. */
 data class WordRun(
     val text: String,
     val bold: Boolean = false,
@@ -31,21 +23,17 @@ data class WordRun(
     companion object {
         const val DEFAULT_SIZE_PT = 11f
 
-        /** Üst/alt simge metninin görüntüleyicide küçültüldüğü oran. */
+        /** Üst ve alt simge metninin küçültme oranı. */
         const val SCRIPT_SHRINK = 0.7f
 
-        /** Satır yükseltme (w:position / sprmCHpsPos) bu yarım punto değerinden büyükse simge sayılır. */
+        /** Satır bundan fazla yükseltilmişse üst ya da alt simge sayılır. */
         const val MIN_RAISE_HALF_POINTS = 2
     }
 }
 
 sealed interface WordBlock
 
-/**
- * Bir paragraf. Girinti ve boşluklar punto (pt) cinsindendir. [firstLinePt] ilk satırın [indentPt]'e göre kaymasıdır
- * (negatif: asılı girinti). [label] liste imi ("•", "1.", "a)"); doluysa görüntüleyici imi asılı girintide çizer.
- * [heading] 1..9: başlık düzeyi, 0: gövde metni. [emptyPt]: paragraf boşsa bıraktığı satırın puntosu.
- */
+/** Bir paragraf. Ölçüler punto cinsindendir; [label] liste imidir. */
 data class WordParagraph(
     val runs: List<WordRun>,
     val align: WordAlign = WordAlign.Left,
@@ -62,7 +50,7 @@ data class WordParagraph(
     val emptyPt: Float = WordRun.DEFAULT_SIZE_PT,
 ) : WordBlock
 
-/** Satır içi ya da kayan görsel. [key] [WordDoc.images] içindeki anahtardır; boyutlar punto, 0: görselin kendi boyutu. */
+/** Görsel. [key] [WordDoc.images] içindeki anahtar. */
 data class WordImage(
     val key: String,
     val widthPt: Float,
@@ -70,7 +58,7 @@ data class WordImage(
     val align: WordAlign = WordAlign.Left,
 ) : WordBlock
 
-/** [columnsPt]: ızgara sütun genişlikleri. [borderColor]: null ise çizgisiz tablo. */
+/** Tablo. [borderColor] null ise çizgisiz. */
 class WordTable(
     val columnsPt: List<Float>,
     val rows: List<WordRow>,
@@ -79,7 +67,7 @@ class WordTable(
 
 class WordRow(val cells: List<WordCell>)
 
-/** [span]: kaç ızgara sütununu kapsadığı. [continuesAbove]: üstteki hücreyle dikey birleşik devam hücresi (içi boş). */
+/** Tablo hücresi. [continuesAbove] üstteki hücreyle birleşik olduğunu söyler. */
 class WordCell(
     val blocks: List<WordBlock>,
     val span: Int = 1,
@@ -88,14 +76,10 @@ class WordCell(
     val continuesAbove: Boolean = false,
 )
 
-/** Sayfa sonu (görüntüleyicide sayfalar arası boşluk). */
+/** Sayfa sonu. */
 data object WordPageBreak : WordBlock
 
-/**
- * Okunmuş belge. [images]: görsel anahtarı → dosya baytları (png/jpeg/gif/bmp/webp). [truncated]: belge çok
- * uzun olduğu için sonu gösterilmiyor. [format]: "docx" ya da "doc". [imageCount]: belgedeki görsel sayısı (gösterilemeyen
- * türler dahil); özetleme "görsel ağırlıklı mı" kararı için.
- */
+/** Okunmuş Word belgesi; .docx ve .doc aynı modele çevrilir. [truncated] belgenin sonunun gösterilmediğini söyler. */
 class WordDoc(
     val blocks: List<WordBlock>,
     val images: Map<String, ByteArray>,
@@ -103,7 +87,7 @@ class WordDoc(
     val format: String,
     val imageCount: Int = images.size,
 ) {
-    /** Belgedeki tüm düz metin (testler ve boş belge denetimi için). */
+    /** Belgedeki tüm düz metin. */
     fun plainText(): String {
         val out = StringBuilder()
         fun walk(list: List<WordBlock>) {
@@ -121,11 +105,7 @@ class WordDoc(
 
     fun isBlank(): Boolean = plainText().isBlank() && images.isEmpty()
 
-    /**
-     * Özetleme için düz metin: her paragraf bir satır (tablo hücrelerindeki paragraflar da, sırayla), ardışık boş
-     * satırlar teke iner. Biçim (kalın, renk...) taşımaz. Telefondaki .docx okuyucusunun ([com.eayd.arkive.ai.DocumentReader])
-     * çıkardığı metinle aynı düzendedir, böylece .doc ile .docx aynı biçimde özetlenir.
-     */
+    /** Özetleme için düz metin: her paragraf bir satır. */
     fun summaryText(): String {
         val lines = ArrayList<String>()
         fun walk(list: List<WordBlock>) {
@@ -140,6 +120,6 @@ class WordDoc(
     }
 }
 
-/** Dosya Word belgesi olarak okunamadı (bozuk, desteklenmeyen biçim…). */
+/** Dosya Word belgesi olarak okunamadı. */
 class WordFormatException(message: String) : Exception(message)
 

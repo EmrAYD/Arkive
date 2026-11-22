@@ -27,10 +27,9 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
 /**
- * Özetleme sürerken çalışan ön plan servisi. Android, arka plana alınan bir uygulamanın işlemcisini kısıtlar ve
- * süreci dondurur ya da sonlandırır; dosyanın indirilmesi ve sunucudaki özetleme dakikalar sürebildiğinden bu olmadan iş yarıda kalırdı.
- * Servis yalnızca ilerleme bildirimini gösterir ve CPU uyumasın diye kısmi WakeLock tutar; asıl iş [AiSummarizer]'dadır.
- * Özetlenen dosya kalmayınca kendini kapatır.
+ * Özetleme sürerken çalışan ön plan servisi.
+ *
+ * Uygulama arka plandayken Android'in süreci dondurmasını önler ve ilerleme bildirimini gösterir.
  */
 class SummaryService : Service() {
 
@@ -41,9 +40,7 @@ class SummaryService : Service() {
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        // Süreç bu servisle (Activity olmadan) başlamış olabilir: bildirim metinleri seçili dilde olsun diye dil okunur.
         AppSettings.storedAppLanguage(this)
-        // startForegroundService() çağrısından sonra 5 sn içinde startForeground() gerekir: ilk iş budur.
         goForeground(buildNotification(Txt.ai.serviceStarting))
         acquireWakeLock()
         if (watcher == null) {
@@ -81,7 +78,6 @@ class SummaryService : Service() {
     private fun acquireWakeLock() {
         if (wakeLock?.isHeld == true) return
         val power = getSystemService(PowerManager::class.java) ?: return
-        // Üst sınırlı: en kötü durumda 30 dakika sonra kendiliğinden bırakılır.
         wakeLock = power.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "arkive:summary").apply {
             setReferenceCounted(false)
             acquire(30 * 60 * 1000L)
@@ -116,11 +112,9 @@ class SummaryService : Service() {
         private const val CHANNEL_ID = "ai_summary"
         private const val NOTIFICATION_ID = 4101
 
-        /** Servisi başlatır (zaten çalışıyorsa bir şey değişmez). */
+        /** Servisi başlatır. Manifest'te tanımlı değilse başlatmaz ve Logcat'e hata yazar. */
         fun start(context: Context) {
             val intent = Intent(context, SummaryService::class.java)
-            // AndroidManifest.xml'de <service> yoksa Android servisi sessizce başlatmaz: uygulama arka plana alınınca süreç
-            // dondurulur, özetlemenin sonucu alınamaz ve bildirim gelmez. Bu durum Logcat'te açıkça görünsün.
             if (context.packageManager.resolveService(intent, 0) == null) {
                 Log.e(TAG, "SummaryService AndroidManifest.xml'de tanımlı değil; özetleme arka planda sürmez, bildirim gelmez.")
                 return

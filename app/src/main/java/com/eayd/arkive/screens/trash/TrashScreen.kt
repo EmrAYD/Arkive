@@ -64,24 +64,16 @@ import com.eayd.arkive.viewmodel.TrashViewModel
 import com.eayd.arkive.viewmodel.fileKey
 import com.eayd.arkive.viewmodel.folderKey
 
-/**
- * Çöp kutusu. Normal modda: solda geri oku (ana ekranın içindeyken, yani [onOpenMenu] verilmişse bunun yerine menü düğmesi), başlık + öğe sayısı, sağda "Tümünü sil" (kökte; onay sorar) ve "Seç"; altında saklama süresini anlatan bilgi
- * metni ve silinen öğeler (her birinde kalıcı silinmeye kalan gün). "Seç"e ya da bir öğeye basınca seçim modu
- * açılır: solda "Hepsi", ortada başlık, sağda "İptal"; öğelerde seçim daireleri; altta "Geri yükle" ve "Kalıcı olarak sil".
- * Ekran yalnızca [TrashViewModel] durumunu çizer; seçim, geri yükleme ve silme ViewModel'dedir.
- */
+/** Çöp kutusu: silinen öğeler, seçim, geri yükleme ve kalıcı silme. */
 @Composable
 fun TrashScreen(
     viewModel: TrashViewModel,
     onBack: () -> Unit,
     onOpenFolder: (folderId: String) -> Unit,
     onOpenFile: (fileId: String) -> Unit,
-    /**
-     * Ana ekranın içindeki (kök) çöp kutusunda verilir: soldaki geri oku yerine, diğer sayfalardaki gibi yan menüyü açan
-     * hamburger düğmesi gösterilir. Çöpteki bir klasörün içinde (ayrı ekran) verilmez; orada geri oku kalır.
-     */
+    /** Ana ekrandaki çöp kutusunda verilir; geri oku yerine menü düğmesi çıkar. */
     onOpenMenu: (() -> Unit)? = null,
-    /** false: sayfa şu an görünmüyor (üstünde profil sayfası açık); seçim modu kapatılır. */
+    /** false ise sayfa görünmüyor; seçim modu kapatılır. */
     active: Boolean = true,
 ) {
     val state by viewModel.state.collectAsState()
@@ -89,13 +81,10 @@ fun TrashScreen(
     val inFolder = viewModel.isFolderView
 
     LaunchedEffect(viewModel) { viewModel.onShown() }
-    // Sayfadan çıkılınca (menüden başka bölüme geçildi, bir klasöre girildi) seçim modu kapanır; geri gelince sürmez.
-    // Ekran döndürülünce kapanmaz.
     LeaveEffect(viewModel) { viewModel.stopSelecting() }
     LaunchedEffect(active) { if (!active) viewModel.stopSelecting() }
     NoticeEffect(state.notice, notices, viewModel::clearNotice)
 
-    // Geri tuşu: önce seçim modundan çıkar, sonra çöp kutusundan.
     BackHandler { if (state.selection.active) viewModel.stopSelecting() else onBack() }
 
     Box(Modifier.fillMaxSize().safeDrawingPadding()) {
@@ -113,7 +102,6 @@ fun TrashScreen(
                     title = state.folderName ?: Txt.home.trash,
                     subtitle = headerSubtitle(state, inFolder),
                     showSelect = !state.isLoading && state.itemCount > 0,
-                    // Tüm çöp kutusunu boşaltma yalnızca kökte; çöpteki bir klasörün içinde gösterilmez.
                     showEmpty = !state.isLoading && state.itemCount > 0 && !inFolder,
                     emptyEnabled = !state.busy,
                     onBack = onBack,
@@ -170,8 +158,6 @@ fun TrashScreen(
     }
 }
 
-// --- Başlıklar --------------------------------------------------------------------------------------
-
 @Composable
 private fun TrashHeader(
     title: String,
@@ -211,7 +197,6 @@ private fun TrashHeader(
             )
         }
         if (showEmpty) {
-            // "Seç"in solunda: kırmızı, çünkü her şeyi kalıcı siler (önce onay penceresi açılır).
             TextButton(
                 onClick = onEmpty,
                 enabled = emptyEnabled,
@@ -224,7 +209,7 @@ private fun TrashHeader(
     }
 }
 
-/** Seçim modunun başlığı: solda daire + "Hepsi", ortada "Öğeleri seç" / "N öğe seçildi", sağda "İptal". */
+/** Seçim modunun başlığı: "Hepsi", seçili sayısı ve "İptal". */
 @Composable
 private fun SelectionHeader(
     count: Int,
@@ -260,7 +245,7 @@ private fun SelectionHeader(
     }
 }
 
-/** Başlığın altındaki satır: kökte öğe sayısı, klasör içinde "Çöp kutusunda · N gün kaldı". */
+/** Başlığın altındaki satır: kökte öğe sayısı, klasör içinde kalan gün. */
 private fun headerSubtitle(state: TrashUiState, inFolder: Boolean): String = when {
     inFolder -> Txt.trash.inTrash + (state.folderDaysLeft?.let {
         " · " + if (it <= 0) Txt.trash.deletedToday else Txt.trash.daysLeft(it)
@@ -268,8 +253,6 @@ private fun headerSubtitle(state: TrashUiState, inFolder: Boolean): String = whe
     state.itemCount == 0 -> Txt.trash.empty
     else -> Txt.trash.itemCount(state.itemCount)
 }
-
-// --- Liste ------------------------------------------------------------------------------------------
 
 @Composable
 private fun TrashList(
@@ -298,7 +281,7 @@ private fun TrashList(
             TrashRow(
                 title = folder.name,
                 subtitle = if (folder.fileCount == 0) Txt.trash.folder else Txt.trash.folderMeta(folder.fileCount, formatBytes(folder.size)),
-                daysLeft = folder.daysLeft.takeUnless { inFolder },   // klasörün içindekiler klasörle birlikte silindi: aynı gün sayısını tekrarlamaya gerek yok
+                daysLeft = folder.daysLeft.takeUnless { inFolder },
                 icon = { FolderGlyph(folderAccent(folder.color), folder.emoji) },
                 selecting = selection.active,
                 selected = key in selection.keys,
@@ -328,7 +311,7 @@ private val FOLDER_INFO: String
 private fun infoText(days: Int): String =
     Txt.trash.retentionNote(days)
 
-/** Çöp kutusu satırı: ortak [ItemRow] + sağda kalıcı silinmeye kalan gün ([daysLeft] null ise gösterilmez). */
+/** Çöp kutusu satırı; sağda kalıcı silinmeye kalan gün. */
 @Composable
 private fun TrashRow(
     title: String,
@@ -353,7 +336,6 @@ private fun TrashRow(
                 Text(
                     text = if (daysLeft <= 0) Txt.trash.today else Txt.trash.daysShort(daysLeft),
                     style = MaterialTheme.typography.labelMedium,
-                    // Süresi dolmaya 3 gün ya da daha az kaldıysa dikkat çekmesi için kırmızı.
                     color = if (daysLeft <= 3) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.outline,
                     modifier = Modifier.padding(horizontal = 12.dp),
                 )
@@ -361,8 +343,6 @@ private fun TrashRow(
         },
     )
 }
-
-// --- Alt çubuk, boş durum ---------------------------------------------------------------------------
 
 @Composable
 private fun ActionBar(enabled: Boolean, onRestore: () -> Unit, onDeleteForever: () -> Unit) {

@@ -33,7 +33,7 @@ import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.ui.components.SkeletonBox
 
-/** Ses: [MediaPlayer] ile akıştan çalar; oynat/durdur düğmesi ve ilerleme çubuğu bu ekranda çizilir. */
+/** Ses oynatıcı; akıştan çalar. */
 @Composable
 internal fun AudioPlayer(url: String, file: FileDto, onOpenExternally: () -> Unit) {
     var failed by remember(url) { mutableStateOf(false) }
@@ -61,7 +61,7 @@ internal fun AudioPlayer(url: String, file: FileDto, onOpenExternally: () -> Uni
             }
             player.setOnCompletionListener { playing = false; position = 0 }
             player.setOnErrorListener { _, _, _ -> failed = true; true }
-            player.prepareAsync()   // arka planda hazırlanır, arayüzü bloklamaz
+            player.prepareAsync()
         } catch (e: Exception) {
             failed = true
         }

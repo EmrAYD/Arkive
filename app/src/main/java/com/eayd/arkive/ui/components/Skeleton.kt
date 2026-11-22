@@ -33,10 +33,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.i18n.Txt
 
-// Yüklenen içeriğin yerinde gösterilen iskelet (skeleton) görünümler: dönen çark yerine, içeriğin şeklini taklit eden
-// ve üzerinden ışık geçen gri bloklar.
-
-/** Arka planı soldan sağa kayan bir ışık şeridiyle dolar. Işığın konumu yalnızca çizim aşamasında okunur. */
+/** Üzerinden kayan bir ışık şeridi çizer. */
 @Composable
 private fun Modifier.shimmer(): Modifier {
     val base = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.08f)
@@ -54,13 +51,13 @@ private fun Modifier.shimmer(): Modifier {
     }
 }
 
-/** Tek bir iskelet bloğu (metin çubuğu, simge, görsel alanı…). Boyutunu çağıran verir. */
+/** Tek bir iskelet bloğu. */
 @Composable
 fun SkeletonBox(modifier: Modifier = Modifier, shape: Shape = RoundedCornerShape(6.dp)) {
     Box(modifier.clip(shape).shimmer())
 }
 
-/** Liste yüklenirken: gerçek satırlarla ([ItemRow]) aynı kart biçiminde, simge + iki satır metin görünümlü satırlar. */
+/** Liste yüklenirken gösterilen iskelet satırlar. */
 @Composable
 fun ListSkeleton(
     modifier: Modifier = Modifier,
@@ -98,7 +95,7 @@ private fun SkeletonRow(titleWidth: Float) {
     }
 }
 
-/** Depolama kullanımı (çubuk + iki satır metin) yüklenirken. */
+/** Depolama kullanımı yüklenirken gösterilen iskelet. */
 @Composable
 fun StorageSkeleton(modifier: Modifier = Modifier) {
     Column(

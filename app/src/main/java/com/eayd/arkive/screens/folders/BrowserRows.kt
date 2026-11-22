@@ -38,10 +38,7 @@ import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.viewmodel.UploadItem
 import com.eayd.arkive.viewmodel.UploadPhase
 
-// Liste ekranının satırları. Hepsi ortak [ItemRow] üzerine kurulu; fark yalnızca içerik ve menülerdir.
-
-/** Satırda yapılabilecek işlemler: ekran bunları ViewModel'e bağlar. */
-/** [onMove] null ise menüde "Taşı" gösterilmez (Favorilerim'de taşıma yoktur). */
+/** Klasör satırının işlemleri. [onMove] null ise "Taşı" gösterilmez. */
 class FolderRowActions(
     val onToggleFavorite: () -> Unit,
     val onEdit: () -> Unit,
@@ -49,7 +46,7 @@ class FolderRowActions(
     val onDelete: () -> Unit,
 )
 
-/** [onMove] null ise menüde "Taşı" gösterilmez (Favorilerim'de taşıma yoktur). */
+/** Dosya satırının işlemleri. [onMove] null ise "Taşı" gösterilmez. */
 class FileRowActions(
     val onToggleFavorite: () -> Unit,
     val onToggleAi: () -> Unit,
@@ -68,9 +65,9 @@ fun FolderRow(
     modifier: Modifier = Modifier,
     selectionMode: Boolean = false,
     selected: Boolean = false,
-    highlighted: Boolean = false,   // sürüklenen öğe şu an bu klasörün üstünde
-    dimmed: Boolean = false,        // sürüklenen klasörün yerindeki satır soluk görünür
-    menuEnabled: Boolean = true,    // internetsizken 3 nokta menüsü pasiftir
+    highlighted: Boolean = false,
+    dimmed: Boolean = false,
+    menuEnabled: Boolean = true,
 ) {
     ItemRow(
         title = folder.name,
@@ -107,12 +104,12 @@ fun FileRow(
     modifier: Modifier = Modifier,
     selectionMode: Boolean = false,
     selected: Boolean = false,
-    dimmed: Boolean = false,   // sürüklenen dosyanın yerindeki satır soluk görünür
-    ai: Boolean? = false,      // dosyanın özeti var mı (AI düğmesi dolu görünür); null ise düğme hiç gösterilmez
-    aiWorking: Boolean = false, // özet hazırlanıyor mu (AI düğmesi yerine yükleme simgesi)
-    aiStatus: String? = null,   // özetleme sürerken yüzdesi ya da adımı (boyutun yanında gösterilir: "1,2 MB · %40")
-    enabled: Boolean = true,    // false: satır pasif (internetsizken telefonda kopyası olmayan dosya)
-    menuEnabled: Boolean = true, // internetsizken 3 nokta menüsü pasiftir
+    dimmed: Boolean = false,
+    ai: Boolean? = false,
+    aiWorking: Boolean = false,
+    aiStatus: String? = null,
+    enabled: Boolean = true,
+    menuEnabled: Boolean = true,
 ) {
     ItemRow(
         title = file.name,
@@ -146,13 +143,13 @@ fun FileRow(
     )
 }
 
-/** Seçim modunda satırın sağındaki onay kutusu. Satırın tamamı tıklanır, kutunun kendisi yalnızca gösterir. */
+/** Seçim modundaki onay kutusu; yalnızca gösterir. */
 @Composable
 private fun SelectionCheck(checked: Boolean) {
     Checkbox(checked = checked, onCheckedChange = null, modifier = Modifier.padding(end = 12.dp))
 }
 
-/** Devam eden ya da başarısız olmuş bir yüklemenin satırı: ad, ilerleme çubuğu ve iptal/kapat düğmesi. */
+/** Süren ya da başarısız yüklemenin satırı. */
 @Composable
 fun UploadRow(item: UploadItem, onCancel: () -> Unit, onDismiss: () -> Unit) {
     val failed = item.phase == UploadPhase.Failed
@@ -187,7 +184,7 @@ fun UploadRow(item: UploadItem, onCancel: () -> Unit, onDismiss: () -> Unit) {
                         LinearProgressIndicator(
                             progress = { item.progress },
                             modifier = Modifier.fillMaxWidth(),
-                            drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
+                            drawStopIndicator = {},
                         )
                         Spacer(Modifier.height(4.dp))
                         UploadStatus(Txt.browser.uploadProgress((item.progress * 100).toInt()))

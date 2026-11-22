@@ -59,11 +59,7 @@ import com.eayd.arkive.utils.toApiErrorMessage
 import kotlin.coroutines.cancellation.CancellationException
 import kotlinx.coroutines.launch
 
-/**
- * Plus tanıtımı açık mı ([PlusOffer]); açıksa tam ekran pencereyi gösterir. Uygulamada bir kez, ana gezinmenin
- * yanında durur (ArkiveNavHost): AI düğmesi, yan menüdeki "Daha fazla depolama alanı alın" ve profildeki "Plus'a geç"
- * aynı pencereyi açar.
- */
+/** Plus tanıtımı açıksa tam ekran pencereyi gösterir. */
 @Composable
 fun PlusOfferHost() {
     val request by PlusOffer.request.collectAsState()
@@ -71,13 +67,7 @@ fun PlusOfferHost() {
     request?.let { PlusOfferDialog(reason = it.reason, alreadyPlus = quota?.isPlus == true, onDismiss = PlusOffer::dismiss) }
 }
 
-/**
- * Tüm ekranı kaplayan Plus tanıtımı: logo ve başlık, (varsa) neden açıldığı, Plus'ın sundukları (toplam depolama, tek
- * seferde yükleme sınırı, yapay zeka özetleri) ve fiyatlı "Plus'a geç" düğmesi. Sağ üstteki çarpı ya da geri tuşu kapatır.
- *
- * DENEME İÇİN: ödeme sistemi yok; "Plus'a geç" ödeme almadan Plus'a geçirir ([PlanSwitcher], 30 gün), Plus'taki kullanıcı
- * buradan ücretsiz plana dönebilir. Sunucuda PLAN_SWITCH_ENABLED kapatılınca düğme hatayı gösterir.
- */
+/** Tam ekran Plus tanıtımı. Deneme sürümünde ödeme almadan Plus'a geçirir. */
 @Composable
 private fun PlusOfferDialog(reason: String?, alreadyPlus: Boolean, onDismiss: () -> Unit) {
     val colors = MaterialTheme.colorScheme
@@ -110,7 +100,6 @@ private fun PlusOfferDialog(reason: String?, alreadyPlus: Boolean, onDismiss: ()
     ) {
         Surface(modifier = Modifier.fillMaxSize(), color = colors.background) {
             Box(Modifier.fillMaxSize()) {
-                // Üstte temanın renginden arka plana yumuşak geçiş.
                 Box(
                     Modifier
                         .fillMaxWidth()
@@ -196,7 +185,6 @@ private fun PlusOfferDialog(reason: String?, alreadyPlus: Boolean, onDismiss: ()
                         Spacer(Modifier.height(24.dp))
                     }
 
-                    // Altta sabit: fiyatlı düğme.
                     Column(
                         modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 16.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,

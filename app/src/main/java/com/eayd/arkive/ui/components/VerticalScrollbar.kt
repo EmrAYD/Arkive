@@ -10,15 +10,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-/**
- * Kaydırılabilir alanın sağ kenarına ince bir kaydırma çubuğu çizer: soluk bir ray ve üzerinde içeriğin görünen kısmını
- * gösteren tutamaç. İçerik alana sığıyorsa hiçbir şey çizilmez. Çubuk hep görünür (kaydırınca kaybolmaz): metnin
- * kaydırılabildiği ilk bakışta anlaşılsın diye.
- *
- * Compose'un `verticalScroll`'u kendiliğinden çubuk çizmez. Bu değiştirici `verticalScroll`'dan ÖNCE yazılmalıdır
- * (`Modifier.verticalScrollbar(state).verticalScroll(state)`): böylece görünen alanın ölçülerinde çizilir, içerikle
- * birlikte kaymaz. İçeriğe sağdan [width]'ten biraz fazla boşluk bırakılırsa yazı çubuğun altında kalmaz.
- */
+/** Kaydırılabilir alanın sağına ince bir kaydırma çubuğu çizer. İçerik sığıyorsa çizilmez. */
 fun Modifier.verticalScrollbar(
     state: ScrollState,
     thumbColor: Color,
@@ -28,7 +20,6 @@ fun Modifier.verticalScrollbar(
 ): Modifier = drawWithContent {
     drawContent()
     val hidden = state.maxValue
-    // maxValue ilk ölçümden önce Int.MAX_VALUE'dur; 0 ise içerik sığıyordur.
     if (hidden <= 0 || hidden == Int.MAX_VALUE) return@drawWithContent
     val viewport = size.height
     val barWidth = width.toPx()

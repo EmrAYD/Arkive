@@ -11,24 +11,18 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 
-/**
- * "Taşı" penceresindeki klasör ağacında gezinti. Liste ekranı ve ön izleme ekranı aynı pencereyi kullanır;
- * klasörleri sunucudan bu ViewModel getirir.
- *
- * [path]: kökten şu anki klasöre inen klasörler (boşsa "Ana Sayfa"nın en üstündeyiz). [folders]: şu anki
- * klasörün alt klasörleri; null ise yükleniyor.
- */
+/** "Taşı" penceresindeki klasör ağacında gezinti. [path] kökten şu anki klasöre kadar olan klasörler. */
 data class MoveFolderState(
     val path: List<FolderDto> = emptyList(),
     val folders: List<FolderDto>? = null,
     val error: String? = null,
-    /** Gezinilen sayfa (klasörler yalnızca ana sayfada: [FolderLocations.HOME]). */
+    /** Gezinilen sayfa. */
     val location: String = FolderLocations.HOME,
 ) {
     /** Sayfanın en üstünün adı. */
     val rootName: String get() = Txt.home.home
 
-    /** Şu anki klasörün kimliği (null = sayfanın en üstü). */
+    /** Şu anki klasör; en üstteyse null. */
     val currentId: String? get() = path.lastOrNull()?.id
     val currentName: String get() = path.lastOrNull()?.name ?: rootName
     val breadcrumb: String get() = (listOf(rootName) + path.map { it.name }).joinToString("  ›  ")
@@ -41,7 +35,7 @@ class MoveFolderViewModel : ViewModel() {
 
     private var job: Job? = null
 
-    /** Pencere her açıldığında çağrılır: [location] sayfasının en üstünden başlar. */
+    /** Pencere her açıldığında [location] sayfasının en üstünden başlar. */
     fun start(location: String = FolderLocations.HOME) {
         _state.value = MoveFolderState(location = location)
         go(emptyList())
@@ -53,7 +47,7 @@ class MoveFolderViewModel : ViewModel() {
 
     fun retry() = go(_state.value.path)
 
-    /** Pencere kapandı: bekleyen istek iptal edilir, gezinti sıfırlanır. */
+    /** Pencere kapandı; bekleyen istek iptal edilir. */
     fun clear() {
         job?.cancel()
         _state.value = MoveFolderState(location = _state.value.location)
@@ -65,7 +59,6 @@ class MoveFolderViewModel : ViewModel() {
         _state.value = MoveFolderState(path = path, location = location)
         val parentId = path.lastOrNull()?.id
         job = launchCatching(onError = { message -> _state.update { it.copy(error = message) } }) {
-            // Kökte yalnızca o sayfanın klasörleri istenir.
             val children = ApiClient.api.getFolders(
                 parentId = parentId,
                 location = if (parentId == null) location else null,

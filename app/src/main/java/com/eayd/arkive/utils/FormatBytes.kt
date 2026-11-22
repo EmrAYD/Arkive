@@ -2,7 +2,7 @@ package com.eayd.arkive.utils
 
 import com.eayd.arkive.i18n.Lang
 
-/** Bayt sayısını okunur biçime çevirir: 1536 → "1,5 KB" (İngilizcede "1.5 KB"), 104857600 → "100 MB". */
+/** Bayt sayısını okunur yazar, ör. 1536 için "1,5 KB". */
 fun formatBytes(bytes: Long): String {
     if (bytes < 1024) return "$bytes B"
     val units = listOf("KB", "MB", "GB", "TB")
@@ -12,7 +12,6 @@ fun formatBytes(bytes: Long): String {
         value /= 1024
         unit++
     }
-    // Tam sayıysa ondalık göstermeyelim ("100 MB"), değilse bir basamak ("7,6 MB").
     val text = if (value % 1.0 == 0.0) String.format(Lang.locale, "%.0f", value) else String.format(Lang.locale, "%.1f", value)
     return "$text ${units[unit]}"
 }

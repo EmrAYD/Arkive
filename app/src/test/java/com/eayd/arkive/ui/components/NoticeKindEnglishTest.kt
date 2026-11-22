@@ -8,7 +8,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Before
 import org.junit.Test
 
-/** İngilizce bildirimler de doğru simge ve renkle gösterilir (Türkçe kalıplar NoticeKindTest'te). */
+/** İngilizce bildirimlerin türü doğru anlaşılıyor mu. */
 class NoticeKindEnglishTest {
 
     @Before
@@ -25,7 +25,7 @@ class NoticeKindEnglishTest {
     fun `hata mesajlari`() {
         assertEquals(NoticeKind.Error, NoticeKind.classify(EnStrings.errors.serverUnreachable))
         assertEquals(NoticeKind.Error, NoticeKind.classify(EnStrings.ai.summarizeFailed("a.pdf", "x")))
-        assertEquals(NoticeKind.Error, NoticeKind.classify(EnStrings.errors.badRequest)) // "Invalid" büyük harfle başlar
+        assertEquals(NoticeKind.Error, NoticeKind.classify(EnStrings.errors.badRequest))
         assertEquals(NoticeKind.Error, NoticeKind.classify(EnStrings.docs.wrongPassword))
         assertEquals(NoticeKind.Error, NoticeKind.classify(EnStrings.errors.forbidden))
     }

@@ -2,12 +2,7 @@ package com.eayd.arkive.utils
 
 import com.eayd.arkive.i18n.Txt
 
-
-/**
- * Dosyanın mime türüne göre kaba sınıfı. Simge ([com.eayd.arkive.ui.components.fileTypeIcon]), tür adı
- * ([fileTypeLabel]), ön izleme türü ([previewKind]) ve "Kategori" filtresi aynı sınıflandırmayı kullanır;
- * böylece bir dosya bir yerde "belge", başka yerde "diğer" sayılmaz.
- */
+/** Dosyanın türüne göre kaba sınıfı. Simge, tür adı, ön izleme ve filtre aynı sınıflandırmayı kullanır. */
 enum class FileKind { Image, Video, Audio, Pdf, Text, Word, Excel, Presentation, Document, Archive, Other }
 
 private val archiveMarkers = listOf("zip", "rar", "7z", "tar", "gzip", "compressed")
@@ -29,13 +24,12 @@ fun fileKind(mimeType: String?): FileKind {
     }
 }
 
-/** Dosya türünün okunur adı: "Resim (JPG)", "PDF", "Word belgesi (DOCX)"… */
+/** Dosya türünün okunur adı, ör. "Word belgesi (DOCX)". */
 fun fileTypeLabel(mimeType: String?, fileName: String): String {
     val kind = when (fileKind(mimeType)) {
         FileKind.Image -> Txt.files.kindImage
         FileKind.Video -> Txt.files.kindVideo
         FileKind.Audio -> Txt.files.kindAudio
-        // PDF'in tek bir adı var: uzantı eklemeye gerek yok.
         FileKind.Pdf -> return "PDF"
         FileKind.Text -> Txt.files.kindText
         FileKind.Word -> Txt.files.kindWord
@@ -45,7 +39,6 @@ fun fileTypeLabel(mimeType: String?, fileName: String): String {
         FileKind.Archive -> Txt.files.kindArchive
         FileKind.Other -> Txt.files.kindFile
     }
-    // Uzantı çok uzunsa (ör. noktalı bir ad) gösterme.
     val extension = fileName.substringAfterLast('.', "").uppercase()
     return if (extension.isNotEmpty() && extension.length <= 5) "$kind ($extension)" else kind
 }
@@ -59,10 +52,9 @@ private val wordMimeTypes = setOf(
     "application/vnd.ms-word.template.macroenabled.12",
 )
 
-// docx/docm/dotx/dotm aynı zip biçimindedir; doc/dot eski ikili biçimdir. İkisi de aynı görüntüleyiciyle açılır.
 private val wordExtensions = setOf("docx", "docm", "dotx", "dotm", "doc", "dot")
 
-/** Uygulamanın içinde gösterebildiğimiz dosya türleri. [Word]: .docx ve eski .doc. */
+/** Uygulamanın içinde gösterilebilen türler. */
 enum class PreviewKind { Image, Pdf, Word, Text, Video, Audio, None }
 
 private val textMimeTypes = setOf(
@@ -76,20 +68,15 @@ private val textExtensions = setOf(
     "sql", "sh", "bat", "gradle", "toml",
 )
 
-/**
- * Dosyanın hangi tür ön izlemeyle açılacağını belirler. Önce sunucudaki mime türüne bakılır; tür genel
- * ("application/octet-stream") ya da bilinmiyorsa dosya uzantısına bakılır.
- */
+/** Dosyanın hangi ön izlemeyle açılacağı. Tür bilinmiyorsa uzantıya bakılır. */
 fun previewKind(mimeType: String?, fileName: String): PreviewKind {
     val mime = mimeType?.lowercase().orEmpty()
     val ext = fileName.substringAfterLast('.', "").lowercase()
     val kind = fileKind(mime)
     return when {
-        // SVG bir "image/" türüdür ama BitmapFactory çözemez.
         mime == "image/svg+xml" -> PreviewKind.None
         kind == FileKind.Image -> PreviewKind.Image
         kind == FileKind.Pdf || ext == "pdf" -> PreviewKind.Pdf
-        // Word belgesi (.docx ve eski .doc): biçimiyle (başlık, liste, tablo, görsel) çizilir.
         mime in wordMimeTypes || ext in wordExtensions -> PreviewKind.Word
         kind == FileKind.Video -> PreviewKind.Video
         kind == FileKind.Audio -> PreviewKind.Audio

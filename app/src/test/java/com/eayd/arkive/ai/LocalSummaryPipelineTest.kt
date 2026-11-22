@@ -7,7 +7,7 @@ import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Telefondaki yapay zekanın özetleme adımları (model yerine sahte yanıtlarla). */
+/** Telefondaki özetleme adımları; model yerine sahte yanıtlar kullanılır. */
 class LocalSummaryPipelineTest {
 
     private class Calls {
@@ -36,7 +36,7 @@ class LocalSummaryPipelineTest {
         assertEquals(LocalSummaryPipeline.FINAL_MAX_TOKENS, tokens)
         assertTrue(prompt.contains("Toplantı salı günü yapılacak."))
         assertTrue(prompt.contains("\"Bu belge\" diye başla") && prompt.contains("tek paragrafta"))
-        assertEquals(listOf(1 to 1), steps) // kısa belgede de ilerleme bildirilir
+        assertEquals(listOf(1 to 1), steps)
     }
 
     @Test
@@ -64,7 +64,7 @@ class LocalSummaryPipelineTest {
         val text = ("Kelime ".repeat(1500) + "\n\n").repeat(5)
         val out = pipeline(calls = calls) { prompt ->
             when {
-                prompt.contains("BÖLÜM:") -> "Uzun bir not. ".repeat(150) // ~2 bin karakter: birleştirmeye sığmaz
+                prompt.contains("BÖLÜM:") -> "Uzun bir not. ".repeat(150)
                 prompt.startsWith("Aşağıda bir belgenin ardışık") -> "Kısa not."
                 else -> "Bu belge uzundur."
             }
@@ -79,7 +79,7 @@ class LocalSummaryPipelineTest {
         val text = (1..400).joinToString(" ") { "Cümle numarası $it burada bitiyor." }
         val parts = LocalSummaryPipeline.chunks(text, size = 1_000)
         assertTrue(parts.all { it.length <= 1_000 })
-        assertTrue(parts.dropLast(1).all { it.endsWith(".") }) // cümle sonunda kesilir
+        assertTrue(parts.dropLast(1).all { it.endsWith(".") })
         assertEquals(text.replace(" ", ""), parts.joinToString("").replace(" ", ""))
         assertEquals(listOf("kısa"), LocalSummaryPipeline.chunks("  kısa  "))
         assertTrue(LocalSummaryPipeline.chunks("   ").isEmpty())
@@ -110,7 +110,6 @@ class LocalSummaryPipelineTest {
 
     @Test
     fun `bir bolumun istemi telefondaki modelin baglamina sigar`() {
-        // Türkçede bir belirteç ortalama 3 karakterden uzundur; istem + sistem mesajı + yanıt 4096 belirteci aşmamalı.
         val chunk = "a".repeat(LocalSummaryPipeline.CHUNK_CHARS)
         val prompts = LocalSummaryPipeline.prompts(AppLanguage.Turkish)
         val chars = prompts.single(chunk).length + prompts.system.length

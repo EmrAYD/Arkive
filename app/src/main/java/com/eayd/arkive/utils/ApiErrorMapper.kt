@@ -8,7 +8,7 @@ import java.net.UnknownHostException
 import org.json.JSONObject
 import retrofit2.HttpException
 
-/** Sunucunun hata gövdesindeki {"detail": "..."} mesajını okur (yalnızca düz metinse). */
+/** Sunucunun hata gövdesindeki "detail" mesajı. */
 private fun HttpException.serverDetail(): String? = try {
     val body = response()?.errorBody()?.string()
     if (body.isNullOrBlank()) null else JSONObject(body).opt("detail") as? String
@@ -16,15 +16,11 @@ private fun HttpException.serverDetail(): String? = try {
     null
 }
 
-/** Ağ/sunucu hatalarını kullanıcıya gösterilecek Türkçe mesaja çevirir. */
+/** Ağ ve sunucu hatalarını kullanıcıya gösterilecek mesaja çevirir. */
 fun Throwable.toApiErrorMessage(): String = when (this) {
     is HttpException -> when (val c = code()) {
-        // 400 ve 409'da sunucunun kendi (Türkçe) açıklaması kullanıcıya uygundur,
-        // ör. "Bu konumda aynı adlı bir klasör zaten var".
         400 -> serverDetail() ?: Txt.errors.badRequest
         409 -> serverDetail() ?: Txt.errors.conflict
-        // 413: dosya çok büyük / depolama alanı yetersiz; 503: depolama (RustFS) hazır değil.
-        // İkisinde de sunucunun açıklaması neyin yanlış olduğunu en iyi anlatır.
         413 -> serverDetail() ?: Txt.errors.tooLargeOrNoSpace
         503 -> serverDetail() ?: Txt.errors.serviceUnavailable
         401 -> Txt.errors.sessionInvalid

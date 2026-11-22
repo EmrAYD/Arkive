@@ -17,33 +17,22 @@ import okio.BufferedSink
 import okio.source
 import retrofit2.HttpException
 
-/** Seçilen dosyanın yükleme için gereken bilgileri. */
+/** Yükleme için gereken dosya bilgileri. */
 private class FileMeta(val name: String, val size: Long, val mimeType: String)
 
-/**
- * Bir dosyayı sunucuya yükleyen akış. Backend'in 3 adımlı tasarımını uygular:
- *
- *  1. `POST /files/init`        → backend kuralları denetler, dosya kaydını açar, imzalı adres verir.
- *  2. `PUT <imzalı adres>`      → dosya DOĞRUDAN RustFS'e gider (backend'den geçmez), ilerleme burada izlenir.
- *  3. `POST /files/{id}/complete` → backend dosyanın depolamada gerçekten var olduğunu doğrular, "ready" yapar.
- *
- * Bir yerde hata olur ya da kullanıcı iptal ederse, 1. adımda açılan kayıt sunucudan silinir; böylece
- * "yükleniyor" durumunda takılı kalan ve kotadan yer tutan kayıtlar birikmez.
- */
+/** Dosyayı sunucuya yükler: önce kayıt açılır, dosya doğrudan depolamaya gider, sonra sunucu doğrular. */
 object FileUploader {
 
-    // Sunucudaki mime_type doğrulamasının aynısı; uymayan tür "genel ikili dosya" sayılır.
     private val mimeRegex = Regex("[A-Za-z0-9!#\\$&^_.+-]{1,127}/[A-Za-z0-9!#\\$&^_.+-]{1,127}")
     private const val FALLBACK_MIME = "application/octet-stream"
 
-    /** Seçici penceresinde görünen dosya adı. Yüklenme sırasında listede göstermek için hızlıca okunur. */
+    /** Seçilen dosyanın görünen adı. */
     fun queryName(resolver: ContentResolver, uri: Uri): String {
         val raw = runCatching {
             resolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
                 if (c.moveToFirst() && !c.isNull(0)) c.getString(0) else null
             }
         }.getOrNull() ?: uri.lastPathSegment?.substringAfterLast('/') ?: "dosya"
-        // Sunucu '/' ve '\' içeren adı ve 255 karakterden uzununu reddeder.
         return raw.replace('/', '_').replace('\\', '_').trim().take(255).ifEmpty { "dosya" }
     }
 
@@ -55,7 +44,6 @@ object FileUploader {
         }.getOrNull()
         if (fromProvider != null && fromProvider >= 0) return fromProvider
 
-        // Bazı kaynaklar boyutu bildirmez: akışı sayarak buluruz (yalnızca bu nadir durumda tüm dosya okunur).
         val input = resolver.openInputStream(uri) ?: throw IOException(Txt.errors.fileOpenFailed)
         return input.use { stream ->
             val buffer = ByteArray(64 * 1024)
@@ -84,8 +72,8 @@ object FileUploader {
 
     /**
      * Dosyayı yükler ve sunucudaki hazır kaydı döner.
-     * @param onProgress  0f..1f; yalnızca yüzde değeri değiştiğinde çağrılır (arayüzü boğmamak için).
-     * @param onFinishing dosya depolamaya ulaştı, sunucu doğrulaması (3. adım) başlıyor.
+     *
+     * [onProgress] 0f..1f arası, yalnızca yüzde değişince çağrılır. [onFinishing] doğrulama adımı başlayınca çağrılır.
      */
     suspend fun upload(
         resolver: ContentResolver,
@@ -94,17 +82,15 @@ object FileUploader {
         onProgress: (Float) -> Unit,
         onFinishing: () -> Unit,
     ): FileDto {
-        NetworkPolicy.requireAllowed() // "Yalnızca Wi-Fi" açıksa sunucuda kayıt açılmadan reddedilir
+        NetworkPolicy.requireAllowed()
         val meta = withContext(Dispatchers.IO) { readMeta(resolver, uri) }
         if (meta.size == 0L) throw IOException(Txt.errors.emptyFileUpload)
 
-        // 1. adım: hata olursa (boyut sınırı, kota…) henüz sunucuda kayıt açılmadığı için temizlik gerekmez.
         val init = ApiClient.api.initUpload(
             InitUploadRequest(meta.name, meta.size, meta.mimeType, folderId)
         )
         val fileId = init.file.id
 
-        // 2. adım
         try {
             putToStorage(resolver, uri, meta, init, onProgress)
         } catch (e: Throwable) {
@@ -112,14 +98,10 @@ object FileUploader {
             throw e
         }
 
-        // 3. adım
         onFinishing()
         try {
             return ApiClient.api.completeUpload(fileId)
         } catch (e: Throwable) {
-            // Sunucu açıkça reddettiyse (HttpException) ya da kullanıcı iptal ettiyse kaydı sileriz.
-            // Ağ kesintisinde (IOException) sonuç belirsizdir: sunucu belki tamamlamıştır, silersek
-            // başarılı bir yüklemeyi yok etmiş oluruz. O durumda kayıt bırakılır (bkz. README: periyodik temizlik).
             if (e is HttpException || e is CancellationException) deleteQuietly(fileId)
             throw e
         }
@@ -139,7 +121,6 @@ object FileUploader {
             .url(init.uploadUrl)
             .put(UriRequestBody(resolver, uri, contentType, meta.size, onProgress))
             .apply {
-                // Sunucunun istediği ek başlıklar aynen eklenir. Content-Type gövdeden gelir (yukarıda).
                 init.uploadHeaders.forEach { (k, v) ->
                     if (!k.equals("Content-Type", ignoreCase = true)) header(k, v)
                 }
@@ -156,7 +137,7 @@ object FileUploader {
         ) { }
     }
 
-    /** İptal edilmiş bir coroutine içinde bile çalışsın diye NonCancellable. Hata olursa yutulur. */
+    /** Kaydı sessizce siler; iptal edilmiş coroutine içinde de çalışır. */
     private suspend fun deleteQuietly(fileId: String) {
         withContext(NonCancellable) {
             runCatching { ApiClient.api.deleteFile(fileId) }
@@ -164,10 +145,7 @@ object FileUploader {
     }
 }
 
-/**
- * Dosyayı hiç belleğe tümüyle almadan, parça parça ağa yazan istek gövdesi.
- * Boyut önceden bilindiği için Content-Length başlığı gönderilir (imzalı adres bunu bekler).
- */
+/** Dosyayı belleğe almadan parça parça gönderen istek gövdesi. */
 private class UriRequestBody(
     private val resolver: ContentResolver,
     private val uri: Uri,
@@ -195,7 +173,6 @@ private class UriRequestBody(
                     onProgress(percent / 100f)
                 }
             }
-            // Dosya seçildikten sonra küçüldüyse Content-Length tutmaz; OkHttp zaten hata verir, ama anlaşılır olsun.
             if (sent != size) throw IOException(Txt.errors.fileChangedDuringUpload)
         }
     }

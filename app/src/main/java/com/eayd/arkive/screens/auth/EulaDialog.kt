@@ -47,12 +47,7 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import com.eayd.arkive.i18n.Txt
 
-/**
- * Kullanıcı Sözleşmesi'nin tamamını gösteren tam ekran pencere.
- *
- * "Okudum, onaylıyorum" düğmesi, metin en sonuna kadar kaydırılana kadar KAPALIDIR. Bir kez en sona inildikten
- * sonra (kullanıcı geri yukarı kaydırsa bile) açık kalır. Pencere her açıldığında bu durum sıfırdan başlar.
- */
+/** Kullanıcı Sözleşmesi'ni gösteren tam ekran pencere. Onay düğmesi metin sonuna kadar kaydırılınca açılır. */
 @Composable
 fun EulaDialog(
     onDismiss: () -> Unit,
@@ -65,8 +60,6 @@ fun EulaDialog(
         Surface(modifier = Modifier.fillMaxSize(), color = MaterialTheme.colorScheme.background) {
             val listState = rememberLazyListState()
 
-            // Düzen henüz ölçülmeden canScrollForward = false görünür; yanlışlıkla "sona geldi" saymamak için
-            // en az bir öğenin ekranda olması şart koşulur.
             val atEnd by remember {
                 derivedStateOf {
                     listState.layoutInfo.visibleItemsInfo.isNotEmpty() && !listState.canScrollForward
@@ -143,7 +136,7 @@ private fun EulaBlockView(block: EulaBlock) {
     }
 }
 
-/** `**kalın**` işaretli metni, kalın kısımları koyu yazılmış bir [AnnotatedString]'e çevirir. */
+/** `**kalın**` işaretli metni biçimli metne çevirir. */
 private fun boldMarkup(text: String): AnnotatedString = buildAnnotatedString {
     text.split("**").forEachIndexed { index, part ->
         if (index % 2 == 1) {
@@ -154,12 +147,7 @@ private fun boldMarkup(text: String): AnnotatedString = buildAnnotatedString {
     }
 }
 
-/**
- * Kayıt ekranındaki "Kullanıcı Sözleşmesi'ni okudum ve kabul ediyorum" satırı.
- *
- * Kutu doğrudan işaretlenemez: işaretli değilken dokunmak sözleşmeyi açtırır ([onOpen]), kutu yalnızca
- * [EulaDialog] içinde onaylanınca işaretlenir. İşaretliyken dokunmak onayı geri alır ([onWithdraw]).
- */
+/** Kayıt ekranındaki sözleşme onayı. Kutu doğrudan işaretlenmez; sözleşme penceresinde onaylanınca işaretlenir. */
 @Composable
 fun EulaConsentRow(accepted: Boolean, onOpen: () -> Unit, onWithdraw: () -> Unit) {
     val linkColor = MaterialTheme.colorScheme.primary
@@ -174,8 +162,6 @@ fun EulaConsentRow(accepted: Boolean, onOpen: () -> Unit, onWithdraw: () -> Unit
         Checkbox(checked = accepted, onCheckedChange = null)
         Spacer(modifier = Modifier.width(8.dp))
         Text(
-            // Türkçede bağlantı başta ("Kullanıcı Sözleşmesi'ni okudum…"), İngilizcede ortadadır ("I have read and accept the
-            // User Agreement."); bu yüzden bağlantının önü ve arkası ayrı metinlerdir.
             text = buildAnnotatedString {
                 append(Txt.eula.consentPrefix)
                 withStyle(SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)) {

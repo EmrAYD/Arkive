@@ -28,30 +28,23 @@ import com.eayd.arkive.navigation.ArkiveNavHost
 import com.eayd.arkive.ui.theme.ArkiveTheme
 import java.util.Locale
 
-// enableEdgeToEdge varsayılanlarıyla aynı gezinme çubuğu perdeleri.
 private val NAV_BAR_LIGHT_SCRIM = Color.argb(0xe6, 0xFF, 0xFF, 0xFF)
 private val NAV_BAR_DARK_SCRIM = Color.argb(0x80, 0x1b, 0x1b, 0x1b)
 
 class MainActivity : ComponentActivity() {
 
-    /** Bu Activity oluşturulurken uygulanan tema. Ayar bundan farklı bir değere geçerse Activity yeniden kurulur. */
+    /** Bu ekran açılırken kullanılan tema; ayar değişince Activity yeniden kurulur. */
     private var appliedThemeMode = ThemeMode.System
 
-    /** Bu Activity oluşturulurken uygulanan dil. Ayar değişirse Activity yeniden kurulur. */
+    /** Bu ekran açılırken kullanılan dil; ayar değişince Activity yeniden kurulur. */
     private var appliedLanguage = AppLanguage.Turkish
 
-    /**
-     * Seçilen dili ve temayı kaynak (resource) yapılandırmasına işler. Dil: Android'in kendi metinleri (erişilebilirlik
-     * açıklamaları, tarih seçiciler) ve tarih/sayı biçimleri uygulamanın diline uyar. Tema: logolar gibi `drawable-night`
-     * ile hazırlanmış görseller telefonun değil UYGULAMANIN seçtiği temaya göre yüklenir; "Sistem varsayılanı" seçiliyse
-     * gece modu alanına dokunulmaz ve telefonun ayarı izlenir.
-     */
+    /** Seçilen dili ve temayı Android kaynaklarına uygular. */
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(newBase)
         appliedThemeMode = AppSettings.storedThemeMode(newBase)
         appliedLanguage = AppSettings.storedAppLanguage(newBase)
         Locale.setDefault(appliedLanguage.locale)
-        // Yalnızca dil ve (gerekirse) gece modu alanı dolu bir yapılandırma: gerisi (yön, ekran boyutu…) telefondan gelir.
         val override = Configuration().apply { setLocale(appliedLanguage.locale) }
         when (appliedThemeMode) {
             ThemeMode.System -> Unit
@@ -61,20 +54,19 @@ class MainActivity : ComponentActivity() {
         applyOverrideConfiguration(override)
     }
 
-    /** Uygulama zaten açıkken özetleme bildirimine dokunuldu. */
+    /** Uygulama açıkken bildirime dokunulunca çağrılır. */
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
         openSummaryFrom(intent)
     }
 
-    /** Intent özetleme bildiriminden geliyorsa isteği kaydeder (gezinme [com.eayd.arkive.navigation.ArkiveNavHost]'ta). */
+    /** Intent bir özet bildiriminden geldiyse özeti açma isteğini kaydeder. */
     private fun openSummaryFrom(intent: Intent?) {
         val request = SummaryOpenRequest.fromExtras(
             intent?.getStringExtra(SummaryOpenRequest.EXTRA_FILE_ID),
             intent?.getStringExtra(SummaryOpenRequest.EXTRA_FILE_NAME),
         ) ?: return
-        // Bir kez işlenir: Activity yeniden kurulsa da aynı Intent ikinci kez özet açmasın.
         intent?.removeExtra(SummaryOpenRequest.EXTRA_FILE_ID)
         intent?.removeExtra(SummaryOpenRequest.EXTRA_FILE_NAME)
         AiSummarizer.requestOpenSummary(request)
@@ -92,24 +84,19 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        AppSettings.init(this) // tema ve "yalnızca Wi-Fi" ayarları ekranlardan önce okunur
-        // Özetleme bildirimine dokunularak açıldıysa o dosyanın özeti açılır. Yeniden kurulumda (tema değişimi, döndürme)
-        // aynı Intent yeniden gelir; yalnızca ilk kurulumda işlenir.
+        AppSettings.init(this)
         if (savedInstanceState == null) openSummaryFrom(intent)
         enableEdgeToEdge()
         setContent {
             val themeMode by AppSettings.themeMode.collectAsState()
             val appLanguage by AppSettings.appLanguage.collectAsState()
-            // Tema değişince Activity yeniden kurulur ki kaynaklar (logolar) yeni temaya göre yüklensin.
             LaunchedEffect(themeMode) { if (themeMode != appliedThemeMode) recreate() }
-            // Dil değişince de: bütün ekranlar metinlerini yeni dilde yeniden okur.
             LaunchedEffect(appLanguage) { if (appLanguage != appliedLanguage) recreate() }
             val darkTheme = when (themeMode) {
                 ThemeMode.System -> isSystemInDarkTheme()
                 ThemeMode.Light -> false
                 ThemeMode.Dark -> true
             }
-            // Seçilen tema telefonunkinden farklı olabilir: durum/gezinme çubuğu simgeleri temaya göre yeniden ayarlanır.
             DisposableEffect(darkTheme) {
                 this@MainActivity.enableEdgeToEdge(
                     statusBarStyle = SystemBarStyle.auto(Color.TRANSPARENT, Color.TRANSPARENT) { darkTheme },
@@ -118,8 +105,6 @@ class MainActivity : ComponentActivity() {
                 onDispose { }
             }
             ArkiveTheme(darkTheme = darkTheme) {
-                // Scaffold'un innerPadding'i kaldırıldı: her ekran arka planını sistem çubuklarının arkasına
-                // kadar çizer, içeriğini safeDrawingPadding() ile çubukların dışında tutar.
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background,

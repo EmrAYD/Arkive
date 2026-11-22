@@ -17,11 +17,7 @@ import com.eayd.arkive.viewmodel.saveFileToDevice
 
 private class PendingDownload(val fileId: String, val name: String, val mimeType: String?)
 
-/**
- * "İndir" için kullanılacak işlevi döndürür: dosyayı uygulama içinden İndirilenler/Arkive klasörüne kaydeder.
- * Android 9 ve eskide önce depolama iznini ister (verilmişse sormaz); izin reddedilirse [notify] ile bildirir.
- * Android 10+ için izin gerekmez, doğrudan indirir. [notify]: kısa bildirim (Snackbar) göstericisi.
- */
+/** Dosyayı İndirilenler/Arkive klasörüne kaydeden işlevi döner. Android 9 ve öncesinde önce depolama izni ister. */
 @Composable
 fun rememberFileDownloader(notify: (String) -> Unit): (fileId: String, name: String, mimeType: String?) -> Unit {
     val context = LocalContext.current

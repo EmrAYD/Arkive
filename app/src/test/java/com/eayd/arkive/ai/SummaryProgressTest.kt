@@ -4,7 +4,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Dosya satırında gösterilen özetleme yüzdesinin tahmini. */
+/** Özetleme yüzdesinin tahmini. */
 class SummaryProgressTest {
 
     private fun at(phase: SummaryPhase, current: Int, seconds: Double): Int {
@@ -17,9 +17,9 @@ class SummaryProgressTest {
         val phase = SummaryPhase.InCloud(sizeBytes = 0)
         assertEquals(SummaryProgress.range(phase).first, at(phase, 0, 0.0))
         val values = listOf(1.0, 5.0, 15.0, 60.0, 600.0).map { at(phase, 0, it) }
-        assertEquals(values.sorted(), values) // hiç geri gitmez
+        assertEquals(values.sorted(), values)
         assertTrue(values.last() <= SummaryProgress.MAX)
-        assertTrue(at(phase, 0, 15.0) in 80..SummaryProgress.MAX) // beklenen sürede aralığın büyük kısmı
+        assertTrue(at(phase, 0, 15.0) in 80..SummaryProgress.MAX)
     }
 
     @Test
@@ -34,10 +34,8 @@ class SummaryProgressTest {
 
     @Test
     fun `yuzde geri gitmez`() {
-        // Telefonda %60'a gelmiş dosya buluta geçince %6'ya düşmez; oradan devam eder.
         assertEquals(60, at(SummaryPhase.InCloud(0), current = 60, seconds = 0.0))
         assertTrue(at(SummaryPhase.InCloud(0), current = 60, seconds = 10.0) > 60)
-        // Aralığın sonunu geçmiş yüzde olduğu yerde kalır.
         assertEquals(40, at(SummaryPhase.LoadingModel, current = 40, seconds = 30.0))
     }
 

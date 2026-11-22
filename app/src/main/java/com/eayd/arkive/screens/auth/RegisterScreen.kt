@@ -33,15 +33,12 @@ fun RegisterScreen(
     val uiState by viewModel.uiState.collectAsState()
     val emailCheck by viewModel.emailCheck.collectAsState()
     val loading = uiState is AuthUiState.Loading
-    // Google ile kayıt yeni hesap açtıysa sözleşme onay bekliyor demektir (aşağıdaki pencere).
     val eulaPending = uiState is AuthUiState.EulaRequired
     val context = LocalContext.current
     val rules = viewModel.passwordRules
 
-    // Şifre kutusuna tıklanınca ya da içinde yazı varsa kurallar gösterilir.
     var passwordFocused by remember { mutableStateOf(false) }
 
-    // Kullanıcı Sözleşmesi: kutu yalnızca sözleşme sonuna kadar okunup onaylanınca işaretlenir (EulaDialog).
     var eulaAccepted by rememberSaveable { mutableStateOf(false) }
     var showEula by rememberSaveable { mutableStateOf(false) }
 
@@ -74,7 +71,6 @@ fun RegisterScreen(
         Spacer(Modifier.height(12.dp))
         AuthErrorText(uiState)
 
-        // Kayıt düğmesi sadece kurallar sağlandığında aktif olur.
         AuthSubmitButton(
             label = Txt.auth.signUp,
             loading = loading,
@@ -82,8 +78,6 @@ fun RegisterScreen(
             onClick = viewModel::register,
         )
         Spacer(Modifier.height(12.dp))
-        // Google ile kayıt için kutuyu işaretlemek gerekmez: yeni hesap açılırsa sözleşme o anda gösterilir.
-        // Kutu zaten işaretliyse sözleşme tekrar sorulmaz.
         GoogleSignInButton(
             label = Txt.auth.signUpWithGoogle,
             enabled = !loading && !eulaPending,

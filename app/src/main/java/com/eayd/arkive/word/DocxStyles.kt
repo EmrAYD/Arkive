@@ -1,6 +1,6 @@
 package com.eayd.arkive.word
 
-/** word/styles.xml içindeki bir stil. [conditional]: tablo stillerinde "firstRow", "band1Horz"… koşullu biçimleri. */
+/** word/styles.xml'deki bir stil. */
 internal class StyleDef(
     val id: String,
     val type: String,
@@ -24,7 +24,7 @@ internal class Styles(
 
     val isEmpty: Boolean get() = byId.isEmpty()
 
-    /** [id] stilinin dayandığı stillerle birlikte zinciri; en temel stil başta, [id] sonda. Döngüye karşı korumalı. */
+    /** Stilin dayandığı stillerle birlikte zinciri; en temel stil başta. */
     fun chain(id: String?): List<StyleDef> {
         if (id == null) return emptyList()
         return cache.getOrPut(id) {
@@ -86,7 +86,7 @@ internal class NumLevel(val start: Int, val fmt: String, val text: String, val p
 
 internal class NumDef(val abstractId: String, val startOverrides: Map<Int, Int>, val levelOverrides: Map<Int, NumLevel>)
 
-/** word/numbering.xml: liste tanımları. */
+/** word/numbering.xml'deki liste tanımları. */
 internal class Numbering(
     private val abstracts: Map<String, Map<Int, NumLevel>>,
     val nums: Map<String, NumDef>,
@@ -141,7 +141,7 @@ internal class Numbering(
     }
 }
 
-/** Liste imleri ve sayı biçimleri (docx ve doc ortak). */
+/** Liste imleri ve sayı biçimleri. */
 internal object ListText {
     fun bulletGlyph(text: String): String {
         val ch = text.firstOrNull() ?: return "•"
@@ -191,7 +191,7 @@ internal object ListText {
     }
 }
 
-/** Renk yardımcıları (ARGB Int). */
+/** Renk yardımcıları. */
 internal object WordColors {
     private val highlightNames = mapOf(
         "yellow" to 0xFFFFFF00.toInt(), "green" to 0xFF00FF00.toInt(), "cyan" to 0xFF00FFFF.toInt(),
@@ -216,7 +216,7 @@ internal object WordColors {
         return 0xFF000000.toInt() or rgb
     }
 
-    /** theme1.xml'deki renk şeması: ad (dk1, lt1, accent1…) → renk. */
+    /** Temadaki renk şeması. */
     fun parseTheme(root: XNode?): Map<String, Int> {
         fun find(n: XNode): XNode? {
             if (n.name == "a:clrScheme") return n
@@ -233,7 +233,7 @@ internal object WordColors {
         return out
     }
 
-    /** theme1.xml'deki yazı tipleri: "major" / "minor" → latin yazı tipi adı. */
+    /** Temadaki yazı tipleri. */
     fun parseThemeFonts(root: XNode?): Map<String, String> {
         fun find(n: XNode): XNode? {
             if (n.name == "a:fontScheme") return n
@@ -247,7 +247,7 @@ internal object WordColors {
         return out
     }
 
-    /** [themeColor] (varsa) temadan çözülür, [tint]/[shade] (16'lık 00..FF) uygulanır; yoksa [value] altı haneli renktir. */
+    /** Tema rengini ve açma/koyulaştırma değerlerini uygular; tema rengi yoksa [value] kullanılır. */
     fun resolve(theme: Map<String, Int>, value: String?, themeColor: String?, tint: String?, shade: String?): Int? {
         if (themeColor != null) {
             val key = themeAliases[themeColor] ?: themeColor

@@ -8,7 +8,7 @@ import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
-/** Telefonda özetleme kuralları ve özetin nerede çıkarılacağı (yapay zeka işlem yeri: Yerel / Bulut / Yerel + Bulut). */
+/** Telefonda özetleme kuralları ve özetin nerede çıkarılacağı. */
 class LocalSummaryPolicyTest {
 
     @Test

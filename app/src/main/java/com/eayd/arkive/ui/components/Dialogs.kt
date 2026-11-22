@@ -35,10 +35,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.i18n.Txt
 
-// Ekranların ortak pencereleri. Pencerenin açık/kapalı olması, "kaydediliyor" ve sunucu hatası ViewModel'de
-// (DialogHost) tutulur; buradaki bileşenler yalnızca verilen değerleri çizer ve olayları iletir.
-
-/** Onay penceresi (silme gibi geri alınması zor işler için). [error]: sunucunun verdiği hata, pencerede gösterilir. */
+/** Silme gibi işler için onay penceresi. [error] sunucunun verdiği hata. */
 @Composable
 fun ConfirmDialog(
     title: String,
@@ -70,14 +67,10 @@ fun ConfirmDialog(
     )
 }
 
-// Klasör renk seçenekleri. null = renksiz (varsayılan tema rengi kullanılır).
 private val FolderColorChoices: List<String?> =
     listOf(null, "#1E88E5", "#43A047", "#FB8C00", "#E53935", "#8E24AA", "#000000")
 
-/**
- * Ad (ve istenirse renk ve emoji) giriş penceresi: klasör oluşturma/düzenleme ve dosya yeniden adlandırma için ortak.
- * Dosyada renk ve emoji yoktur, o yüzden [showColor] = false verilir ([showEmoji] de ona uyar).
- */
+/** Ad girme penceresi; klasörde renk ve emoji de seçilir. */
 @Composable
 fun NameDialog(
     title: String,
@@ -97,7 +90,6 @@ fun NameDialog(
     var color by remember { mutableStateOf(initialColor) }
     var emoji by remember { mutableStateOf(initialEmoji) }
 
-    // Sunucudaki kuralların aynısı istemcide de denetlenir; kullanıcı daha gönderirken uyarılır.
     val trimmed = name.trim()
     val localError = when {
         trimmed.length > 255 -> Txt.files.nameTooLong
@@ -110,7 +102,6 @@ fun NameDialog(
         onDismissRequest = { if (!saving) onDismiss() },
         title = { Text(title) },
         text = {
-            // Renk ve emoji satırları eklenince pencere küçük ekranlarda taşabilir: içerik kaydırılabilir.
             Column(Modifier.verticalScroll(rememberScrollState())) {
                 OutlinedTextField(
                     value = name,

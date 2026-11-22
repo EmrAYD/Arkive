@@ -12,14 +12,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 
-/** Uygulama teması. [System]: telefonun açık/koyu tema ayarını izler (varsayılan). */
+/** Uygulama teması. */
 enum class ThemeMode {
     System,
     Light,
     Dark,
     ;
 
-    /** Seçili dilde adı (dil değişince yeniden okunur). */
     val label: String
         get() = when (this) {
             System -> Txt.profile.themeSystem
@@ -28,10 +27,7 @@ enum class ThemeMode {
         }
 }
 
-/**
- * Bu cihaza özgü uygulama ayarları (tema, dil, yalnızca Wi-Fi ile aktarım, yapay zeka işlem yeri). Sunucuya gitmez;
- * SharedPreferences'ta saklanır, değerler StateFlow olarak dinlenir. [init] uygulama açılırken (MainActivity) bir kez çağrılır.
- */
+/** Bu cihaza ait ayarlar; SharedPreferences'ta saklanır, sunucuya gitmez. */
 object AppSettings {
 
     private const val PREFS_NAME = "arkive_settings"
@@ -39,40 +35,32 @@ object AppSettings {
     private const val KEY_WIFI_ONLY = "wifi_only"
     private const val KEY_PENDING_EULA_UID = "pending_eula_uid"
     private const val KEY_AI_MODE = "ai_mode"
-    // Kaldırılan ayarlar (özet şablonu): eski kayıtları silmek için.
     private val OLD_KEYS = listOf("summary_template")
     private const val KEY_APP_LANGUAGE = "app_language"
     private const val KEY_SUMMARY_LANGUAGE = "summary_language"
 
     private lateinit var prefs: SharedPreferences
 
-    /** Uygulama bağlamı (bellek sızdırmaz): ağ durumunu sormak için kullanılır. */
+    /** Uygulama bağlamı. */
     lateinit var appContext: Context
         private set
 
     private val _themeMode = MutableStateFlow(ThemeMode.System)
     val themeMode: StateFlow<ThemeMode> = _themeMode.asStateFlow()
 
-    /** true: dosya yükleme/indirme yalnızca kablosuz ağdayken yapılır. Varsayılan kapalı. */
+    /** true ise dosya aktarımı yalnızca Wi-Fi'da yapılır. */
     private val _wifiOnly = MutableStateFlow(false)
     val wifiOnly: StateFlow<Boolean> = _wifiOnly.asStateFlow()
 
-    /**
-     * Uygulamanın dili. Kullanıcı seçmediyse telefonun dili (Türkçe telefonda Türkçe, diğerlerinde İngilizce). Dil
-     * değişince Activity yeniden kurulur (bkz. MainActivity).
-     */
+    /** Uygulamanın dili. Seçilmediyse telefonun dili. */
     private val _appLanguage = MutableStateFlow(AppLanguage.Turkish)
     val appLanguage: StateFlow<AppLanguage> = _appLanguage.asStateFlow()
 
-    /**
-     * Yapay zeka özetlemesinin nerede yapılacağı: yerel (telefon), bulut (sunucu) ya da ikisi (küçük dosyalar telefonda,
-     * gerisi sunucuda). Varsayılan ikisi. Bulut Plus'a özeldir; ücretsiz planda ayar ne olursa olsun yerel geçerlidir
-     * ([PlanPolicy.effectiveMode]). Kurallar için bkz. [com.eayd.arkive.ai.AiPolicy].
-     */
+    /** Yapay zeka işlem yeri. Varsayılan "Yerel + Bulut"; ücretsiz planda her zaman yerel geçerlidir. */
     private val _aiMode = MutableStateFlow(AiMode.Hybrid)
     val aiMode: StateFlow<AiMode> = _aiMode.asStateFlow()
 
-    /** Özetin yazılacağı dil. Kullanıcı ayrıca seçmediyse uygulamanın diliyle aynıdır. */
+    /** Özetin dili. Ayrıca seçilmediyse uygulamanın diliyle aynı. */
     private val _summaryLanguage = MutableStateFlow(AppLanguage.Turkish)
     val summaryLanguage: StateFlow<AppLanguage> = _summaryLanguage.asStateFlow()
 
@@ -87,23 +75,16 @@ object AppSettings {
         _wifiOnly.value = prefs.getBoolean(KEY_WIFI_ONLY, false)
         _aiMode.value = AiMode.entries.firstOrNull { it.name == prefs.getString(KEY_AI_MODE, null) } ?: AiMode.Hybrid
         if (OLD_KEYS.any(prefs::contains)) prefs.edit().apply { OLD_KEYS.forEach(::remove) }.apply()
-        AiSummarizer.start(appContext) // bekleyen telefon özetlerini yükler
+        AiSummarizer.start(appContext)
     }
 
-    /**
-     * Kayıtlı temayı [init]'ten ÖNCE de okuyabilir: Activity, bağlamı kurulurken (attachBaseContext) temayı
-     * kaynak yapılandırmasına işlemek için buna ihtiyaç duyar.
-     */
+    /** Kayıtlı temayı [init]'ten önce okur; Activity açılırken gerekir. */
     fun storedThemeMode(context: Context): ThemeMode {
         val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_THEME, null)
         return ThemeMode.entries.firstOrNull { it.name == saved } ?: ThemeMode.System
     }
 
-    /**
-     * Kayıtlı uygulama dilini [init]'ten ÖNCE de okuyabilir (Activity, bağlamı kurulurken dili kaynak yapılandırmasına
-     * işler). Kayıt yoksa telefonun dili kullanılır; telefonun dili, uygulamanın kendi ayarından etkilenmeyen sistem
-     * yapılandırmasından okunur. Okunan dil [Lang.app]'e de yazılır.
-     */
+    /** Kayıtlı dili [init]'ten önce okur; kayıt yoksa telefonun dili. */
     fun storedAppLanguage(context: Context): AppLanguage {
         val saved = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE).getString(KEY_APP_LANGUAGE, null)
         val language = AppLanguage.fromTag(saved) ?: AppLanguage.fromSystem(Resources.getSystem().configuration.locales[0])
@@ -111,7 +92,7 @@ object AppSettings {
         return language
     }
 
-    /** Uygulamanın dilini değiştirir. Özet dili ayrıca seçilmemişse o da bu dile geçer. */
+    /** Uygulamanın dilini değiştirir; özet dili ayrıca seçilmediyse o da değişir. */
     fun setAppLanguage(language: AppLanguage) {
         val summaryFollowsApp = prefs.getString(KEY_SUMMARY_LANGUAGE, null) == null
         _appLanguage.value = language
@@ -131,9 +112,8 @@ object AppSettings {
     }
 
     /**
-     * Google ile yeni açılan ama Kullanıcı Sözleşmesi'ni henüz onaylamamış hesabın kimliği (yoksa null).
-     * Sözleşme penceresi açıkken uygulama kapanırsa, bir sonraki açılışta bu hesap onaysız sayılıp silinir;
-     * silme başarısız olursa işaret kalır ve aynı hesapla tekrar girilince sözleşme yine sorulur.
+     * Google ile açılıp sözleşmeyi henüz onaylamamış hesap. Uygulama bu sırada kapanırsa sonraki açılışta hesap
+     * silinir.
      */
     var pendingEulaUid: String?
         get() = prefs.getString(KEY_PENDING_EULA_UID, null)

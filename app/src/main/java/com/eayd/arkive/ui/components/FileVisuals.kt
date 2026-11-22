@@ -27,35 +27,28 @@ import androidx.core.graphics.ColorUtils
 import com.eayd.arkive.utils.FileKind
 import com.eayd.arkive.utils.fileKind
 
-// Klasör ve dosya satırlarının ortak görselleri. Liste, çöp kutusu, "Taşı" penceresi ve sürükleme kartı
-// aynı simgeleri bu dosyadan alır.
-
-/** "#RRGGBB" metnini Compose rengine çevirir; null ya da hatalıysa null döner. */
+/** "#RRGGBB" metnini renge çevirir; hatalıysa null. */
 fun folderColorOrNull(hex: String?): Color? =
     hex?.let { runCatching { Color(android.graphics.Color.parseColor(it)) }.getOrNull() }
 
-/** Bir klasör renginin açık ve koyu temadaki görünümü. */
+/** Bir klasör renginin açık ve koyu temadaki hali. */
 private class FolderTone(val light: Color, val dark: Color)
 
-/**
- * Renk seçicideki her renk için temaya göre elle seçilmiş ton çifti. Sunucuda hep seçilen özgün renk
- * ("#RRGGBB") saklanır; ekranda gösterilirken temaya göre bu çiftten biri kullanılır:
- * açık temada (açık zemin) daha KOYU, koyu temada (koyu zemin) daha AÇIK ton. Anahtarlar büyük harfle yazılır.
- */
+/** Seçicideki her renk için açık ve koyu temada kullanılacak ton. Sunucuda hep seçilen renk saklanır. */
 private val FolderTones: Map<String, FolderTone> = mapOf(
-    "#1E88E5" to FolderTone(light = Color(0xFF1879CE), dark = Color(0xFF5FAAED)),   // mavi
-    "#43A047" to FolderTone(light = Color(0xFF44A248), dark = Color(0xFF81CA84)),   // yeşil
-    "#FB8C00" to FolderTone(light = Color(0xFFE68000), dark = Color(0xFFFFB04D)),   // turuncu
-    "#E53935" to FolderTone(light = Color(0xFFCB1E1A), dark = Color(0xFFEB6461)),   // kırmızı
-    "#8E24AA" to FolderTone(light = Color(0xFF9E28BD), dark = Color(0xFFC86CE0)),   // mor
-    "#000000" to FolderTone(light = Color(0xFF000000), dark = Color(0xFFFFFFFF)),   // siyah / beyaz
+    "#1E88E5" to FolderTone(light = Color(0xFF1879CE), dark = Color(0xFF5FAAED)),
+    "#43A047" to FolderTone(light = Color(0xFF44A248), dark = Color(0xFF81CA84)),
+    "#FB8C00" to FolderTone(light = Color(0xFFE68000), dark = Color(0xFFFFB04D)),
+    "#E53935" to FolderTone(light = Color(0xFFCB1E1A), dark = Color(0xFFEB6461)),
+    "#8E24AA" to FolderTone(light = Color(0xFF9E28BD), dark = Color(0xFFC86CE0)),
+    "#000000" to FolderTone(light = Color(0xFF000000), dark = Color(0xFFFFFFFF)),
 )
 
-/** Uygulama şu an koyu temada mı (kullanıcının seçtiği tema dahil; zeminin parlaklığına bakılır). */
+/** Uygulama koyu temada mı. */
 @Composable
 private fun isDarkTheme(): Boolean = MaterialTheme.colorScheme.background.luminance() < 0.5f
 
-/** Listede olmayan bir rengi temaya uydurur: açık temada koyulaştırır, koyu temada açar (tonu korur). */
+/** Listede olmayan rengi temaya uydurur. */
 private fun adaptToTheme(color: Color, dark: Boolean): Color {
     val hsl = FloatArray(3)
     ColorUtils.colorToHSL(color.toArgb(), hsl)
@@ -63,10 +56,7 @@ private fun adaptToTheme(color: Color, dark: Boolean): Color {
     return Color(ColorUtils.HSLToColor(hsl))
 }
 
-/**
- * Klasörün simge rengi: seçilmiş rengin temaya uygun tonu (açık temada koyu, koyu temada açık), renk yoksa tema rengi.
- * Klasör simgesi çizen her yer bunu kullanmalı; ham renk için [folderColorOrNull].
- */
+/** Klasör simgesinin rengi; renk seçilmediyse tema rengi. */
 @Composable
 fun folderAccent(hex: String?): Color {
     val base = folderColorOrNull(hex) ?: return MaterialTheme.colorScheme.primary
@@ -78,7 +68,7 @@ fun folderAccent(hex: String?): Color {
     }
 }
 
-/** Dosya türüne uygun simge. Sınıflandırma [fileKind] ile yapılır; tür adı ve ön izleme de aynısını kullanır. */
+/** Dosya türüne uygun simge. */
 fun fileTypeIcon(mimeType: String?): ImageVector = when (fileKind(mimeType)) {
     FileKind.Image -> Icons.Filled.Image
     FileKind.Audio -> Icons.Filled.AudioFile
@@ -87,19 +77,17 @@ fun fileTypeIcon(mimeType: String?): ImageVector = when (fileKind(mimeType)) {
     else -> Icons.Filled.Description
 }
 
-/** Basit klasör simgesi (ek simge kütüphanesi gerektirmesin diye elle çizilir). */
+/** Elle çizilen klasör simgesi. */
 @Composable
 fun FolderGlyph(color: Color, modifier: Modifier = Modifier) {
     Canvas(modifier.size(width = 40.dp, height = 32.dp)) {
         val corner = CornerRadius(4.dp.toPx())
-        // Sekme (klasörün sol üstündeki çıkıntı)
         drawRoundRect(
             color = color,
             topLeft = Offset.Zero,
             size = Size(size.width * 0.45f, size.height * 0.5f),
             cornerRadius = corner,
         )
-        // Gövde
         drawRoundRect(
             color = color,
             topLeft = Offset(0f, size.height * 0.15f),
@@ -109,7 +97,7 @@ fun FolderGlyph(color: Color, modifier: Modifier = Modifier) {
     }
 }
 
-/** Dosya simgesi; klasör simgesiyle aynı genişlikte, satırlar alt alta hizalı görünsün. */
+/** Dosya simgesi; klasör simgesiyle aynı genişlikte. */
 @Composable
 fun FileGlyph(mimeType: String?) {
     Box(Modifier.width(40.dp), contentAlignment = Alignment.Center) {

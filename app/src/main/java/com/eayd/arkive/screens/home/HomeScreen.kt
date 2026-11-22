@@ -47,16 +47,10 @@ import com.eayd.arkive.viewmodel.HomeViewModel
 import com.eayd.arkive.viewmodel.TrashViewModel
 import kotlinx.coroutines.launch
 
-/** Profil sayfasının sağdan kayma süresi (ms). */
+/** Profil sayfasının kayma süresi (ms). */
 private const val PROFILE_SLIDE_MILLIS = 300
 
-/**
- * Ana ekran: üst çubukta solda menü (hamburger), sağda profil düğmesi; altında seçili bölümün içeriği.
- * Menü düğmesi yan menüyü açar: bölümler (yüklenen dosyalar, favorilerim, AI sonuçları: özetlerin listesi, çöp kutusu) ve
- * kalan depolama kullanımı. Profil düğmesi profil sayfasını açar.
- *
- * Her bölümün kendi ViewModel'i vardır (key); bölüm değiştirince diğerinin listesi yeniden yüklenmez.
- */
+/** Ana ekran: üstte menü ve profil düğmeleri, altında seçili bölüm. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -69,20 +63,16 @@ fun HomeScreen(
 ) {
     val state by homeViewModel.state.collectAsState()
 
-    // rememberSaveable: ekran döndürülse bile seçili bölüm korunur.
     var section by rememberSaveable { mutableStateOf(HomeSection.Files) }
 
-    // Profil sayfası ana ekranın üstüne sağdan kayarak gelen bir katmandır (ayrı bir rota değil).
     var showProfile by rememberSaveable { mutableStateOf(false) }
 
     val drawerState = rememberDrawerState(DrawerValue.Closed)
     val scope = rememberCoroutineScope()
 
-    // Menü her açıldığında kullanım bilgisi sunucudan tazelenir.
     LaunchedEffect(drawerState.currentValue) {
         if (drawerState.currentValue == DrawerValue.Open) homeViewModel.refresh()
     }
-    // Plan değişince (Plus tanıtımından Plus'a geçildi / ücretsiz plana dönüldü) menüdeki kullanım bilgisi de tazelenir.
     val planName = PlanStatus.quota.collectAsState().value?.planName
     LaunchedEffect(planName) {
         val shown = state.storage?.planName
@@ -107,10 +97,8 @@ fun HomeScreen(
             },
         ) {
             Column(
-                // Scaffold padding'i kaldırıldığı için sistem çubuklarını ekran kendisi hesaba katar
                 modifier = Modifier.fillMaxSize().safeDrawingPadding(),
             ) {
-                // Çöp kutusunun kendi başlığı var (geri oku, öğe sayısı, "Seç"); ana çubuk orada gösterilmez.
                 if (section != HomeSection.Trash) {
                     TopAppBar(
                         title = { Text(section.title, maxLines = 1, overflow = TextOverflow.Ellipsis) },
@@ -123,10 +111,8 @@ fun HomeScreen(
                             ProfileButton(email = state.userEmail, onClick = { showProfile = true })
                         },
                         colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent),
-                        // Sistem çubuğu boşluğunu yukarıdaki safeDrawingPadding zaten ayırdı; ikinci kez eklenmesin.
                         windowInsets = WindowInsets(0, 0, 0, 0),
                     )
-                    // Üst çubuğu içerikten (+ düğmesi, filtreler) ayıran çizgi.
                     HorizontalDivider()
                 }
 
@@ -137,9 +123,8 @@ fun HomeScreen(
                             onBack = { section = HomeSection.Files },
                             onOpenFolder = onOpenTrashFolder,
                             onOpenFile = onOpenTrashFile,
-                            // Çöp kutusunun kendi başlığı var; geri oku yerine diğer sayfalardaki gibi menü düğmesi olsun.
                             onOpenMenu = { scope.launch { drawerState.open() } },
-                            active = !showProfile, // profil açılınca seçim modu kapanır
+                            active = !showProfile,
                         )
 
                         HomeSection.Favorites -> BrowserContent(
@@ -162,7 +147,6 @@ fun HomeScreen(
                             active = !showProfile,
                         )
 
-                        // Özetlerin listesi; dokununca özet penceresi açılır.
                         HomeSection.AiResults -> AiSummariesContent(
                             viewModel = viewModel(key = "summaries"),
                             onOpenFile = onOpenFile,
@@ -177,13 +161,11 @@ fun HomeScreen(
             enter = slideInHorizontally(animationSpec = tween(PROFILE_SLIDE_MILLIS), initialOffsetX = { it }),
             exit = slideOutHorizontally(animationSpec = tween(PROFILE_SLIDE_MILLIS), targetOffsetX = { it }),
         ) {
-            // Katmanın boş yerlerine dokunuş alttaki ana ekrana geçmesin.
             Box(Modifier.fillMaxSize().pointerInput(Unit) { detectTapGestures { } }) {
                 ProfileScreen(onBack = { showProfile = false }, onLogout = onLogout)
             }
         }
 
-        // Katman açıkken geri tuşu önce profili kapatır (alttaki seçim/menü geri işleyicilerinden önce çalışır).
         BackHandler(enabled = showProfile) { showProfile = false }
     }
 }

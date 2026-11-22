@@ -42,14 +42,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.i18n.Txt
 
-/**
- * Klasör, dosya ve çöp kutusu satırlarının ortak kartı: [icon], başlık, isteğe bağlı alt yazı ve sağda [trailing].
- *
- * @param selectMark null değilse satırın solunda seçim dairesi çizilir (true = seçili). Seçim modunda olmayan
- *                   satırlarda null verilir.
- * @param highlighted sürüklenen öğe şu an bu satırın üstünde (en belirgin vurgu)
- * @param dimmed sürüklenen öğenin yerindeki satır soluk görünür
- */
+/** Klasör, dosya ve çöp kutusu satırlarının ortak kartı. [selectMark] null değilse solda seçim dairesi çizilir. */
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun ItemRow(
@@ -63,7 +56,7 @@ fun ItemRow(
     selectMark: Boolean? = null,
     highlighted: Boolean = false,
     dimmed: Boolean = false,
-    /** false ise satır pasiftir: soluk görünür ve tıklanamaz (ör. internetsizken telefonda kopyası olmayan dosya). */
+    /** false ise satır soluk görünür ve tıklanmaz. */
     enabled: Boolean = true,
     trailing: @Composable RowScope.() -> Unit = {},
 ) {
@@ -117,9 +110,8 @@ fun ItemRow(
 }
 
 /**
- * Satırın sağındaki düğmeler: (varsa) yapay zeka düğmesi, favori yıldızı ve "daha fazla" menüsü ([menu] açık/kapalı
- * durumunu alır). Yapay zeka düğmesi yıldızın soluna konur; [ai] null ise (klasörlerde) hiç gösterilmez. [aiWorking]
- * iken (özet hazırlanırken) düğmenin yerinde küçük bir yükleme simgesi döner; satırın geri kalanı kullanılabilir kalır.
+ * Satırın sağındaki düğmeler: yapay zeka, favori ve menü. Özet hazırlanırken yapay zeka düğmesinin yerinde yükleme
+ * simgesi döner.
  */
 @Composable
 fun RowScope.RowActions(
@@ -133,7 +125,6 @@ fun RowScope.RowActions(
 ) {
     var menuOpen by remember { mutableStateOf(false) }
     if (ai != null) {
-        // Yıldızla yan yana, daha dar (36dp) bir dokunma alanı: iki simge birbirine yaklaşır, dikey ortaları aynı kalır.
         IconButton(onClick = onToggleAi, modifier = Modifier.size(width = 36.dp, height = 48.dp)) {
             if (aiWorking) {
                 CircularProgressIndicator(
@@ -164,7 +155,7 @@ fun RowScope.RowActions(
     }
 }
 
-/** Seçim dairesi: seçili değilken boş halka, seçiliyken içinde tik olan dolu daire. */
+/** Seçim dairesi. */
 @Composable
 fun SelectCircle(checked: Boolean) {
     val primary = MaterialTheme.colorScheme.primary

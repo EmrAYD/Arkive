@@ -15,9 +15,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.eayd.arkive.i18n.Txt
 
-// Liste, çöp kutusu ve ön izleme ekranlarının ortak "hata / boş durum / bildirim" parçaları.
-
-/** Ekranın ortasında hata mesajı ve "Tekrar dene" düğmesi. Çağıran, bunu `Box` içinde ortalar. */
+/** Hata mesajı ve "Tekrar dene" düğmesi. */
 @Composable
 fun ErrorRetry(message: String, onRetry: () -> Unit, modifier: Modifier = Modifier) {
     Column(
@@ -35,7 +33,7 @@ fun ErrorRetry(message: String, onRetry: () -> Unit, modifier: Modifier = Modifi
     }
 }
 
-/** Ekranın ortasında kısa bir bilgi metni (boş liste gibi). */
+/** Ortada kısa bir bilgi metni. */
 @Composable
 fun CenteredHint(text: String, modifier: Modifier = Modifier) {
     Text(
@@ -47,13 +45,7 @@ fun CenteredHint(text: String, modifier: Modifier = Modifier) {
     )
 }
 
-/**
- * ViewModel'in [notice] (kısa bildirim) alanı dolunca bildirimi [host]'a (NoticeHost kartı) verir ve alanı hemen
- * temizletir ([onShown]). Liste, çöp kutusu, profil ve ön izleme ekranları aynı kuralı kullanır.
- *
- * Alan HEMEN temizlenir: ViewModel ekrandan uzun yaşar; bildirim kartı kapanmadan ekrandan çıkılırsa alan dolu kalırdı
- * ve ekrana dönünce aynı bildirim yeniden çıkardı. Kartın süresi [host]'a aittir, bu etkiye değil.
- */
+/** ViewModel'deki bildirimi gösterir ve alanı hemen temizletir; aynı bildirim iki kez görünmesin. */
 @Composable
 fun NoticeEffect(notice: String?, host: NoticeHostState, onShown: () -> Unit) {
     LaunchedEffect(notice) {

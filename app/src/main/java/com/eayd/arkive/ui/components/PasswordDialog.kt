@@ -59,10 +59,7 @@ fun PasswordInput(
     )
 }
 
-/**
- * Parolalı bir dosyayı açmak için parola isteyen pencere (ön izleme ve yapay zeka özetleme ortak kullanır).
- * [note]: parolanın nereye gittiğini söyleyen küçük açıklama. [error]: "Parola yanlış." gibi hata; [busy]: doğrulanıyor.
- */
+/** Parolalı dosya için parola penceresi. [note] parolanın nereye gittiğini söyler. */
 @Composable
 fun PasswordDialog(
     title: String,

@@ -41,12 +41,7 @@ suspend fun getGoogleIdToken(context: Context): String? {
     }
 }
 
-/**
- * Çıkış yaparken Credential Manager'daki Google oturum durumunu temizler.
- * Bunu yapmazsak setAutoSelectEnabled(true) yüzünden bir sonraki girişte
- * aynı Google hesabı kendiliğinden seçilebilir.
- * Hata olsa bile çıkış akışını bozmaması için hatalar yutulur.
- */
+/** Çıkışta Google oturum durumunu temizler; yoksa sonraki girişte aynı hesap kendiliğinden seçilebilir. */
 suspend fun clearGoogleCredentialState(context: Context) {
     try {
         CredentialManager.create(context).clearCredentialState(ClearCredentialStateRequest())

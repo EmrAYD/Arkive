@@ -55,10 +55,7 @@ import com.eayd.arkive.ui.components.StorageSkeleton
 import com.eayd.arkive.utils.formatBytes
 import com.eayd.arkive.viewmodel.StorageInfo
 
-// Profil ekranının bölümleri. Bu dosyadaki bileşenler yalnızca verilen değerleri çizer; durum ProfileViewModel'dedir.
-
-
-/** Sayfanın başındaki büyük profil simgesi ve e-posta. */
+/** Sayfanın başındaki profil simgesi ve e-posta. */
 @Composable
 internal fun ProfileHeader(email: String?) {
     Column(
@@ -78,7 +75,7 @@ internal fun ProfileHeader(email: String?) {
     }
 }
 
-/** Başlıklı, yuvarlak köşeli kart; satırlar [content] içinde alt alta dizilir. */
+/** Başlıklı kart. */
 @Composable
 private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxWidth()) {
@@ -98,10 +95,7 @@ private fun SectionCard(title: String, content: @Composable ColumnScope.() -> Un
     }
 }
 
-/**
- * Kart içindeki tek satır: solda simge, ortada başlık + açıklama, sağda isteğe bağlı [trailing].
- * [onClick] null ise satır yalnızca bilgi gösterir; [enabled] false ise soluk çizilir ve dokunulamaz.
- */
+/** Kart içindeki satır. [onClick] null ise yalnızca bilgi gösterir. */
 @Composable
 private fun ProfileRow(
     icon: ImageVector,
@@ -150,7 +144,7 @@ private fun Chevron() {
     )
 }
 
-/** "Hesap": e-posta ve şifre değiştirme. Google ile girenlerin şifresi Google'da olduğu için o satır pasiftir. */
+/** Hesap bölümü. Google ile girenlerin şifresi Google'da olduğu için şifre satırı pasiftir. */
 @Composable
 internal fun AccountSection(email: String?, hasPassword: Boolean, onChangePassword: () -> Unit) {
     SectionCard(Txt.profile.account) {
@@ -167,18 +161,14 @@ internal fun AccountSection(email: String?, hasPassword: Boolean, onChangePasswo
     }
 }
 
-/**
- * "Ayarlar": bildirimler (sistem ayarlarını açar), dil (uygulamanın ve özetin dili), tema, yalnızca Wi-Fi, yapay zeka işlem
- * yeri, telefondaki yapay zeka modeli, çöp kutusu saklama süresi. Dil, tema, Wi-Fi ve işlem yeri bu cihazda, saklama süresi
- * sunucuda tutulur; süre henüz yüklenmediyse ([trashRetentionDays] null) o satır pasiftir.
- */
+/** Ayarlar bölümü. */
 @Composable
 internal fun SettingsSection(
     themeMode: ThemeMode,
     wifiOnly: Boolean,
     appLanguage: AppLanguage,
     summaryLanguage: AppLanguage,
-    /** Geçerli yapay zeka işlem yeri (ücretsiz planda her zaman Yerel). */
+    /** Geçerli işlem yeri; ücretsiz planda her zaman Yerel. */
     aiMode: AiMode,
     trashRetentionDays: Int?,
     onNotifications: () -> Unit,
@@ -187,7 +177,7 @@ internal fun SettingsSection(
     onLanguage: () -> Unit,
     onAiMode: () -> Unit,
     onTrashRetention: () -> Unit,
-    /** Telefondaki yapay zeka modelinin durumu; null ise satır gösterilmez. */
+    /** Modelin durumu; null ise satır gösterilmez. */
     localModel: LocalModelState? = null,
     onLocalModel: () -> Unit = {},
 ) {
@@ -203,7 +193,6 @@ internal fun SettingsSection(
         ProfileRow(
             icon = Icons.Filled.Language,
             title = Txt.language.title,
-            // İki dil aynıysa yalnızca dilin adı, farklıysa ikisi de yazılır.
             subtitle = if (appLanguage == summaryLanguage) {
                 appLanguage.nativeName
             } else {
@@ -226,12 +215,11 @@ internal fun SettingsSection(
             title = Txt.profile.wifiOnly,
             subtitle = Txt.profile.wifiOnlyDetail,
             onClick = { onWifiOnlyChange(!wifiOnly) },
-            // Satırın tamamı dokunulabilir olduğu için anahtarın kendi dokunuşu kapalıdır (çift işlem olmasın).
             trailing = { Switch(checked = wifiOnly, onCheckedChange = null) },
         )
         RowDivider()
         ProfileRow(
-            icon = AiIcons.Filled, // uygulamanın yapay zeka simgesi
+            icon = AiIcons.Filled,
             title = Txt.aiMode.title,
             subtitle = aiMode.label,
             onClick = onAiMode,
@@ -259,7 +247,6 @@ internal fun SettingsSection(
     }
 }
 
-/** "Telefondaki yapay zeka" satırının alt yazısı: indirilmedi / iniyor %… / hazır / bu telefonda çalışmaz. */
 private fun localModelSubtitle(state: LocalModelState): String = when (state) {
     LocalModelState.NotDownloaded -> Txt.localAi.notDownloaded(LocalModel.sizeText)
     is LocalModelState.Downloading -> when {
@@ -270,7 +257,7 @@ private fun localModelSubtitle(state: LocalModelState): String = when (state) {
     LocalModelState.Unsupported -> Txt.localAi.unsupportedShort
 }
 
-/** "Planım": plan adı, tek dosya ve toplam yükleme limiti, kullanım çubuğu. */
+/** Plan bölümü: plan adı, sınırlar ve kullanım. */
 @Composable
 internal fun PlanSection(storage: StorageInfo?, isLoading: Boolean, error: String?, onRetry: () -> Unit) {
     SectionCard(Txt.profile.myPlan) {
@@ -308,7 +295,7 @@ private fun PlanDetails(storage: StorageInfo) {
         progress = { storage.fraction },
         modifier = Modifier.fillMaxWidth().height(8.dp).clip(RoundedCornerShape(4.dp)),
         trackColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
-        drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
+        drawStopIndicator = {},
     )
     Spacer(Modifier.height(8.dp))
     Text(
@@ -334,10 +321,7 @@ private fun LimitRow(label: String, value: String) {
     }
 }
 
-/**
- * Yalnızca ücretsiz plandaki kullanıcıya gösterilen Plus tanıtımı: avantajlar ve "Plus'a geç" düğmesi.
- * [onUpgrade]: tam ekran Plus tanıtımını açar (PlusOfferDialog).
- */
+/** Ücretsiz plandaki kullanıcıya gösterilen Plus tanıtımı. */
 @Composable
 internal fun PlusPromo(storage: StorageInfo, onUpgrade: () -> Unit) {
     Surface(
@@ -348,7 +332,7 @@ internal fun PlusPromo(storage: StorageInfo, onUpgrade: () -> Unit) {
     ) {
         Column(Modifier.padding(16.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Icon(AiIcons.Filled, contentDescription = null) // uygulamanın yapay zeka simgesi (elmas ve parıltı)
+                Icon(AiIcons.Filled, contentDescription = null)
                 Spacer(Modifier.width(12.dp))
                 Text(Txt.profile.morePlus, style = MaterialTheme.typography.titleMedium)
             }

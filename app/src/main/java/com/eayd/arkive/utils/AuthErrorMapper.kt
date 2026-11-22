@@ -6,11 +6,8 @@ import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuthException
 
 /**
- * Firebase hatalarını kullanıcıya gösterilecek Türkçe mesajlara çevirir.
- * Tanınmayan hatalarda ham (İngilizce) mesaj yerine [default] döner.
- *
- * Güvenlik notu: "kullanıcı yok" ve "şifre yanlış" aynı mesajla döner,
- * böylece bir e-postanın kayıtlı olup olmadığı dışarıdan anlaşılamaz.
+ * Firebase hatalarını kullanıcıya gösterilecek mesaja çevirir. "Kullanıcı yok" ile "şifre yanlış" aynı mesajı verir;
+ * e-postanın kayıtlı olup olmadığı belli olmasın.
  */
 fun Throwable.toAuthErrorMessage(default: String): String = when (this) {
     is FirebaseNetworkException ->

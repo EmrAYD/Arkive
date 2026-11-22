@@ -8,11 +8,7 @@ import org.xml.sax.InputSource
 import org.xml.sax.SAXException
 import org.xml.sax.helpers.DefaultHandler
 
-/**
- * Küçük bir XML ağacı. Eleman adları, ad alanının kısa önekiyle tutulur ("w:p", "a:blip", "wp:extent"); önek
- * dosyadaki önekten bağımsızdır (ad alanı adresinden bulunur). Nitelikler yalnızca yerel adıyla tutulur
- * ("w:val" → "val", "r:embed" → "embed").
- */
+/** Küçük bir XML ağacı. Eleman adları kısa önekle tutulur ("w:p"). */
 internal class XNode(val name: String, val attrs: Map<String, String>) {
     val kids = ArrayList<XNode>()
     private var chars: StringBuilder? = null
@@ -33,7 +29,7 @@ internal class XNode(val name: String, val attrs: Map<String, String>) {
 
     fun children(childName: String): List<XNode> = kids.filter { it.name == childName }
 
-    /** Açık/kapalı niteliği olan eleman ("w:b", "w:i"…): eleman var ve val "0/false/off" değilse true. */
+    /** "w:b" gibi açık/kapalı elemanlar için: var ve kapalı değilse true. */
     fun isOn(): Boolean = when (attrs["val"]?.lowercase()) {
         null, "1", "true", "on" -> true
         else -> false
@@ -43,7 +39,7 @@ internal class XNode(val name: String, val attrs: Map<String, String>) {
 internal object Xml {
     private const val MAX_DEPTH = 200
 
-    /** Ad alanı adresinden kısa önek; bilinmeyenlerde boş (eleman adı yalnızca yerel ad olur). */
+    /** Ad alanı adresinden kısa önek. */
     private fun prefixOf(uri: String): String = when {
         uri.endsWith("/wordprocessingml/2006/main") || uri.endsWith("/ooxml/wordprocessingml/main") -> "w"
         uri.endsWith("/drawingml/2006/main") || uri.endsWith("/ooxml/drawingml/main") -> "a"
@@ -56,10 +52,7 @@ internal object Xml {
         else -> ""
     }
 
-    /**
-     * [bytes]'ı ayrıştırıp kök elemanı verir. Office dosyalarında DOCTYPE olmaz; olanı (varlık bombası, dış
-     * varlık saldırısı) reddederiz. Bozuk XML'de [WordFormatException].
-     */
+    /** XML'i ayrıştırır. Güvenlik için DOCTYPE içeren dosyalar reddedilir. */
     fun parse(bytes: ByteArray): XNode {
         if (bytes.size >= 2) {
             val b0 = bytes[0].toInt() and 0xFF
@@ -74,21 +67,20 @@ internal object Xml {
         val factory = SAXParserFactory.newInstance()
         factory.isNamespaceAware = true
         factory.isValidating = false
-        // Bu özellikleri her ayrıştırıcı tanımaz (Android'inki bazılarını tanımaz); tanımayan sessizce geçilir.
         for ((feature, value) in listOf(
             "http://apache.org/xml/features/disallow-doctype-decl" to true,
             "http://xml.org/sax/features/external-general-entities" to false,
             "http://xml.org/sax/features/external-parameter-entities" to false,
             "http://apache.org/xml/features/nonvalidating/load-external-dtd" to false,
         )) {
-            try { factory.setFeature(feature, value) } catch (e: Exception) { /* tanınmıyor */ }
+            try { factory.setFeature(feature, value) } catch (e: Exception) { }
         }
 
         val handler = TreeHandler()
         try {
             val reader = factory.newSAXParser().xmlReader
             reader.contentHandler = handler
-            reader.errorHandler = handler // varsayılan işleyici hatayı standart çıktıya yazar; DefaultHandler yalnızca fırlatır
+            reader.errorHandler = handler
             reader.entityResolver = org.xml.sax.EntityResolver { _, _ -> InputSource(java.io.StringReader("")) }
             reader.parse(InputSource(ByteArrayInputStream(bytes)))
         } catch (e: SAXException) {

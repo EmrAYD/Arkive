@@ -7,12 +7,7 @@ import java.io.IOException
 import java.util.Locale
 import java.util.zip.ZipInputStream
 
-/**
- * .docx (Office Open XML) dosyasını [WordDoc]'a çevirir. Desteklenenler: paragraf ve karakter biçimleri (stil
- * zinciri dahil), başlıklar, numaralı/madde işaretli listeler, tablolar (birleşik hücreler, kenarlık, gölge, tablo
- * stilinin ilk satır/şeritleri), görseller, bağlantılar, dipnotlar, metin kutuları, sayfa/bölüm sonları.
- * Üst/alt bilgi, yorum ve değişiklik izleme silinen metni gösterilmez.
- */
+/** .docx dosyasını [WordDoc]'a çevirir. */
 internal object DocxReader {
     private const val MAX_XML_BYTES = 8 * 1024 * 1024
     private const val MAX_IMAGE_BYTES = 12 * 1024 * 1024
@@ -25,7 +20,7 @@ internal object DocxReader {
         "word/footnotes.xml", "word/theme/theme1.xml",
     )
 
-    /** [bytes]: şifresi çözülmüş .docx (zip) dosyası. */
+    /** [bytes] şifresi çözülmüş .docx dosyasıdır. */
     fun read(bytes: ByteArray): WordDoc {
         try {
             val parts = readParts(bytes, { it in XML_PARTS }, MAX_XML_BYTES, Long.MAX_VALUE, skipOversize = false)
@@ -100,7 +95,7 @@ internal object DocxReader {
         return out
     }
 
-    /** [baseDir] klasörüne göre bağıl [target] yolunu zip içindeki tam yola çevirir. */
+    /** Bağıl yolu zip içindeki tam yola çevirir. */
     fun resolvePart(baseDir: String, target: String): String {
         if (target.startsWith("/")) return target.trimStart('/')
         val parts = ArrayList(baseDir.split('/').filter { it.isNotEmpty() })
@@ -121,7 +116,7 @@ private const val EMU_PER_PT = 12700f
 private val LINK_COLOR = 0xFF0563C1.toInt()
 private val HEADING_NAME = Regex("^(?:heading|başlık|baslik)\\s*(\\d)")
 
-/** Çalıştırma (karakter) özellikleri; stil zinciri boyunca üst üste uygulanır. */
+/** Karakter biçimi; stil zinciri boyunca üst üste uygulanır. */
 private class RProps(
     var bold: Boolean = false,
     var italic: Boolean = false,
@@ -135,13 +130,13 @@ private class RProps(
     var caps: Boolean = false,
     var smallCaps: Boolean = false,
     var vanish: Boolean = false,
-    /** w:position: satırı yükselten/alçaltan yarım punto değeri (LibreOffice üst/alt simgeyi böyle yazar). */
+    /** w:position: satırı yükselten ya da alçaltan yarım punto değeri. */
     var position: Int = 0,
 ) {
     fun copy() = RProps(bold, italic, underline, strike, color, highlight, sizePt, font, script, caps, smallCaps, vanish, position)
 }
 
-/** Paragraf özellikleri. */
+/** Paragraf biçimi. */
 private class PProps {
     var align = WordAlign.Left
     var left = 0f
@@ -199,8 +194,6 @@ private class DocxConverter(
         return out
     }
 
-    // --- Bloklar ---------------------------------------------------------------------------------------
-
     private fun convertBlocks(nodes: List<XNode>, out: MutableList<WordBlock>, ctx: Ctx) {
         for (n in nodes) {
             if (truncated) return
@@ -220,8 +213,6 @@ private class DocxConverter(
         if (ctx.inCell || out.isEmpty() || out.last() === WordPageBreak) return
         out.add(WordPageBreak)
     }
-
-    // --- Özellik çözümleme -----------------------------------------------------------------------------
 
     private fun onOff(n: XNode) = n.isOn()
 
@@ -332,10 +323,8 @@ private class DocxConverter(
         chain.forEach { applyR(r, it.rPr) }
 
         val styleName = chain.lastOrNull()?.name?.lowercase().orEmpty()
-        // "Heading 1"e dayanan özel stiller de başlıktır: zincir en türetilmiş stilden temele doğru aranır.
         val headingNumber = chain.asReversed().firstNotNullOfOrNull { HEADING_NAME.find(it.name.lowercase())?.groupValues?.get(1)?.toIntOrNull() }
         val heading = headingNumber?.coerceIn(1, 9) ?: p.outline?.takeIf { it in 0..8 }?.plus(1) ?: 0
-        // stiller.xml yoksa başlıklar yine de başlık gibi görünsün
         if (styles.isEmpty && heading > 0) r.bold = true
         if (r.sizePt == null) {
             r.sizePt = when {
@@ -372,8 +361,6 @@ private class DocxConverter(
         return text.ifEmpty { null }
     }
 
-    // --- Paragraf --------------------------------------------------------------------------------------
-
     private fun convertParagraph(p: XNode, out: MutableList<WordBlock>, ctx: Ctx) {
         val pPr = p.child("w:pPr")
         val info = resolvePara(pPr, ctx)
@@ -386,7 +373,6 @@ private class DocxConverter(
 
         if (info.p.pageBreakBefore) addPageBreak(out, ctx)
 
-        // Sayfa sonu işaretleri ("\u000C") paragrafı parçalara böler.
         val segments = ArrayList<MutableList<WordRun>>()
         var current = ArrayList<WordRun>()
         for (run in mergeRuns(runs)) {
@@ -397,9 +383,7 @@ private class DocxConverter(
         for ((i, seg) in segments.withIndex()) {
             val first = i == 0
             val last = i == segments.lastIndex
-            if (seg.isEmpty() && (segments.size > 1 || extras.isNotEmpty())) {
-                // sayfa sonundan önce/sonra kalan boş parça ya da yalnızca görsel içeren paragraf: boş satır çizilmez
-            } else {
+            if (seg.isEmpty() && (segments.size > 1 || extras.isNotEmpty())) {} else {
                 out.add(makeParagraph(seg, info, emptyPt, first, last))
             }
             if (!last) addPageBreak(out, ctx)
@@ -444,8 +428,6 @@ private class DocxConverter(
         }
         return out
     }
-
-    // --- Satır içi içerik ------------------------------------------------------------------------------
 
     private fun currentLink(link: String?): String? = link ?: fields.lastOrNull { it.separated && it.link != null }?.link
 
@@ -546,7 +528,6 @@ private class DocxConverter(
         var size = (props.sizePt ?: WordRun.DEFAULT_SIZE_PT) * (if (props.smallCaps && !props.caps) 0.85f else 1f)
         var script = props.script
         if (script == 0 && kotlin.math.abs(props.position) >= WordRun.MIN_RAISE_HALF_POINTS) {
-            // yazarın seçtiği punto korunur: görüntüleyici simge boyutunu küçülteceği için burada büyütülür
             script = if (props.position > 0) 1 else -1
             size /= WordRun.SCRIPT_SHRINK
         }
@@ -567,14 +548,12 @@ private class DocxConverter(
         )
     }
 
-    // --- Görseller ve metin kutuları -------------------------------------------------------------------
-
     private fun graphic(g: XNode, info: ParaInfo, extras: MutableList<WordBlock>) {
         val align = when (info.p.align) { WordAlign.Justify -> WordAlign.Left; else -> info.p.align }
         when (g.name) {
             "w:drawing" -> for (d in g.kids) {
                 if (d.name != "wp:inline" && d.name != "wp:anchor") continue
-                if (d.name == "wp:anchor" && d.attr("behindDoc") == "1") continue // arka plan / filigran
+                if (d.name == "wp:anchor" && d.attr("behindDoc") == "1") continue
                 val ext = d.child("wp:extent")
                 val w = (ext?.attr("cx")?.toFloatOrNull() ?: 0f) / EMU_PER_PT
                 val h = (ext?.attr("cy")?.toFloatOrNull() ?: 0f) / EMU_PER_PT
@@ -602,7 +581,6 @@ private class DocxConverter(
                 return
             }
             "pic:pic" -> if (blips > 1) {
-                // grup içinde birden çok görsel: her görselin kendi ölçüsü
                 val ext = n.child("pic:spPr")?.child("a:xfrm")?.child("a:ext")
                 val pw = (ext?.attr("cx")?.toFloatOrNull() ?: 0f) / EMU_PER_PT
                 val ph = (ext?.attr("cy")?.toFloatOrNull() ?: 0f) / EMU_PER_PT
@@ -657,8 +635,6 @@ private class DocxConverter(
         extras.add(WordImage(rel.target, w, h, align))
     }
 
-    // --- Tablolar --------------------------------------------------------------------------------------
-
     private fun lookOf(tblPr: XNode?): Look {
         val n = tblPr?.child("w:tblLook") ?: return Look(firstRow = true, lastRow = false, firstCol = true, lastCol = false, noHBand = false)
         val mask = n.attr("val")?.toIntOrNull(16)
@@ -674,7 +650,7 @@ private class DocxConverter(
             }
             return null
         }
-        tblPr?.child("w:tblBorders")?.let { return fromBorders(it) } // açıkça belirtilmişse stil dikkate alınmaz
+        tblPr?.child("w:tblBorders")?.let { return fromBorders(it) }
         for (def in chain.reversed()) def.tblPr?.child("w:tblBorders")?.let { return fromBorders(it) }
         return null
     }
@@ -741,7 +717,7 @@ private class DocxConverter(
         return WordTable(grid, rows, borderColor)
     }
 
-    /** Hücrenin koşullu stil adları, uygulama sırasıyla (sonraki öncekini ezer). */
+    /** Hücrenin koşullu stil adları, uygulama sırasıyla. */
     private fun conditionalTypes(row: Int, rowCount: Int, col: Int, look: Look): List<String> {
         val out = ArrayList<String>()
         if (!look.noHBand) {
@@ -755,8 +731,6 @@ private class DocxConverter(
         return out
     }
 
-    // --- Dipnotlar -------------------------------------------------------------------------------------
-
     private fun footnoteNode(id: String): XNode? {
         val f = footnotes?.children("w:footnote")?.firstOrNull { it.attr("id") == id } ?: return null
         val type = f.attr("type")
@@ -767,7 +741,7 @@ private class DocxConverter(
         if (footnoteOrder.isEmpty()) return
         out.add(WordParagraph(listOf(WordRun(Txt.docs.footnotes, bold = true, sizePt = 12f)), beforePt = 18f, afterPt = 6f, borderTop = 0xFF9E9E9E.toInt()))
         var i = 0
-        while (i < footnoteOrder.size) { // dipnot metni yeni dipnot içeremez, ama liste büyürse güvenle döner
+        while (i < footnoteOrder.size) {
             val node = footnoteNode(footnoteOrder[i])
             i++
             if (node == null) continue
@@ -777,7 +751,6 @@ private class DocxConverter(
             for (b in sub) {
                 if (b is WordParagraph && !labelled) {
                     labelled = true
-                    // dipnot numarası etiket olur; metnin başındaki boşluk/sekme atılır
                     val small = b.runs.map { it.copy(sizePt = minOf(it.sizePt, 10f)) }.toMutableList()
                     if (small.isNotEmpty()) small[0] = small[0].copy(text = small[0].text.trimStart())
                     out.add(b.copy(label = "$i", indentPt = 18f, firstLinePt = -18f, runs = small.filter { it.text.isNotEmpty() }))

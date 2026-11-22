@@ -27,7 +27,6 @@ internal fun TextViewer(text: String, truncated: Boolean) {
             )
             Spacer(Modifier.height(8.dp))
         }
-        // SelectionContainer: metin seçilip kopyalanabilsin.
         SelectionContainer {
             Text(text, fontFamily = FontFamily.Monospace, style = MaterialTheme.typography.bodySmall)
         }

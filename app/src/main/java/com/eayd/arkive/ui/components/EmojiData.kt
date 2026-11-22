@@ -2,21 +2,15 @@ package com.eayd.arkive.ui.components
 
 import com.eayd.arkive.i18n.Txt
 
-// Emoji seçicinin verisi. Liste Unicode 15.0 temel emojilerini içerir (ten rengi ve cinsiyet varyantları yok);
-// sıra ve gruplar Google'ın emoji sıralamasından alınmıştır. Cihazın yazı tipi bir emojiyi çizemiyorsa
-// (eski Android) seçicide çalışma anında elenir, bkz. EmojiPicker.kt.
-
-/** Seçicinin bir bölümü. [icon]: sekmede gösterilen örnek emoji. */
+/** Emoji seçicinin bir bölümü. [icon] sekmede görünen emoji. */
 internal class EmojiCategory(private val labelText: () -> String, val icon: String, val emojis: List<String>) {
-    /** Seçili dilde bölüm adı. */
     val label: String get() = labelText()
 }
 
-/** Klasör penceresindeki hızlı seçim satırı: sık kullanılanlar. Hepsi için "+" tuşuyla tam liste açılır. */
+/** Klasör penceresindeki hızlı seçim emojileri. */
 internal val BasicFolderEmojis: List<String> =
     listOf("💙", "📚", "💼", "💚", "📷", "🎵", "🎬", "⭐", "❤\uFE0F", "🎓")
 
-/** Boşlukla ayrılmış emoji dizisini listeye çevirir. */
 private fun emojiList(blob: String): List<String> = blob.split(' ').filter { it.isNotEmpty() }
 
 internal val EmojiCategories: List<EmojiCategory> = listOf(

@@ -48,20 +48,7 @@ import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.viewmodel.CategoryOption
 import com.eayd.arkive.viewmodel.SortOption
 
-/**
- * Üst çubuğun hemen altındaki işlem satırı: solda filtre seçenekleri ([filters] yuvası), sağda dolgulu "+" düğmesi.
- *
- * Satırın kenar boşlukları (16 dp) altındaki liste kartlarınınkiyle aynıdır; böylece filtreler listenin sol
- * kenarıyla, "+" düğmesi sağ kenarıyla hizalanır.
- *
- * "+" düz bir ikon yerine [FilledIconButton] (dolgulu, yuvarlatılmış kare) olarak çizilir; böylece
- * arka planda silik kalmaz ve dokunulabilir bir düğme olduğu belli olur.
- *  - Dosya yüklenebilen bir yerdeyken ([canUpload]) basınca küçük bir menü açılır: "Yeni klasör" / "Dosya yükle".
- *  - Yüklenemeyen yerde (ör. internet yokken) menü gereksizdir, doğrudan "yeni klasör" açılır.
- *
- * [filters] bir "slot"tur: çağıran yer `filters = { ... }` ile istediği bileşenleri (ör. [FilterPill]) verir,
- * bu dosyayı değiştirmek gerekmez.
- */
+/** Listenin üstündeki işlem satırı: solda filtreler, sağda "+" düğmesi. */
 @Composable
 fun FolderActionRow(
     canUpload: Boolean,
@@ -74,7 +61,6 @@ fun FolderActionRow(
     var menuOpen by remember { mutableStateOf(false) }
 
     Row(
-        // end = 12 dp: "+" düğmesinin kendi içindeki 4 dp'lik boşlukla birlikte görünür kenarı 16 dp'ye denk gelir.
         modifier = modifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = 4.dp, bottom = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
@@ -112,11 +98,7 @@ fun FolderActionRow(
     }
 }
 
-/**
- * Filtre düğmesi: ince çerçeveli, tam yuvarlak kenarlı "hap" ("Sırala", "Kategori ⌄" gibi).
- * Simgeler tema renginde, yazı normal metin renginde çizilir. [active] true ise (bir filtre seçiliyse)
- * çerçeve tema renginde olur; böylece filtrenin açık olduğu görülür.
- */
+/** Filtre düğmesi. [active] true ise çerçeve tema renginde olur. */
 @Composable
 fun FilterPill(
     label: String,
@@ -149,10 +131,7 @@ fun FilterPill(
     }
 }
 
-/**
- * "Sırala" ve "Kategori" filtre düğmeleri (işlem satırının solunda). Seçim istemcide, ekrandaki liste üzerinde
- * uygulanır (sunucuya yeni istek gitmez); durumu ViewModel tutar.
- */
+/** "Sırala" ve "Kategori" filtreleri; liste telefonda süzülür. */
 @Composable
 fun BrowserFilters(
     sort: SortOption,
@@ -169,7 +148,6 @@ fun BrowserFilters(
         onSelect = onSort,
     )
     OptionPill(
-        // Bir kategori seçiliyse düğme onun adını gösterir ve çerçevesi renklenir.
         label = if (category == CategoryOption.All) Txt.browser.category else category.label,
         trailingIcon = Icons.Filled.KeyboardArrowDown,
         active = category != CategoryOption.All,
@@ -180,7 +158,7 @@ fun BrowserFilters(
     )
 }
 
-/** Basınca seçenek menüsü açan [FilterPill]; geçerli seçenekte tik görünür. */
+/** Basınca seçenek menüsü açan filtre düğmesi. */
 @Composable
 private fun <T> OptionPill(
     label: String,
@@ -215,7 +193,7 @@ private fun <T> OptionPill(
     }
 }
 
-/** Seçim modunda işlem satırının yerini alan çubuk: seçili sayısı ve toplu işlemler. */
+/** Seçim modunda işlem satırının yerine gelen çubuk. */
 @Composable
 fun SelectionBar(
     count: Int,
@@ -228,7 +206,6 @@ fun SelectionBar(
     onDelete: () -> Unit,
 ) {
     Row(
-        // 48 dp: normal işlem satırıyla aynı yükseklik; seçime geçince liste yerinden oynamasın.
         modifier = Modifier.fillMaxWidth().height(48.dp).padding(horizontal = 4.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {

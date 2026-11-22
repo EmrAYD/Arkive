@@ -9,12 +9,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
-/** Açık pencere ([current], null = hiçbiri), sunucuya kaydediliyor mu ve pencerede gösterilecek sunucu hatası. */
+/** Açık pencere, kaydetme durumu ve sunucu hatası. */
 data class DialogState<D : Any>(val current: D? = null, val saving: Boolean = false, val error: String? = null)
 
 /**
- * Bir ekranın pencerelerinin (dialog) yaşam döngüsü: aç, kaydet, hata göster, kapat. Liste ekranı ve ön izleme
- * ekranı aynı kuralı kullanır: işlem başarılıysa pencere kapanır, hata verirse pencerede kalır ve mesaj gösterilir.
+ * Bir ekranın pencereleri: aç, kaydet, hata göster, kapat. İşlem başarılıysa pencere kapanır, hata olursa açık kalır.
  */
 class DialogHost<D : Any>(private val scope: CoroutineScope) {
 
@@ -29,7 +28,7 @@ class DialogHost<D : Any>(private val scope: CoroutineScope) {
         _state.value = DialogState()
     }
 
-    /** [block] başarıyla biterse pencere kapanır; hata fırlatırsa pencerede gösterilir. */
+    /** [block] başarılı olursa pencereyi kapatır, hata atarsa pencerede gösterir. */
     fun submit(block: suspend () -> Unit) {
         _state.update { it.copy(saving = true, error = null) }
         scope.launch {

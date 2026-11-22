@@ -27,18 +27,9 @@ import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.formatBytes
 
 /**
- * "Telefondaki yapay zeka" penceresi: dosyaları telefonda özetleyen modelin ([LocalModel]) durumu ve işlemleri. Metinler
- * geçerli yapay zeka işlem yerine göre değişir ([AiMode]; ücretsiz planda her zaman Yerel): Yerel'de dosyalar yalnızca
- * bununla, Yerel + Bulut'ta küçük dosyalar bununla özetlenir, Bulut'ta model kullanılmaz. Durum canlıdır; indirme
- * sürerken ilerleme çubuğu dolar.
- *  - İndirilmedi: ne işe yaradığı, boyutu, Wi-Fi notu → "İndir".
- *  - İniyor: ilerleme → "İndirmeyi durdur".
- *  - Hazır: → "Modeli sil" (yer açmak için; önce onay sorulur).
- *  - Bu telefonda çalışmaz: nedeni.
+ * Telefondaki yapay zeka modelinin penceresi: indir, durdur ya da sil. Metinler işlem yeri ayarına göre değişir.
  *
- * Hem AI düğmesinden (dosya telefonda özetlenecekken model hazır değilse) hem Profil > Ayarlar'dan açılır.
- * [onSummarizeInCloud]: AI düğmesinden "Yerel + Bulut"ta açıldıysa, model inmeden dosyayı hemen bulutta özetler
- * ("Bulutta özetle" düğmesi); yoksa null.
+ * [onSummarizeInCloud] verilirse "Bulutta özetle" düğmesi de çıkar.
  */
 @Composable
 fun LocalModelDialog(
@@ -94,7 +85,7 @@ fun LocalModelDialog(
                             LinearProgressIndicator(
                                 progress = { percent / 100f },
                                 modifier = Modifier.fillMaxWidth(),
-                                drawStopIndicator = {}, // Material 3'ün çubuğun sonuna çizdiği nokta çizilmesin
+                                drawStopIndicator = {},
                             )
                         } else {
                             LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
@@ -120,7 +111,6 @@ fun LocalModelDialog(
         confirmButton = {
             when {
                 state == LocalModelState.NotDownloaded -> TextButton(onClick = onDownload) { Text(Txt.localAi.download) }
-                // Model inerken "Yerel + Bulut"ta dosya beklemeden bulutta özetlenebilir.
                 state is LocalModelState.Downloading && onSummarizeInCloud != null ->
                     TextButton(onClick = onSummarizeInCloud) { Text(Txt.localAi.summarizeInCloud) }
                 state == LocalModelState.Ready && confirmDelete -> TextButton(onClick = onDelete) {

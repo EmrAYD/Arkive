@@ -87,10 +87,7 @@ private val DarkColorScheme = darkColorScheme(
     surfaceContainerHighest = DarkSurfaceContainerHighest
 )
 
-/**
- * Material ColorScheme'de karşılığı olmayan, uygulamaya özel renkler.
- * Kullanım: MaterialTheme.arkiveColors.success
- */
+/** Material renk şemasında olmayan uygulama renkleri, ör. `MaterialTheme.arkiveColors.success`. */
 @Immutable
 data class ArkiveExtraColors(
     val success: Color,
@@ -120,7 +117,6 @@ val MaterialTheme.arkiveColors: ArkiveExtraColors
 @Composable
 fun ArkiveTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
-    // Android 12+ duvar kağıdı renkleri marka paletini ezer; bu yüzden varsayılan kapalı.
     dynamicColor: Boolean = false,
     content: @Composable () -> Unit
 ) {
@@ -137,7 +133,7 @@ fun ArkiveTheme(
     CompositionLocalProvider(LocalArkiveColors provides extraColors) {
         MaterialTheme(
             colorScheme = colorScheme,
-            typography = Typography, // mevcut Type.kt
+            typography = Typography,
             content = content
         )
     }

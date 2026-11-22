@@ -3,17 +3,13 @@ package com.eayd.arkive.ai
 import android.content.Context
 import java.io.File
 
-/**
- * Özetlenebilir küçük dosyaların telefondaki kopyası. Kopya telefonda varsa dosya internet olmadan da özetlenebilir
- * ve ön izlenebilir (internetsiz listede yalnızca kopyası olan dosyalar açılır). Kopyalar liste açılınca arka planda
- * alınır ([AiSummarizer.prefetch]); toplam boyut [MAX_TOTAL_BYTES]'ı aşınca en eskiler silinir.
- */
+/** Küçük dosyaların telefondaki kopyaları. Kopyası olan dosya internetsiz de açılır ve özetlenir. */
 object InputCache {
 
     /** Tüm kopyaların toplam üst sınırı. */
     const val MAX_TOTAL_BYTES: Long = 40L * 1024 * 1024
 
-    /** Bir pass'te en çok kaç dosya indirilir (liste uzunsa her açılışta biraz ilerler). */
+    /** Bir seferde en çok kaç dosya indirilir. */
     const val MAX_PER_PASS: Int = 20
 
     private lateinit var dir: File
@@ -23,14 +19,13 @@ object InputCache {
         dir = File(context.applicationContext.filesDir, "ai_inputs").also { it.mkdirs() }
     }
 
-    // Dosya adına boyut da yazılır: içerik değişmiş (aynı kimlikle farklı boyut) bir kopya eski sayılır.
     private fun target(fileId: String, size: Long) = File(dir, "${fileId}_$size")
 
     /** Telefondaki kopya; yoksa null. */
     @Synchronized
     fun get(fileId: String, size: Long): File? = target(fileId, size).takeIf { it.isFile && it.length() == size }
 
-    /** İndirilmiş geçici dosyayı kopya olarak yerine taşır (başarısızsa geçici dosya silinmez; çağıran siler). */
+    /** İndirilmiş geçici dosyayı kopya olarak yerine taşır. */
     @Synchronized
     fun adopt(temp: File, fileId: String, size: Long): Boolean {
         if (!temp.isFile || temp.length() != size) return false
@@ -40,10 +35,7 @@ object InputCache {
         return ok
     }
 
-    /**
-     * [source]'un (ör. ön izleme için indirilmiş dosya) bir kopyasını telefonda tutar; [source] yerinde kalır.
-     * Kopyalanamazsa false.
-     */
+    /** [source]'un bir kopyasını tutar; [source] yerinde kalır. */
     @Synchronized
     fun keepCopy(source: File, fileId: String, size: Long): Boolean {
         if (!source.isFile || source.length() != size) return false
@@ -59,13 +51,12 @@ object InputCache {
         }
     }
 
-    /** Bu dosyanın tüm kopyalarını siler. */
+    /** Bu dosyanın kopyalarını siler. */
     @Synchronized
     fun evict(fileId: String) {
         dir.listFiles { f -> f.name.startsWith("${fileId}_") }?.forEach { it.delete() }
     }
 
-    /** Geçici dosyalar için yer. */
     fun tempFile(fileId: String): File = File(dir, "$fileId.part")
 
     private fun trim() {

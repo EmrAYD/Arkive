@@ -1,9 +1,6 @@
 package com.eayd.arkive.navigation
 
-/**
- * Uygulamanın ekran adresleri. Rotada yalnızca kimlikler (UUID) taşınır; ad, içerik ve kullanıcı bilgisi
- * ilgili ekranın ViewModel'i tarafından sunucudan / oturumdan alınır.
- */
+/** Ekran adresleri. Adreslerde yalnızca kimlik taşınır; geri kalanı ekran sunucudan alır. */
 object Routes {
     const val SPLASH = "splash"
     const val LOGIN = "login"
@@ -20,7 +17,7 @@ object Routes {
 
     fun folder(id: String) = "folder/$id"
 
-    /** [readOnly]: çöpteki dosya; ön izlenir ama değiştirilemez. */
+    /** [readOnly] çöpteki dosya içindir; değiştirilemez. */
     fun preview(id: String, readOnly: Boolean = false) = "preview/$id?readOnly=$readOnly"
 
     fun trashFolder(id: String) = "trash/folder/$id"

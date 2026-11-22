@@ -3,26 +3,13 @@ package com.eayd.arkive.ai
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.formatBytes
 
-/**
- * Yapay zeka özetlemesinin kuralları: hangi dosyalar özetlenebilir ve hangileri telefonda özetlenebilir. Hiçbir Android
- * sınıfı kullanmaz; bu yüzden tek başına test edilebilir. Eşikleri değiştirmek için yalnızca bu dosyadaki sabitlere bakmak
- * yeter.
- *
- * Özetin nerede çıkarılacağını ayarlardaki yapay zeka işlem yeri ([AiMode]) ve [route] belirler: "Yerel"de yalnızca
- * telefonda, cihazdaki yapay zekayla ([LocalSummarizer]); "Bulut"ta her zaman sunucuda; "Yerel + Bulut"ta küçük dosyalar
- * önce telefonda, gerisi (ve telefonda özetlenemeyenler) sunucuda. Ücretsiz planda ayar ne olursa olsun "Yerel" geçerlidir
- * ([com.eayd.arkive.data.PlanPolicy.effectiveMode]). Telefonda özetleme iki aşamada denetlenir:
- *  1. [localPrecheck]: dosyayı hiç açmadan (boyutuna bakarak),
- *  2. [localRejection]: dosya cihazda açılıp sayfa/görsel sayısı çıkarılınca.
- */
-
-/** Özetlenebilen dosya türleri. [Docx]: Word belgeleri; hem .docx hem eski .doc (parolalıları dahil). */
+/** Özetlenebilen dosya türleri. Docx, eski .doc dosyalarını da kapsar. */
 enum class SummarizableKind { Text, Pdf, Docx }
 
-/** Telefonda açılan belgenin ölçüleri. [pages] bilinmiyorsa null (düz metin, Word belgesi). */
+/** Telefonda açılan belgenin kelime, sayfa ve görsel sayısı. Sayfa sayısı bilinmiyorsa null. */
 data class DocumentStats(val words: Int, val pages: Int?, val images: Int)
 
-/** Dosyanın yerelde özetlenememe nedeni. [message] kullanıcıya gösterilir. */
+/** Dosyanın telefonda özetlenememe nedeni. */
 enum class LocalRejection {
     TooBig,
     TooManyPages,
@@ -30,7 +17,6 @@ enum class LocalRejection {
     NoText,
     ;
 
-    /** Seçili dilde açıklaması. */
     val message: String
         get() = when (this) {
             TooBig -> Txt.ai.rejectTooBig
@@ -40,25 +26,21 @@ enum class LocalRejection {
         }
 }
 
-/**
- * Ayarlardaki "yapay zeka işlem yeri" ([com.eayd.arkive.data.AppSettings.aiMode]). Varsayılan [Hybrid]. Bulut Plus'a
- * özeldir: ücretsiz planda ayar ne olursa olsun [Local] geçerlidir.
- */
+/** Profildeki "Yapay zeka işlem yeri" ayarı. Ücretsiz planda her zaman [Local] geçerlidir. */
 enum class AiMode {
-    /** Yalnızca telefonda, cihazdaki yapay zekayla; model gerekir. Büyük/uzun/görselli dosyalar özetlenemez. */
+    /** Yalnızca telefonda. */
     Local,
 
-    /** Her zaman sunucuda; telefona model gerekmez. */
+    /** Her zaman sunucuda. */
     Cloud,
 
-    /** Küçük, metin ağırlıklı dosyalar telefonda (model gerekir), gerisi ve telefonda özetlenemeyenler sunucuda. */
+    /** Küçük dosyalar telefonda, gerisi sunucuda. */
     Hybrid,
     ;
 
     val allowsLocal: Boolean get() = this != Cloud
     val allowsCloud: Boolean get() = this != Local
 
-    /** Seçili dilde adı. */
     val label: String
         get() = when (this) {
             Local -> Txt.aiMode.local
@@ -66,7 +48,6 @@ enum class AiMode {
             Hybrid -> Txt.aiMode.hybrid
         }
 
-    /** Seçili dilde açıklaması (ayar penceresinde seçeneğin altında). */
     val description: String
         get() = when (this) {
             Local -> Txt.aiMode.localDetail(formatBytes(AiPolicy.LOCAL_MAX_BYTES), AiPolicy.LOCAL_MAX_PAGES)
@@ -75,49 +56,49 @@ enum class AiMode {
         }
 }
 
-/** Özetin nerede çıkarılacağı; dosya açılmadan, işlem yerine, modele ve dosyanın boyutuna bakılarak belirlenir ([AiPolicy.route]). */
+/** Dosyanın nerede özetleneceği. */
 enum class SummaryRoute {
-    /** "Yerel": yalnızca telefonda. Telefonda özetlenemezse nedeni söylenir (ücretsiz planda Plus önerilir). */
+    /** Yalnızca telefonda. */
     PhoneOnly,
 
-    /** "Yerel + Bulut", model telefonda hazır ve dosya küçük: önce telefonda; telefonda özetlenemezse bulutta. */
+    /** Önce telefonda, olmazsa bulutta. */
     PhoneThenCloud,
 
-    /** "Bulut"; ya da "Yerel + Bulut"ta dosya büyük veya model telefonda hazır değil: doğrudan bulutta. */
+    /** Doğrudan bulutta. */
     Cloud,
 }
 
+/** Yapay zeka özetlemesinin kuralları. Android'e bağlı değil, testlerle denenir. */
 object AiPolicy {
 
-    /** Bundan büyük dosyalar yerelde özetlenmez (bayt). */
+    /** Telefonda özetlenebilecek en büyük dosya. */
     const val LOCAL_MAX_BYTES: Long = 1L * 1024 * 1024
 
-    /** Bundan çok sayfalı belgeler yerelde özetlenmez (PDF, DOCX ve düz metin). */
+    /** Telefonda özetlenebilecek en uzun belge. */
     const val LOCAL_MAX_PAGES: Int = 10
 
-    /** Sayfa sayısı bilinmeyen belgede (düz metin, DOCX) sayfa, kelime sayısından kabaca hesaplanır: sayfa başına bu kadar kelime. */
+    /** Sayfa sayısı bilinmeyen belgede bir sayfanın kaç kelime sayıldığı. */
     const val WORDS_PER_PAGE: Int = 500
 
-    /** Belgenin sayfa sayısı: PDF'te gerçek değer, düz metin ve DOCX'te kelime sayısından tahmin ([WORDS_PER_PAGE]). */
+    /** PDF'te gerçek sayfa sayısı, diğerlerinde kelimeden tahmin. */
     fun pagesOf(stats: DocumentStats): Int = stats.pages ?: ((stats.words + WORDS_PER_PAGE - 1) / WORDS_PER_PAGE)
 
-    /** Bir PDF'te bu kadar ya da daha fazla görsel varsa ve sayfa başına oranı aşıldıysa "görsel ağırlıklı" sayılır. */
+    /** Bundan az görseli olan PDF görsel ağırlıklı sayılmaz. */
     const val IMAGE_HEAVY_MIN_IMAGES: Int = 4
 
-    /** Sayfa başına en çok bu kadar görsel olan PDF metin ağırlıklı sayılır (0,5 = iki sayfada bir görsel). */
+    /** Sayfa başına bundan fazla görsel varsa PDF görsel ağırlıklıdır. */
     const val IMAGE_HEAVY_PER_PAGE: Double = 0.5
 
-    /** Sayfa başına bundan az kelime düşen PDF taranmış (resimden ibaret) sayılır. */
+    /** Sayfa başına bundan az kelime varsa PDF taranmış sayılır. */
     const val SCANNED_MIN_WORDS_PER_PAGE: Int = 20
 
-    /** Telefonda özetleme için dosyayı açmadan verilebilecek karar: çok büyükse nedeni, açılıp bakılabilecekse null. */
+    /** Dosyayı açmadan, yalnızca boyutuna bakarak telefona uygun olup olmadığını söyler. */
     fun localPrecheck(sizeBytes: Long): LocalRejection? = if (sizeBytes <= LOCAL_MAX_BYTES) null else LocalRejection.TooBig
 
     /**
-     * Özetin nerede çıkarılacağı. [mode]: geçerli işlem yeri (plana göre düzeltilmiş,
-     * [com.eayd.arkive.data.PlanPolicy.effectiveMode]); [modelReady]: telefondaki yapay zeka modeli inmiş ve hazır mı;
-     * [sizeBytes]: dosyanın boyutu. "Yerel + Bulut"ta model hazır değilse (inmedi / iniyor / bu telefonda çalışmaz) dosya
-     * bulutta özetlenir; AI düğmesi bu durumda önce modeli indirmeyi önerir ([wantsModel]).
+     * Dosyanın telefonda mı bulutta mı özetleneceğini seçer.
+     *
+     * Model hazır değilse "Yerel + Bulut" da buluta gider.
      */
     fun route(mode: AiMode, modelReady: Boolean, sizeBytes: Long): SummaryRoute = when (mode) {
         AiMode.Local -> SummaryRoute.PhoneOnly
@@ -126,16 +107,10 @@ object AiPolicy {
             if (modelReady && localPrecheck(sizeBytes) == null) SummaryRoute.PhoneThenCloud else SummaryRoute.Cloud
     }
 
-    /**
-     * Bu dosya, işlem yerine göre telefonda özetlenecek mi (bunun için telefonda model gerekir): "Yerel"de ve
-     * "Yerel + Bulut"ta, dosya telefonda özetlenebilecek kadar küçükse. Model yoksa AI düğmesi indirme penceresini açar.
-     */
+    /** Bu dosya için telefonda model gerekiyor mu. */
     fun wantsModel(mode: AiMode, sizeBytes: Long): Boolean = mode.allowsLocal && localPrecheck(sizeBytes) == null
 
-    /**
-     * Belge yerelde özetlenemiyorsa nedeni; uygunsa null. Boyut denetimi [localPrecheck]'tedir. Sayfa sınırı ilk bakılandır
-     * (çok sayfalı PDF'in metni okunmaz, [stats] boş gelir; düz metin ve DOCX'te sayfa sayısı kelimeden tahmin edilir); görsel denetimi metinsizlikten önce gelir.
-     */
+    /** Açılan belge telefonda özetlenemiyorsa nedenini döner, uygunsa null. */
     fun localRejection(stats: DocumentStats): LocalRejection? = when {
         pagesOf(stats) > LOCAL_MAX_PAGES -> LocalRejection.TooManyPages
         isImageHeavy(stats) -> LocalRejection.ImageHeavy
@@ -143,10 +118,7 @@ object AiPolicy {
         else -> null
     }
 
-    /**
-     * Çok görselli mi? İki ayrı işaret vardır: (1) görsel sayısı hem yeterince çok hem de sayfa başına oranı yüksek;
-     * (2) sayfaları metinden çok görselden ibaret (taranmış belge): görsel var ama sayfa başına neredeyse hiç kelime yok.
-     */
+    /** Belge çok görselli ya da taranmış mı. */
     fun isImageHeavy(stats: DocumentStats): Boolean {
         if (stats.images <= 0) return false
         val pages = stats.pages?.coerceAtLeast(1)
@@ -162,15 +134,10 @@ object AiPolicy {
     private fun isOle(bytes: ByteArray): Boolean =
         bytes.size > oleMagic.size && oleMagic.indices.all { bytes[it] == oleMagic[it] }
 
-    /**
-     * Parola ile korunmuş bir Office dosyası (şifreli .docx) mı? Şifrelenen .docx, zip yerine eski OLE kapsayıcısına
-     * sarılır ve içinde "EncryptedPackage" adlı bir akış bulunur (adı UTF-16 olarak saklanır). Eski .doc dosyaları da
-     * OLE'dir ama bu akışı taşımaz; onlar bu işlevde şifreli sayılmaz (parolalı .doc'u [isLegacyOffice] yakalar ve
-     * parolayı kendi okuyucusu ister).
-     */
+    /** Parolalı .docx mi? Şifreli .docx dosyaları eski OLE kapsayıcısının içinde gelir. */
     fun isEncryptedOffice(bytes: ByteArray): Boolean = isOle(bytes) && indexOf(bytes, encryptedPackageName) >= 0
 
-    /** Eski Office kapsayıcısı (OLE) mı ve şifreli .docx DEĞİL mi? Yani eski .doc (parolalı ya da parolasız). */
+    /** Eski .doc dosyası mı (parolalı ya da parolasız). */
     fun isLegacyOffice(bytes: ByteArray): Boolean = isOle(bytes) && !isEncryptedOffice(bytes)
 
     private fun indexOf(haystack: ByteArray, needle: ByteArray): Int {
@@ -191,16 +158,14 @@ object AiPolicy {
         "application/vnd.ms-word",
     )
 
-    // Backend'deki summarize.py ile aynı olmalı. docm/dotx/dotm özetlenmez (ön izleme açar, özet için desteklenmeyen tür).
     private val wordExtensions = setOf("docx", "doc", "dot")
 
     /**
-     * Özetlenebilen dosya türleri: düz metin, PDF ve Word (DOCX ve eski DOC). Birini kapatmak için buradan çıkarın
-     * (backend'de karşılığı SUMMARY_FILE_KINDS ayarıdır; "docx" her iki Word biçimini de kapsar).
+     * Özetlenebilen türler. Bir türü kapatmak için buradan çıkarın; backend'deki SUMMARY_FILE_KINDS ile aynı olmalı.
      */
     val SUPPORTED_KINDS: Set<SummarizableKind> = setOf(SummarizableKind.Text, SummarizableKind.Pdf, SummarizableKind.Docx)
 
-    /** Dosyanın hangi özetlenebilir sınıfa girdiği; desteklenmiyorsa (resim, video, ses…) null. */
+    /** Dosyanın özetlenebilir türü; desteklenmiyorsa null. */
     fun kindOf(mimeType: String?, fileName: String): SummarizableKind? {
         val mime = mimeType?.lowercase().orEmpty()
         val ext = fileName.substringAfterLast('.', "").lowercase()
