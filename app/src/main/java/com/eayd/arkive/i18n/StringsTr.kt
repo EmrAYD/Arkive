@@ -540,4 +540,18 @@ object TrStrings : Strings {
         override fun noResults(query: Any?): String = "“${query}” için sonuç bulunamadı."
         override val contentNote: String = "Parolalı ve taranmış (yazısız) dosyaların içinde arama yapılamaz."
     }
+    override val speech: SpeechStrings = object : SpeechStrings {
+        override val listen: String = "Dinle"
+        override val pause: String = "Duraklat"
+        override val previous: String = "Önceki cümle"
+        override val next: String = "Sonraki cümle"
+        override fun speed(value: Any?): String = "Okuma hızı ${value}"
+        override val preparing: String = "Seslendirme hazırlanıyor"
+        override val noEngine: String = "Telefonda metin okuma motoru bulunamadı. Play Store'dan “Google Konuşma Hizmetleri” uygulamasını yükleyip yeniden deneyin."
+        override fun noVoice(language: Any?): String = "Telefonda ${language} ses paketi yüklü değil."
+        override val installVoice: String = "Ses paketini indir"
+        override val failed: String = "Seslendirme sırasında bir sorun oluştu. Tekrar deneyin."
+        override val turkish: String = "Türkçe"
+        override val english: String = "İngilizce"
+    }
 }

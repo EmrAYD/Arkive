@@ -20,6 +20,7 @@ interface Strings {
     val localAi: LocalAiStrings
     val aiMode: AiModeStrings
     val search: SearchStrings
+    val speech: SpeechStrings
 }
 
 /** Yapay zeka özetleme metinleri. */
@@ -594,4 +595,20 @@ interface SearchStrings {
     val prompt: String
     fun noResults(query: Any?): String
     val contentNote: String
+}
+
+/** Özetin seslendirilmesi. */
+interface SpeechStrings {
+    val listen: String
+    val pause: String
+    val previous: String
+    val next: String
+    fun speed(value: Any?): String
+    val preparing: String
+    val noEngine: String
+    fun noVoice(language: Any?): String
+    val installVoice: String
+    val failed: String
+    val turkish: String
+    val english: String
 }

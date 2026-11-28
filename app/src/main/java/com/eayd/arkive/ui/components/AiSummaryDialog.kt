@@ -24,13 +24,17 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -38,6 +42,7 @@ import com.eayd.arkive.ai.AiPolicy
 import com.eayd.arkive.ai.AiSummarizer
 import com.eayd.arkive.ai.LocalModel
 import com.eayd.arkive.ai.LocalModelState
+import com.eayd.arkive.ai.SpeechStatus
 import com.eayd.arkive.ai.SummaryRoute
 import com.eayd.arkive.ai.SummaryUi
 import com.eayd.arkive.data.AppSettings
@@ -142,6 +147,17 @@ fun AiSummaryDialogHost() {
         is SummaryUi.Viewing -> {
             val context = LocalContext.current
             val scroll = rememberScrollState()
+            val speaker = rememberSummarySpeaker(state.text)
+            val speech by speaker.state.collectAsState()
+            val reading = speaker.currentRange(speech)
+            var layout by remember(state.text) { mutableStateOf<TextLayoutResult?>(null) }
+            var viewport by remember { mutableIntStateOf(0) }
+            LaunchedEffect(reading, speech.status) {
+                val textLayout = layout
+                if (speech.status == SpeechStatus.Playing && reading != null && textLayout != null) {
+                    scroll.reveal(textLayout, reading, viewport)
+                }
+            }
             AlertDialog(
                 onDismissRequest = AiSummarizer::dismiss,
                 icon = { Icon(AiIcons.Filled, contentDescription = null, tint = MaterialTheme.colorScheme.primary) },
@@ -154,16 +170,25 @@ fun AiSummaryDialogHost() {
                         }
                         SelectionContainer {
                             Text(
-                                state.text,
+                                text = highlightSentence(
+                                    state.text,
+                                    reading,
+                                    background = MaterialTheme.colorScheme.primaryContainer,
+                                    foreground = MaterialTheme.colorScheme.onPrimaryContainer,
+                                ),
                                 style = MaterialTheme.typography.bodyLarge,
+                                onTextLayout = { layout = it },
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .heightIn(max = 360.dp)
+                                    .heightIn(max = 320.dp)
+                                    .onSizeChanged { viewport = it.height }
                                     .verticalScrollbar(scroll, thumbColor = MaterialTheme.colorScheme.primary)
                                     .verticalScroll(scroll)
                                     .padding(end = 12.dp),
                             )
                         }
+                        Spacer(Modifier.size(8.dp))
+                        SummaryPlayer(speaker, speech)
                     }
                 },
                 confirmButton = { TextButton(onClick = AiSummarizer::dismiss) { Text(Txt.common.close) } },

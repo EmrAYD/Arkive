@@ -540,4 +540,18 @@ object EnStrings : Strings {
         override fun noResults(query: Any?): String = "No results for “${query}”."
         override val contentNote: String = "Password-protected and scanned (image-only) files can't be searched inside."
     }
+    override val speech: SpeechStrings = object : SpeechStrings {
+        override val listen: String = "Listen"
+        override val pause: String = "Pause"
+        override val previous: String = "Previous sentence"
+        override val next: String = "Next sentence"
+        override fun speed(value: Any?): String = "Reading speed ${value}"
+        override val preparing: String = "Getting ready to read aloud"
+        override val noEngine: String = "No text-to-speech engine was found on this phone. Install “Speech Services by Google” from the Play Store and try again."
+        override fun noVoice(language: Any?): String = "No ${language} voice is installed on this phone."
+        override val installVoice: String = "Download voice"
+        override val failed: String = "Something went wrong while reading aloud. Try again."
+        override val turkish: String = "Turkish"
+        override val english: String = "English"
+    }
 }
