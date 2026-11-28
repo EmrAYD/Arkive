@@ -148,9 +148,14 @@ object AiSummarizer {
     /** Bitmiş bir özeti açar. */
     fun openSummary(file: FileDto) = openSummary(file.id, file.name)
 
-    /** Bildirimden gelince kullanılır; elde yalnızca kimlik ve ad vardır. */
+    /** Bildirimden gelince kullanılır; elde yalnızca kimlik ve ad vardır. Özet o an okunuyorsa sunucuya sorulmaz. */
     fun openSummary(fileId: String, fileName: String) {
         if (fileId in opening || fileId in _running.value) return
+        val playing = SummaryPlayback.session
+        if (playing != null && playing.fileId == fileId) {
+            _ui.value = SummaryUi.Viewing(fileId, playing.fileName, playing.text, playing.note)
+            return
+        }
         openSaved(fileId, fileName)
     }
 

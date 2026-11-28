@@ -147,7 +147,7 @@ fun AiSummaryDialogHost() {
         is SummaryUi.Viewing -> {
             val context = LocalContext.current
             val scroll = rememberScrollState()
-            val speaker = rememberSummarySpeaker(state.text)
+            val speaker = rememberSummarySpeaker(state.fileId, state.fileName, state.text, state.note)
             val speech by speaker.state.collectAsState()
             val reading = speaker.currentRange(speech)
             var layout by remember(state.text) { mutableStateOf<TextLayoutResult?>(null) }

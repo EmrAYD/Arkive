@@ -41,7 +41,6 @@ data class SpeechState(
     val status: SpeechStatus = SpeechStatus.Idle,
     /** Okunan ya da sıradaki parça. */
     val sentence: Int = 0,
-    val count: Int = 0,
     val speed: Float = 1f,
     val problem: SpeechProblem? = null,
 )
@@ -50,9 +49,14 @@ data class SpeechState(
  * Özeti telefonun metin okuma motoruyla sesli okur.
  *
  * Metin cümlelere bölünüp sırayla okunur; duraklatınca okunan cümlenin başından sürer. Başka bir ses (arama, müzik)
- * gelince ya da kulaklık çıkarılınca durur.
+ * gelince ya da kulaklık çıkarılınca durur. [onStart] her başlatmada, okuma başladıktan hemen sonra çağrılır.
  */
-class SummarySpeaker(context: Context, private val text: String, fallback: AppLanguage) {
+class SummarySpeaker(
+    context: Context,
+    private val text: String,
+    fallback: AppLanguage,
+    private val onStart: (SummarySpeaker) -> Unit = {},
+) {
 
     private val appContext = context.applicationContext
     private val prefs = appContext.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
@@ -65,7 +69,7 @@ class SummarySpeaker(context: Context, private val text: String, fallback: AppLa
     val language: AppLanguage = SpeechText.languageOf(text, fallback)
 
     private val _state = MutableStateFlow(
-        SpeechState(count = sentences.size, speed = prefs.getFloat(KEY_SPEED, 1f).takeIf { it in SpeechText.SPEEDS } ?: 1f),
+        SpeechState(speed = prefs.getFloat(KEY_SPEED, 1f).takeIf { it in SpeechText.SPEEDS } ?: 1f),
     )
     val state: StateFlow<SpeechState> = _state.asStateFlow()
 
@@ -146,16 +150,17 @@ class SummarySpeaker(context: Context, private val text: String, fallback: AppLa
             SpeechStatus.Unavailable -> if (_state.value.problem != SpeechProblem.Failed) return
             else -> Unit
         }
-        if (!ready) {
+        if (ready) {
+            speakFrom(_state.value.sentence)
+        } else {
             playWhenReady = true
             _state.update { it.copy(status = SpeechStatus.Preparing, problem = null) }
             if (tts == null) {
                 val main = Handler(Looper.getMainLooper())
                 tts = TextToSpeech(appContext) { status -> main.post { onInit(status) } }
             }
-            return
         }
-        speakFrom(_state.value.sentence)
+        onStart(this)
     }
 
     /** Okumayı duraklatır; aynı cümleden sürer. */
@@ -167,12 +172,6 @@ class SummarySpeaker(context: Context, private val text: String, fallback: AppLa
     }
 
     fun toggle() = if (_state.value.status == SpeechStatus.Playing) pause() else play()
-
-    /** Bir önceki cümleye geçer. */
-    fun previous() = jumpTo(_state.value.sentence - 1)
-
-    /** Bir sonraki cümleye geçer. */
-    fun next() = jumpTo(_state.value.sentence + 1)
 
     /** Okuma hızını sıradakiyle değiştirir; seçim sonraki özetlerde de kullanılır. */
     fun cycleSpeed() {
@@ -214,15 +213,6 @@ class SummarySpeaker(context: Context, private val text: String, fallback: AppLa
         if (playWhenReady) {
             playWhenReady = false
             speakFrom(_state.value.sentence)
-        }
-    }
-
-    private fun jumpTo(index: Int) {
-        val target = index.coerceIn(0, (sentences.size - 1).coerceAtLeast(0))
-        when (_state.value.status) {
-            SpeechStatus.Playing -> speakFrom(target)
-            SpeechStatus.Idle -> _state.update { it.copy(sentence = target, status = SpeechStatus.Paused) }
-            else -> _state.update { it.copy(sentence = target) }
         }
     }
 

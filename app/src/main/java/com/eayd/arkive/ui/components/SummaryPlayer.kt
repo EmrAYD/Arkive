@@ -14,12 +14,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.SkipNext
-import androidx.compose.material.icons.filled.SkipPrevious
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.FilledIconButton
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.LocalContentColor
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
@@ -42,18 +39,22 @@ import com.eayd.arkive.ai.SpeechProblem
 import com.eayd.arkive.ai.SpeechState
 import com.eayd.arkive.ai.SpeechStatus
 import com.eayd.arkive.ai.SpeechText
+import com.eayd.arkive.ai.SummaryPlayback
 import com.eayd.arkive.ai.SummarySpeaker
-import com.eayd.arkive.data.AppSettings
 import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.i18n.Lang
 import com.eayd.arkive.i18n.Txt
 
-/** Özet için seslendirici; pencere kapanınca ses motoru kapatılır. */
+/**
+ * Özet penceresinin seslendiricisi. Bu özet zaten okunuyorsa okuma kaldığı yerden görünür.
+ *
+ * Pencere kapanınca hiç başlatılmamış seslendirici kapatılır; okunan özet bildirimden yönetilmeye devam eder.
+ */
 @Composable
-fun rememberSummarySpeaker(text: String): SummarySpeaker {
+fun rememberSummarySpeaker(fileId: String, fileName: String, text: String, note: String?): SummarySpeaker {
     val context = LocalContext.current
-    val speaker = remember(text) { SummarySpeaker(context, text, AppSettings.summaryLanguage.value) }
-    DisposableEffect(speaker) { onDispose { speaker.release() } }
+    val speaker = remember(fileId, text) { SummaryPlayback.speakerFor(context, fileId, fileName, text, note) }
+    DisposableEffect(speaker) { onDispose { SummaryPlayback.detach(speaker) } }
     return speaker
 }
 
@@ -82,7 +83,7 @@ suspend fun ScrollState.reveal(layout: TextLayoutResult, range: IntRange, viewpo
 
 private const val REVEAL_MARGIN_PX = 24
 
-/** Özet penceresindeki oynatıcı: ortada önceki cümle, oynat/duraklat ve sonraki cümle; sağda okuma hızı. */
+/** Özet penceresindeki oynatıcı: ortada oynat/duraklat, sağda okuma hızı. */
 @Composable
 fun SummaryPlayer(speaker: SummarySpeaker, state: SpeechState, modifier: Modifier = Modifier) {
     val context = LocalContext.current
@@ -101,9 +102,6 @@ fun SummaryPlayer(speaker: SummarySpeaker, state: SpeechState, modifier: Modifie
         }
         Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             Spacer(Modifier.weight(1f))
-            IconButton(onClick = speaker::previous, enabled = usable && state.sentence > 0) {
-                Icon(Icons.Filled.SkipPrevious, contentDescription = Txt.speech.previous)
-            }
             FilledIconButton(onClick = speaker::toggle, enabled = usable) {
                 when (state.status) {
                     SpeechStatus.Preparing -> CircularProgressIndicator(
@@ -114,9 +112,6 @@ fun SummaryPlayer(speaker: SummarySpeaker, state: SpeechState, modifier: Modifie
                     SpeechStatus.Playing -> Icon(Icons.Filled.Pause, contentDescription = Txt.speech.pause)
                     else -> Icon(Icons.Filled.PlayArrow, contentDescription = Txt.speech.listen)
                 }
-            }
-            IconButton(onClick = speaker::next, enabled = usable && state.sentence < state.count - 1) {
-                Icon(Icons.Filled.SkipNext, contentDescription = Txt.speech.next)
             }
             Box(Modifier.weight(1f), contentAlignment = Alignment.CenterEnd) {
                 val speed = SpeechText.speedText(state.speed, Lang.locale)

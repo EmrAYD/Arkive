@@ -543,8 +543,6 @@ object TrStrings : Strings {
     override val speech: SpeechStrings = object : SpeechStrings {
         override val listen: String = "Dinle"
         override val pause: String = "Duraklat"
-        override val previous: String = "Önceki cümle"
-        override val next: String = "Sonraki cümle"
         override fun speed(value: Any?): String = "Okuma hızı ${value}"
         override val preparing: String = "Seslendirme hazırlanıyor"
         override val noEngine: String = "Telefonda metin okuma motoru bulunamadı. Play Store'dan “Google Konuşma Hizmetleri” uygulamasını yükleyip yeniden deneyin."
@@ -553,5 +551,7 @@ object TrStrings : Strings {
         override val failed: String = "Seslendirme sırasında bir sorun oluştu. Tekrar deneyin."
         override val turkish: String = "Türkçe"
         override val english: String = "İngilizce"
+        override val channelName: String = "Özet seslendirme"
+        override fun notificationText(speed: Any?): String = "Yapay zeka özeti · ${speed}"
     }
 }

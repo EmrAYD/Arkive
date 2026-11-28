@@ -543,8 +543,6 @@ object EnStrings : Strings {
     override val speech: SpeechStrings = object : SpeechStrings {
         override val listen: String = "Listen"
         override val pause: String = "Pause"
-        override val previous: String = "Previous sentence"
-        override val next: String = "Next sentence"
         override fun speed(value: Any?): String = "Reading speed ${value}"
         override val preparing: String = "Getting ready to read aloud"
         override val noEngine: String = "No text-to-speech engine was found on this phone. Install “Speech Services by Google” from the Play Store and try again."
@@ -553,5 +551,7 @@ object EnStrings : Strings {
         override val failed: String = "Something went wrong while reading aloud. Try again."
         override val turkish: String = "Turkish"
         override val english: String = "English"
+        override val channelName: String = "Summary read-aloud"
+        override fun notificationText(speed: Any?): String = "AI summary · ${speed}"
     }
 }

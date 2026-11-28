@@ -601,8 +601,6 @@ interface SearchStrings {
 interface SpeechStrings {
     val listen: String
     val pause: String
-    val previous: String
-    val next: String
     fun speed(value: Any?): String
     val preparing: String
     val noEngine: String
@@ -611,4 +609,6 @@ interface SpeechStrings {
     val failed: String
     val turkish: String
     val english: String
+    val channelName: String
+    fun notificationText(speed: Any?): String
 }
