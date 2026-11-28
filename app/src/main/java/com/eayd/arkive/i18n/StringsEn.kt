@@ -44,6 +44,7 @@ object EnStrings : Strings {
         override val confirmPhoneThenCloud: String = "The file will be summarized on this phone first; if that isn't possible, it will be summarized in the cloud, by the AI on the server."
         override val confirmInCloud: String = "The file will be summarized in the cloud, by the AI on the server."
         override val summarize: String = "Summarize"
+        override val showSummary: String = "Show summary"
         override val passwordTitle: String = "Password-protected file"
         override fun passwordBody(name: Any?): String = "“${name}” is password-protected. Enter the password to summarize it."
         override val passwordLocalNote: String = "The password is used only on this phone, to open the file."

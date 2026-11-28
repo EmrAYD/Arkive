@@ -44,6 +44,7 @@ object TrStrings : Strings {
         override val confirmPhoneThenCloud: String = "Dosya önce bu telefonda özetlenecek; telefonda özetlenemezse bulutta, sunucudaki yapay zekayla özetlenecek."
         override val confirmInCloud: String = "Dosya bulutta, sunucudaki yapay zekayla özetlenecek."
         override val summarize: String = "Özetle"
+        override val showSummary: String = "Özeti göster"
         override val passwordTitle: String = "Dosya parolalı"
         override fun passwordBody(name: Any?): String = "“${name}” parola ile korunuyor. Özetlemek için parolayı girin."
         override val passwordLocalNote: String = "Parola yalnızca bu telefonda, dosyayı açmak için kullanılır."

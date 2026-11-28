@@ -13,6 +13,8 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Description
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -42,10 +44,17 @@ import com.eayd.arkive.ui.components.ListSkeleton
 import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.ui.components.NoticeHost
 import com.eayd.arkive.ui.components.SummaryActionsMenu
+import com.eayd.arkive.ui.components.SwipeAction
+import com.eayd.arkive.ui.components.SwipeActions
+import com.eayd.arkive.ui.components.SwipeKind
 import com.eayd.arkive.ui.components.rememberNoticeHostState
 import com.eayd.arkive.viewmodel.AiSummariesViewModel
 
-/** "AI Sonuçlarım" sayfası: özetlerin listesi. Dokununca özet açılır. */
+/**
+ * "AI Sonuçlarım" sayfası: özetlerin listesi. Dokununca özet açılır.
+ *
+ * Satır sağa kaydırılınca özetin silme onayı açılır, sola kaydırılınca özetin dosyası açılır.
+ */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AiSummariesContent(
@@ -96,13 +105,23 @@ fun AiSummariesContent(
                         modifier = Modifier.fillMaxSize(),
                     ) {
                         items(state.items, key = { it.id }) { item ->
-                            SummaryRow(
-                                item = item,
-                                menuEnabled = !state.offline,
-                                onOpen = { AiSummarizer.showSummary(item.file.id, item.file.name, item.summary) },
-                                onOpenFile = { onOpenFile(item.file.id) },
-                                onDelete = { AiSummarizer.askToDelete(item.file.id, item.file.name) },
-                            )
+                            SwipeActions(
+                                toEnd = SwipeAction(Txt.ai.deleteSummary, Icons.Filled.Delete, SwipeKind.Destructive) {
+                                    AiSummarizer.askToDelete(item.file.id, item.file.name)
+                                },
+                                toStart = SwipeAction(Txt.ai.openSourceFile, Icons.Filled.Description, SwipeKind.Secondary) {
+                                    onOpenFile(item.file.id)
+                                },
+                                enabled = !state.offline,
+                            ) {
+                                SummaryRow(
+                                    item = item,
+                                    menuEnabled = !state.offline,
+                                    onOpen = { AiSummarizer.showSummary(item.file.id, item.file.name, item.summary) },
+                                    onOpenFile = { onOpenFile(item.file.id) },
+                                    onDelete = { AiSummarizer.askToDelete(item.file.id, item.file.name) },
+                                )
+                            }
                         }
                     }
                 }

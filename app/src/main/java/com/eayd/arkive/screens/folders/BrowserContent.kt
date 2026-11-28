@@ -15,6 +15,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.pulltorefresh.PullToRefreshBox
@@ -38,6 +40,7 @@ import com.eayd.arkive.ai.SummaryStore
 import com.eayd.arkive.data.FileDto
 import com.eayd.arkive.data.FolderDto
 import com.eayd.arkive.i18n.Txt
+import com.eayd.arkive.ui.components.AiIcons
 import com.eayd.arkive.ui.components.CenteredHint
 import com.eayd.arkive.ui.components.ErrorRetry
 import com.eayd.arkive.ui.components.LeaveEffect
@@ -46,6 +49,9 @@ import com.eayd.arkive.ui.components.NoticeEffect
 import com.eayd.arkive.ui.components.NoticeHost
 import com.eayd.arkive.ui.components.rememberNoticeHostState
 import com.eayd.arkive.ui.components.SummaryDoneBanner
+import com.eayd.arkive.ui.components.SwipeAction
+import com.eayd.arkive.ui.components.SwipeActions
+import com.eayd.arkive.ui.components.SwipeKind
 import com.eayd.arkive.ui.components.rememberFileDownloader
 import com.eayd.arkive.viewmodel.BrowserDialog
 import com.eayd.arkive.viewmodel.BrowserUiState
@@ -211,6 +217,11 @@ private fun emptyText(state: BrowserUiState, favoritesOnly: Boolean): String = w
     else -> Txt.browser.emptyFolders
 }
 
+/**
+ * Klasör ve dosya satırları.
+ *
+ * Satır sağa kaydırılınca silme onayı açılır, dosya satırı sola kaydırılınca özetlenir (özeti varsa gösterilir).
+ */
 @Composable
 private fun BrowserList(
     state: BrowserUiState,
@@ -231,6 +242,7 @@ private fun BrowserList(
             state.files.filter { InputCache.get(it.id, it.size) != null }.map { it.id }.toSet()
         }
     }
+    val swipeEnabled = !selection.active && dragState.dragged == null
     LazyColumn(
         state = listState,
         contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 24.dp),
@@ -248,47 +260,69 @@ private fun BrowserList(
             val rowModifier = Modifier
                 .trackBounds(dragState.itemCoords, rowKey)
                 .trackDropFolder(dragState, folder.id, folder.location)
-            FolderRow(
-                folder = folder,
+            SwipeActions(
+                toEnd = deleteSwipe { viewModel.openDialog(BrowserDialog.DeleteFolder(folder)) },
+                toStart = null,
+                enabled = swipeEnabled && !state.offline,
                 modifier = rowModifier,
-                actions = FolderRowActions(
-                    onToggleFavorite = { viewModel.toggleFavorite(folder) },
-                    onEdit = { viewModel.openDialog(BrowserDialog.EditFolder(folder)) },
-                    onMove = if (viewModel.favoritesOnly) null else ({ viewModel.openDialog(BrowserDialog.MoveFolder(folder)) }),
-                    onDelete = { viewModel.openDialog(BrowserDialog.DeleteFolder(folder)) },
-                ),
-                menuEnabled = !state.offline,
-                highlighted = dragState.hoverFolderId == folder.id,
-                dimmed = dragState.dragged?.keys?.contains(rowKey) == true,
-                selectionMode = selection.active,
-                selected = rowKey in selection.keys,
-                onOpen = { if (selection.active) viewModel.toggleSelection(rowKey) else onOpenFolder(folder) },
-            )
+            ) {
+                FolderRow(
+                    folder = folder,
+                    actions = FolderRowActions(
+                        onToggleFavorite = { viewModel.toggleFavorite(folder) },
+                        onEdit = { viewModel.openDialog(BrowserDialog.EditFolder(folder)) },
+                        onMove = if (viewModel.favoritesOnly) null else ({ viewModel.openDialog(BrowserDialog.MoveFolder(folder)) }),
+                        onDelete = { viewModel.openDialog(BrowserDialog.DeleteFolder(folder)) },
+                    ),
+                    menuEnabled = !state.offline,
+                    highlighted = dragState.hoverFolderId == folder.id,
+                    dimmed = dragState.dragged?.keys?.contains(rowKey) == true,
+                    selectionMode = selection.active,
+                    selected = rowKey in selection.keys,
+                    onOpen = { if (selection.active) viewModel.toggleSelection(rowKey) else onOpenFolder(folder) },
+                )
+            }
         }
         items(state.visibleFiles, key = { fileKey(it.id) }) { file ->
             val rowKey = fileKey(file.id)
-            FileRow(
-                file = file,
+            val hasSummary = file.hasSummary || file.id in waitingUpload
+            val rowEnabled = !state.offline || file.id in availableOffline
+            SwipeActions(
+                toEnd = if (state.offline) null else deleteSwipe { viewModel.openDialog(BrowserDialog.DeleteFile(file)) },
+                toStart = if (file.id in summarizing) null else SwipeAction(
+                    label = if (hasSummary) Txt.ai.showSummary else Txt.ai.summarize,
+                    icon = AiIcons.Filled,
+                    kind = SwipeKind.Primary,
+                ) { AiSummarizer.onAiClicked(file, hasSummary = hasSummary) },
+                enabled = swipeEnabled && rowEnabled,
                 modifier = Modifier.trackBounds(dragState.itemCoords, rowKey),
-                actions = FileRowActions(
-                    onToggleFavorite = { viewModel.toggleFavorite(file) },
-                    onToggleAi = { AiSummarizer.onAiClicked(file, hasSummary = file.hasSummary || file.id in waitingUpload) },
-                    onDownload = { onDownload(file) },
-                    onMove = if (viewModel.favoritesOnly) null else ({ viewModel.openDialog(BrowserDialog.MoveFile(file)) }),
-                    onRename = { viewModel.openDialog(BrowserDialog.RenameFile(file)) },
-                    onInfo = { viewModel.openDialog(BrowserDialog.FileInfo(file)) },
-                    onDelete = { viewModel.openDialog(BrowserDialog.DeleteFile(file)) },
-                ),
-                ai = file.hasSummary || file.id in waitingUpload,
-                aiWorking = file.id in summarizing,
-                aiStatus = summaryProgress[file.id]?.let { Txt.ai.progressPercent(it) } ?: summaryStatus[file.id],
-                enabled = !state.offline || file.id in availableOffline,
-                menuEnabled = !state.offline,
-                dimmed = dragState.dragged?.keys?.contains(rowKey) == true,
-                selectionMode = selection.active,
-                selected = rowKey in selection.keys,
-                onOpen = { if (selection.active) viewModel.toggleSelection(rowKey) else onOpenFile(file) },
-            )
+            ) {
+                FileRow(
+                    file = file,
+                    actions = FileRowActions(
+                        onToggleFavorite = { viewModel.toggleFavorite(file) },
+                        onToggleAi = { AiSummarizer.onAiClicked(file, hasSummary = hasSummary) },
+                        onDownload = { onDownload(file) },
+                        onMove = if (viewModel.favoritesOnly) null else ({ viewModel.openDialog(BrowserDialog.MoveFile(file)) }),
+                        onRename = { viewModel.openDialog(BrowserDialog.RenameFile(file)) },
+                        onInfo = { viewModel.openDialog(BrowserDialog.FileInfo(file)) },
+                        onDelete = { viewModel.openDialog(BrowserDialog.DeleteFile(file)) },
+                    ),
+                    ai = hasSummary,
+                    aiWorking = file.id in summarizing,
+                    aiStatus = summaryProgress[file.id]?.let { Txt.ai.progressPercent(it) } ?: summaryStatus[file.id],
+                    enabled = rowEnabled,
+                    menuEnabled = !state.offline,
+                    dimmed = dragState.dragged?.keys?.contains(rowKey) == true,
+                    selectionMode = selection.active,
+                    selected = rowKey in selection.keys,
+                    onOpen = { if (selection.active) viewModel.toggleSelection(rowKey) else onOpenFile(file) },
+                )
+            }
         }
     }
 }
+
+/** Sağa kaydırınca silme onayını açan işlem. */
+private fun deleteSwipe(onSwipe: () -> Unit) =
+    SwipeAction(label = Txt.common.delete, icon = Icons.Filled.Delete, kind = SwipeKind.Destructive, onSwipe = onSwipe)

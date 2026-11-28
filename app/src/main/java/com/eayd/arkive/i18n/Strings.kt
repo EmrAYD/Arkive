@@ -65,6 +65,7 @@ interface AiStrings {
     val confirmPhoneThenCloud: String
     val confirmInCloud: String
     val summarize: String
+    val showSummary: String
     val passwordTitle: String
     fun passwordBody(name: Any?): String
     val passwordLocalNote: String
