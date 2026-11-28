@@ -145,6 +145,11 @@ interface DocsStrings {
     val xmlUnreadable: String
     val xmlEmpty: String
     val xmlTooDeep: String
+    val excelUnreadable: String
+    val powerPointUnreadable: String
+    val encryptedExcelUnreadable: String
+    val encryptedPowerPointUnreadable: String
+    val officeTooBig: String
 }
 
 /** Birçok ekranda geçen kısa metinler. */

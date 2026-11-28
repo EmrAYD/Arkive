@@ -25,7 +25,7 @@ object TrStrings : Strings {
         override fun serverUnreachableStillRunning(name: Any?): String = "“${name}” için sunucuya ulaşılamadı. Özetleme sunucuda sürüyorsa bitince AI Sonuçlarım'da görünür; uygulama yeniden açılınca sonuç kendiliğinden sorulur."
         override val connectionLostStillRunning: String = "Bağlantı koptu; özetleme sunucuda sürüyor…"
         override fun serverJobFailed(fileName: Any?): String = "“${fileName}” özetlemesi sunucuda tamamlanamadı; yeniden deneyebilirsiniz."
-        override val unsupportedType: String = "Bu dosya türü özetlenemiyor. Metin, PDF ve Word (DOCX, DOC) dosyaları özetlenebilir."
+        override val unsupportedType: String = "Bu dosya türü özetlenemiyor. Metin, PDF, Word (DOCX, DOC), Excel (XLSX) ve PowerPoint (PPTX) dosyaları özetlenebilir."
         override val summaryDoneTitle: String = "Özetleme bitti"
         override val tapToView: String = "Özeti görmek için dokunun"
         override fun summarizedFile(fileName: Any?): String = "“${fileName}” özetlendi"
@@ -121,6 +121,11 @@ object TrStrings : Strings {
         override val xmlUnreadable: String = "XML okunamadı."
         override val xmlEmpty: String = "XML boş."
         override val xmlTooDeep: String = "XML çok derin."
+        override val excelUnreadable: String = "Excel dosyası okunamadı (.xlsx değil ya da bozuk)."
+        override val powerPointUnreadable: String = "PowerPoint sunusu okunamadı (.pptx değil ya da bozuk)."
+        override val encryptedExcelUnreadable: String = "Şifreli Excel dosyası okunamadı."
+        override val encryptedPowerPointUnreadable: String = "Şifreli PowerPoint sunusu okunamadı."
+        override val officeTooBig: String = "Dosya telefonda açılamayacak kadar büyük."
     }
     override val common: CommonStrings = object : CommonStrings {
         override val download: String = "İndir"

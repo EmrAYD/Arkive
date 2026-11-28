@@ -1,6 +1,8 @@
 package com.eayd.arkive.ai
 
 import android.content.Context
+import com.eayd.arkive.data.AppSettings
+import com.eayd.arkive.i18n.AppLanguage
 import com.eayd.arkive.i18n.Txt
 import com.tom_roush.pdfbox.android.PDFBoxResourceLoader
 import com.tom_roush.pdfbox.pdmodel.PDDocument
@@ -40,6 +42,7 @@ object DocumentReader {
                     SummarizableKind.Text -> readText(file)
                     SummarizableKind.Pdf -> readPdf(context, file, password)
                     SummarizableKind.Docx -> readDocx(file, password)
+                    SummarizableKind.Xlsx, SummarizableKind.Pptx -> readOffice(file, kind, password)
                 }
             } catch (e: IOException) {
                 throw UnreadableDocumentException(Txt.docs.unreadableMaybeCorrupt, e)
@@ -165,6 +168,36 @@ object DocumentReader {
         val raw = xml ?: throw UnreadableDocumentException(Txt.docs.wordNotDocxOrCorrupt)
         val text = docxXmlToText(raw)
         return ReadDocument(text, DocumentStats(words = countWords(text), pages = null, images = images))
+    }
+
+    /** Excel ya da PowerPoint dosyasını okur; parolalıysa önce çözer. Eski .xls ve .ppt okunmaz. */
+    private fun readOffice(file: File, kind: SummarizableKind, password: String?): ReadDocument {
+        val excel = kind == SummarizableKind.Xlsx
+        val unreadable = if (excel) Txt.docs.excelUnreadable else Txt.docs.powerPointUnreadable
+        var bytes = file.readBytes()
+        if (AiPolicy.isLegacyOffice(bytes)) throw UnreadableDocumentException(unreadable)
+        if (AiPolicy.isEncryptedOffice(bytes)) {
+            if (password.isNullOrEmpty()) throw PasswordException(wrong = false)
+            bytes = try {
+                OfficeCrypto.decrypt(bytes, password)
+            } catch (e: WrongPasswordException) {
+                throw PasswordException(wrong = true)
+            } catch (e: OfficeCryptoException) {
+                val message = if (excel) Txt.docs.encryptedExcelUnreadable else Txt.docs.encryptedPowerPointUnreadable
+                throw UnreadableDocumentException(message, e)
+            }
+        }
+        val text = try {
+            if (excel) {
+                OfficeText.excel(bytes)
+            } else {
+                OfficeText.powerPoint(bytes, english = AppSettings.summaryLanguage.value == AppLanguage.English)
+            }
+        } catch (e: OfficeTextException) {
+            throw UnreadableDocumentException(if (e.tooBig) Txt.docs.officeTooBig else unreadable, e)
+        }
+        val clean = text.lines().joinToString("\n") { it.trim() }.replace(Regex("\n{3,}"), "\n\n").trim()
+        return ReadDocument(clean, DocumentStats(words = countWords(clean), pages = null, images = 0))
     }
 
     /** document.xml'den düz metin çıkarır. */

@@ -3,8 +3,8 @@ package com.eayd.arkive.ai
 import com.eayd.arkive.i18n.Txt
 import com.eayd.arkive.utils.formatBytes
 
-/** Özetlenebilen dosya türleri. Docx, eski .doc dosyalarını da kapsar. */
-enum class SummarizableKind { Text, Pdf, Docx }
+/** Özetlenebilen dosya türleri. Docx, eski .doc dosyalarını da kapsar; Xlsx Excel, Pptx PowerPoint dosyalarıdır. */
+enum class SummarizableKind { Text, Pdf, Docx, Xlsx, Pptx }
 
 /** Telefonda açılan belgenin kelime, sayfa ve görsel sayısı. Sayfa sayısı bilinmiyorsa null. */
 data class DocumentStats(val words: Int, val pages: Int?, val images: Int)
@@ -134,10 +134,10 @@ object AiPolicy {
     private fun isOle(bytes: ByteArray): Boolean =
         bytes.size > oleMagic.size && oleMagic.indices.all { bytes[it] == oleMagic[it] }
 
-    /** Parolalı .docx mi? Şifreli .docx dosyaları eski OLE kapsayıcısının içinde gelir. */
+    /** Parolalı Office dosyası mı (.docx, .xlsx, .pptx)? Şifreli olanlar eski OLE kapsayıcısının içinde gelir. */
     fun isEncryptedOffice(bytes: ByteArray): Boolean = isOle(bytes) && indexOf(bytes, encryptedPackageName) >= 0
 
-    /** Eski .doc dosyası mı (parolalı ya da parolasız). */
+    /** Eski ikili Office dosyası mı (.doc, .xls, .ppt; parolalı ya da parolasız). */
     fun isLegacyOffice(bytes: ByteArray): Boolean = isOle(bytes) && !isEncryptedOffice(bytes)
 
     private fun indexOf(haystack: ByteArray, needle: ByteArray): Int {
@@ -160,10 +160,36 @@ object AiPolicy {
 
     private val wordExtensions = setOf("docx", "doc", "dot")
 
+    private val excelMimeTypes = setOf(
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.template",
+        "application/vnd.ms-excel.sheet.macroenabled.12",
+        "application/vnd.ms-excel.template.macroenabled.12",
+    )
+
+    private val excelExtensions = setOf("xlsx", "xlsm", "xltx", "xltm")
+
+    private val powerPointMimeTypes = setOf(
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        "application/vnd.openxmlformats-officedocument.presentationml.slideshow",
+        "application/vnd.openxmlformats-officedocument.presentationml.template",
+        "application/vnd.ms-powerpoint.presentation.macroenabled.12",
+        "application/vnd.ms-powerpoint.slideshow.macroenabled.12",
+        "application/vnd.ms-powerpoint.template.macroenabled.12",
+    )
+
+    private val powerPointExtensions = setOf("pptx", "pptm", "ppsx", "ppsm", "potx", "potm")
+
     /**
      * Özetlenebilen türler. Bir türü kapatmak için buradan çıkarın; backend'deki SUMMARY_FILE_KINDS ile aynı olmalı.
      */
-    val SUPPORTED_KINDS: Set<SummarizableKind> = setOf(SummarizableKind.Text, SummarizableKind.Pdf, SummarizableKind.Docx)
+    val SUPPORTED_KINDS: Set<SummarizableKind> = setOf(
+        SummarizableKind.Text,
+        SummarizableKind.Pdf,
+        SummarizableKind.Docx,
+        SummarizableKind.Xlsx,
+        SummarizableKind.Pptx,
+    )
 
     /** Dosyanın özetlenebilir türü; desteklenmiyorsa null. */
     fun kindOf(mimeType: String?, fileName: String): SummarizableKind? {
@@ -172,6 +198,8 @@ object AiPolicy {
         val kind = when {
             mime == "application/pdf" || ext == "pdf" -> SummarizableKind.Pdf
             mime in wordMimeTypes || ext in wordExtensions -> SummarizableKind.Docx
+            mime in excelMimeTypes || ext in excelExtensions -> SummarizableKind.Xlsx
+            mime in powerPointMimeTypes || ext in powerPointExtensions -> SummarizableKind.Pptx
             mime.startsWith("text/") || ext in textExtensions -> SummarizableKind.Text
             else -> null
         }

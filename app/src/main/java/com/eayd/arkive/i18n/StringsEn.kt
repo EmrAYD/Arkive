@@ -25,7 +25,7 @@ object EnStrings : Strings {
         override fun serverUnreachableStillRunning(name: Any?): String = "Couldn't reach the server for “${name}”. If the summary is still running on the server, it will appear in My AI Results when it finishes; the app will check for the result automatically when it's opened again."
         override val connectionLostStillRunning: String = "Connection lost; the summary is still running on the server…"
         override fun serverJobFailed(fileName: Any?): String = "The summary of “${fileName}” couldn't be completed on the server; you can try again."
-        override val unsupportedType: String = "This file type can't be summarized. Text, PDF and Word (DOCX, DOC) files can be summarized."
+        override val unsupportedType: String = "This file type can't be summarized. Text, PDF, Word (DOCX, DOC), Excel (XLSX) and PowerPoint (PPTX) files can be summarized."
         override val summaryDoneTitle: String = "Summary ready"
         override val tapToView: String = "Tap to view the summary"
         override fun summarizedFile(fileName: Any?): String = "“${fileName}” was summarized"
@@ -121,6 +121,11 @@ object EnStrings : Strings {
         override val xmlUnreadable: String = "Couldn't read the XML."
         override val xmlEmpty: String = "The XML is empty."
         override val xmlTooDeep: String = "The XML is nested too deeply."
+        override val excelUnreadable: String = "Couldn't read the Excel file (not an .xlsx or corrupt)."
+        override val powerPointUnreadable: String = "Couldn't read the PowerPoint presentation (not a .pptx or corrupt)."
+        override val encryptedExcelUnreadable: String = "Couldn't read the encrypted Excel file."
+        override val encryptedPowerPointUnreadable: String = "Couldn't read the encrypted PowerPoint presentation."
+        override val officeTooBig: String = "The file is too large to open on the phone."
     }
     override val common: CommonStrings = object : CommonStrings {
         override val download: String = "Download"
