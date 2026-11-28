@@ -1,24 +1,32 @@
 package com.eayd.arkive.ui.components
 
+import androidx.compose.animation.core.animate
 import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
+import androidx.compose.foundation.gestures.Orientation
+import androidx.compose.foundation.gestures.draggable
+import androidx.compose.foundation.gestures.rememberDraggableState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
-import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxState
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -26,11 +34,22 @@ import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.platform.WindowInfo
 import androidx.compose.ui.semantics.CustomAccessibilityAction
 import androidx.compose.ui.semantics.customActions
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
+import kotlin.math.abs
+import kotlin.math.roundToInt
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withTimeoutOrNull
+import kotlin.time.Duration.Companion.milliseconds
 
 /** Kaydırma arka planının rengi. */
 enum class SwipeKind { Destructive, Primary, Secondary }
@@ -43,15 +62,21 @@ class SwipeAction(
     val onSwipe: () -> Unit,
 )
 
-/** Satırın genişliğinin bu kadarı kaydırılınca işlem yapılır. */
+/** Satırın genişliğinin bu kadarı kaydırılıp bırakılınca işlem yapılır. */
 private const val THRESHOLD = 0.35f
 
+/** Satır en çok genişliğinin bu kadarı kaydırılabilir. */
+private const val MAX_SHIFT = 0.6f
+
+/** İşlemden sonra bir pencerenin açılması bu kadar beklenir (ms). */
+private const val DIALOG_WAIT_MS = 800L
+
 /**
- * Satırı sağa ([toEnd]) ya da sola ([toStart]) kaydırınca işlemi yapar; satır sonra yerine döner. Null olan yön kapalıdır.
+ * Satırı sağa ([toEnd]) ya da sola ([toStart]) kaydırıp bırakınca işlemi yapar. Null olan yön kapalıdır.
  *
- * İşlemler ekran okuyucuya da satırın eylemleri olarak sunulur.
+ * İşlem bir pencere (onay, özet) açarsa satır pencere kapanana kadar bırakıldığı yerde bekler, sonra yerine döner.
+ * Pencere açılmazsa ya da eşik geçilmediyse hemen yerine döner.
  */
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SwipeActions(
     toEnd: SwipeAction?,
@@ -62,58 +87,90 @@ fun SwipeActions(
 ) {
     val currentEnd by rememberUpdatedState(toEnd)
     val currentStart by rememberUpdatedState(toStart)
-    val state = rememberSwipeToDismissBoxState(positionalThreshold = { distance -> distance * THRESHOLD })
+    var width by remember { mutableIntStateOf(0) }
+    var shift by remember { mutableFloatStateOf(0f) }
     val haptic = LocalHapticFeedback.current
+    val window = LocalWindowInfo.current
+    val scope = rememberCoroutineScope()
+    var settling by remember { mutableStateOf<Job?>(null) }
+    val active = enabled && (toEnd != null || toStart != null)
 
-    LaunchedEffect(state.currentValue) {
-        val action = when (state.currentValue) {
-            SwipeToDismissBoxValue.StartToEnd -> currentEnd
-            SwipeToDismissBoxValue.EndToStart -> currentStart
-            SwipeToDismissBoxValue.Settled -> return@LaunchedEffect
-        }
-        action?.onSwipe?.invoke()
-        state.reset()
+    val dragState = rememberDraggableState { delta ->
+        val limit = width * MAX_SHIFT
+        val low = if (currentStart != null) -limit else 0f
+        val high = if (currentEnd != null) limit else 0f
+        shift = (shift + delta).coerceIn(low, high)
     }
-    LaunchedEffect(state.targetValue) {
-        if (state.targetValue != SwipeToDismissBoxValue.Settled) {
-            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-        }
+    val reached by remember { derivedStateOf { width > 0 && abs(shift) >= width * THRESHOLD } }
+    val toRight by remember { derivedStateOf { shift > 0f } }
+    val moved by remember { derivedStateOf { shift != 0f } }
+
+    LaunchedEffect(reached) {
+        if (reached) haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+    }
+    LaunchedEffect(active) {
+        if (!active) shift = 0f
     }
 
-    val actions = if (enabled) listOfNotNull(toEnd, toStart) else emptyList()
-    SwipeToDismissBox(
-        state = state,
-        modifier = modifier.semantics {
-            if (actions.isNotEmpty()) {
-                customActions = actions.map { action -> CustomAccessibilityAction(action.label) { action.onSwipe(); true } }
-            }
-        },
-        enableDismissFromStartToEnd = toEnd != null,
-        enableDismissFromEndToStart = toStart != null,
-        gesturesEnabled = enabled && (toEnd != null || toStart != null),
-        backgroundContent = { SwipeBackground(state, toEnd, toStart) },
+    val actions = if (active) listOfNotNull(toEnd, toStart) else emptyList()
+    Box(
+        modifier = modifier
+            .onSizeChanged { width = it.width }
+            .semantics {
+                if (actions.isNotEmpty()) {
+                    customActions = actions.map { action -> CustomAccessibilityAction(action.label) { action.onSwipe(); true } }
+                }
+            },
     ) {
-        content()
+        val action = if (toRight) toEnd else toStart
+        if (moved && action != null) {
+            SwipeBackground(action, fromStart = toRight, reached = reached, modifier = Modifier.matchParentSize())
+        }
+        Box(
+            Modifier
+                .offset { IntOffset(shift.roundToInt(), 0) }
+                .draggable(
+                    state = dragState,
+                    orientation = Orientation.Horizontal,
+                    enabled = active,
+                    onDragStarted = { settling?.cancel() },
+                    onDragStopped = {
+                        val chosen = when {
+                            !reached -> null
+                            shift > 0f -> currentEnd
+                            else -> currentStart
+                        }
+                        chosen?.onSwipe?.invoke()
+                        settling = scope.launch {
+                            if (chosen != null) waitForDialog(window)
+                            animate(shift, 0f, animationSpec = spring()) { value, _ -> shift = value }
+                        }
+                    },
+                ),
+        ) {
+            content()
+        }
     }
 }
 
-/** Kaydırılan satırın altında görünen renkli alan, simge ve yazı. */
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun SwipeBackground(state: SwipeToDismissBoxState, toEnd: SwipeAction?, toStart: SwipeAction?) {
-    val direction = state.dismissDirection
-    val action = when (direction) {
-        SwipeToDismissBoxValue.StartToEnd -> toEnd
-        SwipeToDismissBoxValue.EndToStart -> toStart
-        SwipeToDismissBoxValue.Settled -> null
-    } ?: return
-    val (container, onContainer) = colorsOf(action.kind)
-    val scale by animateFloatAsState(if (state.targetValue == direction) 1.2f else 1f, label = "swipeIcon")
-    val fromStart = direction == SwipeToDismissBoxValue.StartToEnd
+/**
+ * İşlemin açtığı pencere kapanana kadar bekler. Pencere açılınca uygulamanın penceresi odağı kaybeder, kapanınca geri
+ * alır; kısa sürede odak kaybolmazsa pencere açılmamış sayılır.
+ */
+private suspend fun waitForDialog(window: WindowInfo) {
+    val opened = withTimeoutOrNull(DIALOG_WAIT_MS.milliseconds) {
+        snapshotFlow { window.isWindowFocused }.first { focused -> !focused }
+    }
+    if (opened != null) snapshotFlow { window.isWindowFocused }.first { focused -> focused }
+}
 
+/** Kaydırılan satırın altında görünen renkli alan, simge ve yazı. */
+@Composable
+private fun SwipeBackground(action: SwipeAction, fromStart: Boolean, reached: Boolean, modifier: Modifier) {
+    val (container, onContainer) = colorsOf(action.kind)
+    val scale by animateFloatAsState(if (reached) 1.2f else 1f, label = "swipeIcon")
     Box(
-        modifier = Modifier
-            .fillMaxSize()
+        modifier = modifier
             .clip(MaterialTheme.shapes.medium)
             .background(container)
             .padding(horizontal = 24.dp),
